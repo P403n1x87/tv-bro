@@ -9,17 +9,26 @@ import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.annotation.UiThread
 import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.model.WebTabState
+import com.phlox.tvwebbrowser.player.MediaMetadataCache
+import com.phlox.tvwebbrowser.player.MediaMetadataPrefetcher
+import com.phlox.tvwebbrowser.player.MediaRequestCatalog
+import com.phlox.tvwebbrowser.player.MediaRequestContext
+import com.phlox.tvwebbrowser.player.MediaUrlIdentity
+import com.phlox.tvwebbrowser.player.NativeVideoActivity
+import com.phlox.tvwebbrowser.player.PlaybackFailure
+import com.phlox.tvwebbrowser.player.PlayerLauncher
 import com.phlox.tvwebbrowser.utils.observable.ObservableValue
+import com.phlox.tvwebbrowser.webengine.MediaCandidate
 import com.phlox.tvwebbrowser.webengine.WebEngine
 import com.phlox.tvwebbrowser.webengine.WebEngineFactory
 import com.phlox.tvwebbrowser.webengine.WebEngineProvider
 import com.phlox.tvwebbrowser.webengine.WebEngineProviderCallback
 import com.phlox.tvwebbrowser.webengine.WebEngineWindowProviderCallback
-import com.phlox.tvwebbrowser.webengine.gecko.delegates.AppContentScriptPortDelegate
 import com.phlox.tvwebbrowser.webengine.gecko.delegates.AppHomeContentScriptPortDelegate
 import com.phlox.tvwebbrowser.webengine.gecko.delegates.AppWebExtensionBackgroundPortDelegate
 import com.phlox.tvwebbrowser.webengine.gecko.delegates.MyContentBlockingDelegate
@@ -52,7 +61,7 @@ class GeckoWebEngine(val tab: WebTabState): WebEngine,
     CursorDrawerDelegate.Callback {
     companion object {
         const val ENGINE_NAME = "GeckoView"
-        private const val APP_WEB_EXTENSION_VERSION = 48
+        private const val APP_WEB_EXTENSION_VERSION = 53
         val TAG: String = GeckoWebEngine::class.java.simpleName
         lateinit var runtime: GeckoRuntime
         var appWebExtension = ObservableValue<WebExtension?>(null)
@@ -160,7 +169,8 @@ class GeckoWebEngine(val tab: WebTabState): WebEngine,
     val mediaSessionDelegate = MyMediaSessionDelegate()
     val selectionActionDelegate = MySelectionActionDelegate()
     var appHomeContentScriptPortDelegate: AppHomeContentScriptPortDelegate? = null
-    var appContentScriptPortDelegate: AppContentScriptPortDelegate? = null
+    var isForeground = true
+        private set
     var appWebExtensionBackgroundPortDelegate: AppWebExtensionBackgroundPortDelegate? = null
     private lateinit var webExtObserver: (WebExtension?) -> Unit
 
@@ -202,22 +212,6 @@ class GeckoWebEngine(val tab: WebTabState): WebEngine,
 
     private fun connectToAppWebExtension(extension: WebExtension) {
         Log.d(TAG, "connectToAppWebExtension")
-        session.webExtensionController.setMessageDelegate(extension,
-            object : MessageDelegate {
-                override fun onMessage(nativeApp: String, message: Any,
-                                       sender: WebExtension.MessageSender): GeckoResult<Any>? {
-                    Log.d(TAG, "onMessage: $nativeApp, $message, $sender")
-                    return null
-                }
-
-                override fun onConnect(port: WebExtension.Port) {
-                    Log.d(TAG, "onConnect: $port")
-                    appContentScriptPortDelegate = AppContentScriptPortDelegate(port, this@GeckoWebEngine).also {
-                        port.setDelegate(it)
-                    }
-                }
-            }, "tvbro_content"
-        )
         session.webExtensionController.setMessageDelegate(extension,
             object : MessageDelegate {
                 override fun onMessage(nativeApp: String, message: Any,
@@ -293,7 +287,7 @@ class GeckoWebEngine(val tab: WebTabState): WebEngine,
                 }
                 Config.HomePageMode.HOME_PAGE -> {
                     //if (HomePageHelper.homePageFilesReady) {
-                        session.loadUri(Config.HOME_PAGE_URL/*HomePageHelper.HOME_PAGE_URL*/)
+                        session.loadUri(Config.currentHomePageUrl())
                     //} else {
                     //    Toast.makeText(TVBro.instance, R.string.error, Toast.LENGTH_SHORT).show()
                     //}
@@ -385,22 +379,45 @@ class GeckoWebEngine(val tab: WebTabState): WebEngine,
     }
 
     override fun onResume() {
-        if (!session.isOpen) {
-            session.open(runtime)
-            progressDelegate.sessionState?.let {
-                session.restoreState(it)
-            }
-        }
+        isForeground = true
+        //the system player closed itself because playback failed; there is no fallback
+        PlaybackFailure.last = null
+        if (!session.isOpen) recoverClosedSession()
+        session.setActive(true)
+        session.setPriorityHint(GeckoSession.PRIORITY_HIGH)
+        runtime.webExtensionController.setTabActive(session, true)
         session.setFocused(true)
     }
 
     override fun onPause() {
+        isForeground = false
+        runtime.webExtensionController.setTabActive(session, false)
+        if (!session.isOpen) return
+        session.setPriorityHint(GeckoSession.PRIORITY_DEFAULT)
         session.setFocused(false)
         mediaSessionDelegate.mediaSession?.let {
             if (!mediaSessionDelegate.paused) {
                 it.pause()
             }
         }
+    }
+
+    fun recoverClosedSession() {
+        if (session.isOpen || !isForeground || !tab.selected) return
+        val saved = progressDelegate.sessionState
+        val latestUrl = url
+        val savedUrl = runCatching { saved?.get(saved.currentIndex)?.uri }.getOrNull()
+        val view = webView?.takeIf { it.session === session }
+        view?.releaseSession()
+        session.open(runtime)
+        view?.setSession(session)
+        session.setActive(true)
+        session.setFocused(true)
+        session.setPriorityHint(GeckoSession.PRIORITY_HIGH)
+        runtime.webExtensionController.setTabActive(session, true)
+        if (saved != null && (latestUrl == null || savedUrl == latestUrl)) session.restoreState(saved)
+        else latestUrl?.let { session.loadUri(it) }
+        Log.i("TVBroAutoVideo", "visible-session-restored displayRebound=${view != null}")
     }
 
     override fun onUpdateAdblockSetting(newState: Boolean) {
@@ -433,8 +450,73 @@ class GeckoWebEngine(val tab: WebTabState): WebEngine,
         mediaSessionDelegate.mediaSession?.seekForward()
     }
 
+    override fun mediaCandidates(): List<MediaCandidate> {
+        val page = url ?: return emptyList()
+        return MediaRequestCatalog.shared.snapshot(page, session.settings.usePrivateMode)
+            // HLS/DASH segment files are not directly playable in a useful way; keep the
+            // manifests and single progressive files.
+            .filter { !it.url.substringBefore('?').lowercase().endsWith(".ts") }
+            //Collapse signed/tokenised variants of the same resource, keeping the freshest.
+            .groupBy { MediaUrlIdentity.key(it.url) }.values
+            .map { variants -> variants.maxByOrNull { it.time } ?: variants.first() }
+            .map { MediaCandidate(it.url, it.kind.toCandidateKind()) }
+            .sortedBy { if (it.kind == MediaCandidate.Kind.PROGRESSIVE) 1 else 0 }
+    }
+
+    override fun playMediaCandidate(candidate: MediaCandidate) {
+        val page = url ?: return
+        val ua = userAgentString ?: GeckoSession.getDefaultUserAgent()
+        NativeMediaResolver.resolve(candidate.url, page, session.settings.usePrivateMode, ua) { resolved, reason ->
+            if (resolved == null) {
+                Log.i(TAG, "play-media-candidate: $reason")
+                Toast.makeText(AppContext.get(), R.string.native_playback_unavailable, Toast.LENGTH_SHORT).show()
+                return@resolve
+            }
+            val source = resolved.source
+            val cookie = source.headers.entries.firstOrNull { it.key.equals("Cookie", ignoreCase = true) }?.value
+            when (AppContext.provideConfig().playerKind) {
+                Config.PlayerKind.BUILT_IN -> try {
+                    NativeVideoActivity.launch(AppContext.get(), NativeVideoActivity.PlaybackRequest(
+                        source, resolved.context, 0L, 1f)) { result ->
+                        if (result.action == NativeVideoActivity.ReturnAction.FAILED) {
+                            Toast.makeText(AppContext.get(), R.string.native_playback_unavailable, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                } catch (error: Exception) {
+                    Log.w(TAG, "play-media-candidate failed: ${error.javaClass.simpleName}")
+                }
+                Config.PlayerKind.SYSTEM -> PlayerLauncher.openSystem(
+                    callback?.getActivity() ?: AppContext.get(), source.url, ua, source.page, cookie)
+                Config.PlayerKind.EXTERNAL -> callback?.getActivity()?.let { activity ->
+                    PlayerLauncher.openExternal(activity, source.url, ua, source.page, cookie)
+                }
+            }
+        }
+    }
+
+    override fun prefetchMediaMetadata() {
+        val page = url ?: return
+        val catalog = MediaRequestCatalog.shared
+        val ua = userAgentString ?: GeckoSession.getDefaultUserAgent()
+        val observations = catalog.snapshot(page, session.settings.usePrivateMode)
+        observations.filter { it.kind != MediaRequestCatalog.Kind.PROGRESSIVE }
+            .groupBy { MediaUrlIdentity.key(it.url) }.values
+            .map { variants -> variants.maxByOrNull { it.time } ?: variants.first() }
+            .forEach { request ->
+                if (MediaMetadataCache.get(request.url) == null) {
+                    MediaMetadataPrefetcher.prefetch(request.url, request.kind, MediaRequestContext(request, observations, ua))
+                }
+            }
+    }
+
     override suspend fun renderThumbnail(bitmap: Bitmap?): Bitmap? {
         return webView?.renderThumbnail(bitmap)
+    }
+
+    private fun MediaRequestCatalog.Kind.toCandidateKind(): MediaCandidate.Kind = when (this) {
+        MediaRequestCatalog.Kind.HLS -> MediaCandidate.Kind.HLS
+        MediaRequestCatalog.Kind.DASH -> MediaCandidate.Kind.DASH
+        MediaRequestCatalog.Kind.PROGRESSIVE -> MediaCandidate.Kind.PROGRESSIVE
     }
 
     override fun onAttachToWindow(
@@ -448,10 +530,16 @@ class GeckoWebEngine(val tab: WebTabState): WebEngine,
         if (previousSession != null && previousSession != session) {
             Log.d(TAG, "Closing previous session")
             previousSession.setActive(false)
+            runtime.webExtensionController.setTabActive(previousSession, false)
             webView.releaseSession()
         }
         webView.coverUntilFirstPaint(Color.WHITE)
         webView.setSession(session)
+        runtime.webExtensionController.setTabActive(session, true)
+        if (session.isOpen) {
+            session.setActive(true)
+            session.setPriorityHint(GeckoSession.PRIORITY_HIGH)
+        }
         if (session.isOpen && previousSession != null && previousSession != session) {
             Log.d(TAG, "Activating session")
             session.setActive(true)
@@ -468,6 +556,7 @@ class GeckoWebEngine(val tab: WebTabState): WebEngine,
             if (session == this.session) {
                 Log.d(TAG, "Closing session")
                 session.setActive(false)
+                runtime.webExtensionController.setTabActive(session, false)
                 webView.releaseSession()
             }
         }

@@ -30,12 +30,15 @@ class Config(val prefs: SharedPreferences) {
         const val INCOGNITO_MODE_HINT_SUPPRESS_KEY = "incognito_mode_hint_suppress"
         const val DIRECT_NAVIGATION_MODE_HINT_SUPPRESS_KEY = "direct_navigation_mode_hint_suppress"
         const val HOME_PAGE_MODE = "home_page_mode"
-        const val HOME_PAGE_SUGGESTIONS_MODE = "home_page_suggestions_mode"
         const val WEB_ENGINE = "web_engine"
         const val ALLOW_AUTOPLAY_MEDIA = "allow_autoplay_media"
         const val WEBVIEW_USE_ALGORITHMIC_DARKENING_WITH_DARK_UI_MODE_KEY =
             "webview_use_algorithmic_darkening_with_dark_ui_mode"
         const val WEB_ENGINE_DEBUG_KEY = "web_engine_debug"
+        const val PLAYER_KIND_KEY = "player_kind"
+        const val BLOCK_AUTOMATIC_REDIRECTS_KEY = "block_automatic_redirects"
+        const val KEEP_TOOLBAR_OPEN_KEY = "keep_toolbar_open"
+        const val RESTORE_TABS_ON_STARTUP_KEY = "restore_tabs_on_startup"
         //const val HOME_PAGE_VERSION_EXTRACTED = "home_page_version_extracted"
         const val INITIAL_BOOKMARKS_SUGGESTIONS_LOADED = "initial_bookmarks_suggestions_loaded"
         const val ADBLOCK_ENABLED_PREF_KEY = "adblock_enabled"
@@ -58,6 +61,24 @@ class Config(val prefs: SharedPreferences) {
         const val HOME_PAGE_URL = "https://tvbro.phlox.dev/appcontent/home/"
         //const val HOME_PAGE_URL = "http://10.0.2.2:5000/appcontent/home/"
 
+        /**
+         * Set by the loopback asset server (see LocalAssetServer) when it is running. When null
+         * the remote [HOME_PAGE_URL] is used (loopback server unavailable). Engines that can not
+         * load bundled assets directly (GeckoView) load this URL instead.
+         */
+        var localHomePageUrl: String? = null
+
+        /** URL an engine should load for the built-in home page (loopback when available). */
+        fun currentHomePageUrl(): String = localHomePageUrl ?: HOME_PAGE_URL
+
+        /** True if [url] points at the built-in home page (remote, alias or loopback). */
+        fun isHomePageUrl(url: String?): Boolean {
+            if (url == null) return false
+            if (url == HOME_PAGE_URL || url == HOME_URL_ALIAS) return true
+            val local = localHomePageUrl ?: return false
+            return url.startsWith(local)
+        }
+
         fun canRecommendGeckoView(): Boolean {
             //disable recommendation for now
             //There are plans to keep its support, but user reports and internal testing show
@@ -74,8 +95,9 @@ class Config(val prefs: SharedPreferences) {
         HOME_PAGE, SEARCH_ENGINE, CUSTOM, BLANK
     }
 
-    enum class HomePageLinksMode {
-        BOOKMARKS, LATEST_HISTORY, MOST_VISITED
+    /** Player a detected stream is handed to. Default is the built-in ExoPlayer. */
+    enum class PlayerKind {
+        BUILT_IN, SYSTEM, EXTERNAL
     }
 
     var incognitoMode: Boolean
@@ -155,14 +177,6 @@ class Config(val prefs: SharedPreferences) {
             prefs.edit().putInt(HOME_PAGE_MODE, value.ordinal).apply()
         }
 
-    var homePageLinksMode: HomePageLinksMode
-        get() = prefs.getInt(HOME_PAGE_SUGGESTIONS_MODE, 0)
-            .let { if (it < 0 || it >= HomePageLinksMode.values().size) 0 else it }
-            .let { HomePageLinksMode.values()[it] }
-        set(value) {
-            prefs.edit().putInt(HOME_PAGE_SUGGESTIONS_MODE, value.ordinal).apply()
-        }
-
     var homePage: String
         get() = prefs.getString(HOME_PAGE_KEY, HOME_URL_ALIAS)!!
         set(value) {
@@ -202,6 +216,24 @@ class Config(val prefs: SharedPreferences) {
         set(value) {
             prefs.edit().putBoolean(WEB_ENGINE_DEBUG_KEY, value).apply()
         }
+
+    var playerKind: PlayerKind
+        get() = prefs.getInt(PLAYER_KIND_KEY, 0)
+            .let { if (it < 0 || it >= PlayerKind.entries.size) 0 else it }
+            .let { PlayerKind.entries[it] }
+        set(value) { prefs.edit().putInt(PLAYER_KIND_KEY, value.ordinal).apply() }
+
+    var blockAutomaticRedirects: Boolean
+        get() = prefs.getBoolean(BLOCK_AUTOMATIC_REDIRECTS_KEY, true)
+        set(value) { prefs.edit().putBoolean(BLOCK_AUTOMATIC_REDIRECTS_KEY, value).apply() }
+
+    var keepToolbarOpen: Boolean
+        get() = prefs.getBoolean(KEEP_TOOLBAR_OPEN_KEY, true)
+        set(value) { prefs.edit().putBoolean(KEEP_TOOLBAR_OPEN_KEY, value).apply() }
+
+    var restoreTabsOnStartup: Boolean
+        get() = prefs.getBoolean(RESTORE_TABS_ON_STARTUP_KEY, false)
+        set(value) { prefs.edit().putBoolean(RESTORE_TABS_ON_STARTUP_KEY, value).apply() }
 
     /*var homePageVersionExtracted: Int
         get() = prefs.getInt(HOME_PAGE_VERSION_EXTRACTED, 0)

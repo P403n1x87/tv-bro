@@ -1,63 +1,54 @@
 package com.phlox.tvwebbrowser.webengine.gecko.delegates
 
+import android.util.Log
 import org.mozilla.geckoview.GeckoSession
 import org.mozilla.geckoview.MediaSession
 
-class MyMediaSessionDelegate: MediaSession.Delegate {
+/**
+ * Tracks Gecko's active media session so the media transport shortcuts (play/pause, stop,
+ * rewind, fast forward) can drive the page's own player.
+ *
+ * Only transport control lives here. Nothing hands a stream over to another player: the app
+ * has no reliable way of telling which video on a page is "the" video, so that choice is left
+ * to the user through the stream list.
+ */
+class MyMediaSessionDelegate : MediaSession.Delegate {
     var mediaSession: MediaSession? = null
-    var paused = false
+        private set
+    var paused = true
+        private set
+
     override fun onActivated(session: GeckoSession, mediaSession: MediaSession) {
-        super.onActivated(session, mediaSession)
+        Log.i(TAG, "media-activated")
         this.mediaSession = mediaSession
-        this.paused = false
-        mediaSession.nextTrack()
     }
 
     override fun onDeactivated(session: GeckoSession, mediaSession: MediaSession) {
-        super.onDeactivated(session, mediaSession)
-        this.mediaSession = null
-    }
-
-    override fun onMetadata(
-        session: GeckoSession,
-        mediaSession: MediaSession,
-        meta: MediaSession.Metadata
-    ) {
-        super.onMetadata(session, mediaSession, meta)
-    }
-
-    override fun onFeatures(session: GeckoSession, mediaSession: MediaSession, features: Long) {
-        super.onFeatures(session, mediaSession, features)
+        Log.i(TAG, "media-deactivated")
+        if (this.mediaSession === mediaSession) this.mediaSession = null
     }
 
     override fun onPlay(session: GeckoSession, mediaSession: MediaSession) {
-        super.onPlay(session, mediaSession)
+        Log.i(TAG, "media-playing")
         paused = false
     }
 
     override fun onPause(session: GeckoSession, mediaSession: MediaSession) {
-        super.onPause(session, mediaSession)
+        Log.i(TAG, "media-paused")
         paused = true
     }
 
     override fun onStop(session: GeckoSession, mediaSession: MediaSession) {
-        super.onStop(session, mediaSession)
+        Log.i(TAG, "media-stopped")
+        paused = true
     }
 
-    override fun onPositionState(
-        session: GeckoSession,
-        mediaSession: MediaSession,
-        state: MediaSession.PositionState
-    ) {
-        super.onPositionState(session, mediaSession, state)
+    /** Called by the progress delegate when a navigation starts. */
+    fun onNavigation() {
+        paused = true
     }
 
-    override fun onFullscreen(
-        session: GeckoSession,
-        mediaSession: MediaSession,
-        enabled: Boolean,
-        meta: MediaSession.ElementMetadata?
-    ) {
-        super.onFullscreen(session, mediaSession, enabled, meta)
+    companion object {
+        val TAG: String = MyMediaSessionDelegate::class.java.simpleName
     }
 }

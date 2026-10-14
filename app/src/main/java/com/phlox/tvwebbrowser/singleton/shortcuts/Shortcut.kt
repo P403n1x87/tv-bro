@@ -18,7 +18,12 @@ enum class Shortcut private constructor(var titleResId: Int, var prefsKey: Strin
     PLAY_PAUSE(R.string.play_pause,  "shortcut_play_pause", KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE),
     MEDIA_STOP(R.string.media_stop, "shortcut_media_stop", KeyEvent.KEYCODE_MEDIA_STOP),
     MEDIA_REWIND(R.string.media_rewind, "shortcut_media_rewind", KeyEvent.KEYCODE_MEDIA_REWIND),
-    MEDIA_FAST_FORWARD(R.string.media_fast_forward, "shortcut_media_fast_forward", KeyEvent.KEYCODE_MEDIA_FAST_FORWARD);
+    MEDIA_FAST_FORWARD(R.string.media_fast_forward, "shortcut_media_fast_forward", KeyEvent.KEYCODE_MEDIA_FAST_FORWARD),
+    //do not change prefsKey: existing user key bindings are stored under it
+    TOGGLE_TABS_PANEL(R.string.tabs, "shortcut_toggle_tabs_panel", 0),
+    SHOW_STREAMS(R.string.media_list, "shortcut_show_streams", 0),
+    SHOW_BOOKMARKS(R.string.bookmarks, "shortcut_show_bookmarks", 0),
+    CLOSE_TAB(R.string.close_tab, "shortcut_close_tab", 0);
 
     companion object {
         private fun modifiersToString(modifiers: Int): String {

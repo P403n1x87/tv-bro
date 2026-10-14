@@ -23,6 +23,7 @@ import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import android.webkit.ConsoleMessage
+import android.webkit.CookieManager
 import android.webkit.GeolocationPermissions
 import android.webkit.HttpAuthHandler
 import android.webkit.JsPromptResult
@@ -39,17 +40,31 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
 import androidx.core.net.toUri
+import androidx.webkit.ScriptHandler
 import androidx.webkit.WebSettingsCompat
+import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.Config
+import com.phlox.tvwebbrowser.Config.PlayerKind
 import com.phlox.tvwebbrowser.R
+import com.phlox.tvwebbrowser.player.MediaDiscoveryNotifier
+import com.phlox.tvwebbrowser.player.MediaMetadataCache
+import com.phlox.tvwebbrowser.player.MediaMetadataPrefetcher
+import com.phlox.tvwebbrowser.player.MediaRequestCatalog
+import com.phlox.tvwebbrowser.player.MediaRequestContext
+import com.phlox.tvwebbrowser.player.MediaUrlIdentity
+import com.phlox.tvwebbrowser.player.NativeVideoActivity
+import com.phlox.tvwebbrowser.player.PlaybackFailure
+import com.phlox.tvwebbrowser.player.PlayerLauncher
 import com.phlox.tvwebbrowser.utils.DPADNavigationEventsAdapter
 import com.phlox.tvwebbrowser.utils.Utils
+import com.phlox.tvwebbrowser.webengine.MediaCandidate
 import java.net.URLEncoder
 import java.util.UUID
 
@@ -65,11 +80,22 @@ open class WebViewEx(context: Context, val callback: Callback, val jsInterface: 
         const val INTERNAL_SCHEME = "internal://"
         const val INTERNAL_SCHEME_WARNING_DOMAIN = "warning"
         const val INTERNAL_SCHEME_WARNING_DOMAIN_TYPE_CERT = "certificate"
+        const val OVERLAY_ZAPPER_ASSET = "overlay_zapper.js"
+        const val MAX_DETECTED_MEDIA = 30
+        //coming back from an external player sooner than this means it likely failed
+        const val EXTERNAL_PLAYER_FAIL_WINDOW = 15000L
         val WIDEVINE_UUID = UUID(-0x121074568629b532L,-0x5c37d8232ae2de13L)
     }
 
+    /** A media stream found on the page, together with the request headers it was seen with. */
+    data class CastCandidate(val url: String, val headers: Map<String, String>,
+        val kind: MediaRequestCatalog.Kind)
+
     private var virtualCursorMode: Boolean = true
     private var genericInjects: String? = null
+    private var overlayZapperHandler: ScriptHandler? = null
+    private var overlayZapperScript: String? = null
+    private var overlayZapperFallback = false
     private var webChromeClient_: WebChromeClient
     private var fullscreenViewCallback: WebChromeClient.CustomViewCallback? = null
     private var pickFileCallback: ValueCallback<Array<Uri>>? = null
@@ -81,6 +107,15 @@ open class WebViewEx(context: Context, val callback: Callback, val jsInterface: 
     var lastSSLError: SslError? = null
     var trustSsl: Boolean = false
     var currentOriginalUrl: Uri? = null
+    //Media stream candidates detected at the network layer (m3u8/mpd/mp4...), with
+    //the headers they were requested with. Insertion order is preserved, which
+    //matters: see the sniffing code below.
+    val detectedMedia = LinkedHashMap<String, Map<String, String>>()
+    //Identity (see MediaUrlIdentity) -> URL, so a refreshed signed URL replaces its old entry.
+    private val detectedMediaIdentities = HashMap<String, String>()
+    //set when an external player was launched, to detect a quick bounce back
+    private var externalPlayerStartedAt = 0L
+    private var externalPlayerUrl: String? = null
     private val uiHandler = Handler(Looper.getMainLooper())
     private val config = AppContext.provideConfig()
 
@@ -96,7 +131,7 @@ open class WebViewEx(context: Context, val callback: Callback, val jsInterface: 
         fun onShowFileChooser(intent: Intent): Boolean
         fun onReceivedIcon(icon: Bitmap)
         fun requestPermissions(array: Array<String>, geo: Boolean)
-        fun shouldOverrideUrlLoading(url: String): Boolean
+        fun shouldOverrideUrlLoading(url: String, isAutomaticRedirect: Boolean = false): Boolean
         fun onPageStarted(url: String?)
         fun onPageFinished(url: String?)
         fun onPageCertificateError(url: String?)
@@ -167,6 +202,8 @@ open class WebViewEx(context: Context, val callback: Callback, val jsInterface: 
             true
         }
 
+        updateOverlayZapper(callback.isAdBlockingEnabled())
+
         webChromeClient_ = object : WebChromeClient() {
             override fun onJsAlert(view: WebView, url: String, message: String, result: JsResult): Boolean {
                 return if (callback.isDialogsBlockingEnabled()) {
@@ -200,6 +237,7 @@ open class WebViewEx(context: Context, val callback: Callback, val jsInterface: 
             override fun onHideCustomView() {
                 callback.onHideCustomView()
                 fullscreenViewCallback?.onCustomViewHidden()
+                fullscreenViewCallback = null
             }
 
             override fun onProgressChanged(view: WebView, newProgress: Int) {
@@ -357,11 +395,42 @@ open class WebViewEx(context: Context, val callback: Callback, val jsInterface: 
         webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 Log.d(TAG, "shouldOverrideUrlLoading url: ${request.url}")
-                return callback.shouldOverrideUrlLoading(request.url.toString())
+                return callback.shouldOverrideUrlLoading(request.url.toString(), request.isRedirect)
             }
 
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
                 Log.d(TAG, "shouldInterceptRequest url: ${request.url}")
+                run {
+                    //Collect media stream candidates. These are generic patterns,
+                    //not per-site rules. Order is kept (LinkedHashMap) because with
+                    //HLS the master playlist is usually requested first, so it ends
+                    //up first in the list and is the best pick.
+                    val u = request.url.toString()
+                    if (isMediaCandidate(u) && detectedMedia.size < MAX_DETECTED_MEDIA) {
+                        val identity = MediaUrlIdentity.key(u)
+                        val previous = detectedMediaIdentities[identity]
+                        when {
+                            previous == null -> {
+                                detectedMedia[u] = request.requestHeaders ?: emptyMap()
+                                detectedMediaIdentities[identity] = u
+                                MediaDiscoveryNotifier.notifyChanged()
+                            }
+                            previous != u -> {
+                                //Same resource with rotated credentials (e.g. a new signature):
+                                //swap in the freshest URL without disturbing the list order.
+                                val headers = request.requestHeaders ?: emptyMap()
+                                val rebuilt = LinkedHashMap<String, Map<String, String>>(detectedMedia.size)
+                                for ((key, value) in detectedMedia) {
+                                    if (key == previous) rebuilt[u] = headers else rebuilt[key] = value
+                                }
+                                detectedMedia.clear()
+                                detectedMedia.putAll(rebuilt)
+                                detectedMediaIdentities[identity] = u
+                                MediaDiscoveryNotifier.notifyChanged()
+                            }
+                        }
+                    }
+                }
                 val currentPageUrl = currentOriginalUrl
 
                 if (currentPageUrl != null && currentPageUrl.toString().startsWith(Config.HOME_PAGE_URL,
@@ -404,6 +473,8 @@ open class WebViewEx(context: Context, val callback: Callback, val jsInterface: 
                 super.onPageStarted(view, url, favicon)
                 Log.d(TAG, "onPageStarted url: $url")
                 currentOriginalUrl = url.toUri()
+                detectedMedia.clear()
+                detectedMediaIdentities.clear()
                 callback.onPageStarted(url)
             }
 
@@ -412,6 +483,7 @@ open class WebViewEx(context: Context, val callback: Callback, val jsInterface: 
                 Log.d(TAG, "onPageFinished url: $url")
                 callback.onPageFinished(url)
                 evaluateJavascript(getGenericJSInjects(), null)
+                injectOverlayZapperFallback()
             }
 
             override fun onLoadResource(view: WebView, url: String) {
@@ -643,9 +715,249 @@ open class WebViewEx(context: Context, val callback: Callback, val jsInterface: 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             settings.safeBrowsingEnabled = adblockEnabled
         }
+        updateOverlayZapper(adblockEnabled)
+    }
+
+    /**
+     * Registers (or removes) the cosmetic ad-overlay zapper as a document-start
+     * script running in every frame. It complements the network-level ad blocking
+     * with runtime DOM cleanup of overlays/click hijackers that first-party
+     * scripts build after load. A no-op if the WebView provider is too old.
+     */
+    private fun updateOverlayZapper(enabled: Boolean) {
+        if (!enabled) {
+            overlayZapperHandler?.remove()
+            overlayZapperHandler = null
+            overlayZapperFallback = false
+            return
+        }
+        if (overlayZapperHandler != null || overlayZapperFallback) return
+        val script = overlayZapperScript ?: try {
+            context.assets.open(OVERLAY_ZAPPER_ASSET).bufferedReader().use { it.readText() }
+        } catch (e: Exception) {
+            Log.w(TAG, "overlay zapper asset not available", e)
+            return
+        }.also { overlayZapperScript = it }
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            // WebView older than M86 has no document-start API. Fall back to injecting
+            // the zapper into the main frame once a page has loaded (see
+            // injectOverlayZapperFallback); it then observes the DOM from there.
+            Log.d(TAG, "overlay zapper: no document-start API, using load-time fallback")
+            overlayZapperFallback = true
+            return
+        }
+        try {
+            overlayZapperHandler = WebViewCompat.addDocumentStartJavaScript(this, script, setOf("*"))
+        } catch (e: Exception) {
+            Log.w(TAG, "failed to register overlay zapper", e)
+            overlayZapperFallback = true
+        }
+    }
+
+    /** Runs the zapper in the main frame on old WebViews (no document-start API). */
+    fun injectOverlayZapperFallback() {
+        if (!overlayZapperFallback) return
+        overlayZapperScript?.let { evaluateJavascript(it, null) }
     }
 
     fun setVirtualCursorMode(enabled: Boolean) {
         this.virtualCursorMode = enabled
     }
+
+    //region media casting
+
+    /** Generic patterns that mark a URL as a possible media stream, not per-site rules. */
+    private fun isMediaCandidate(u: String): Boolean {
+        val path = u.substringBefore('?').lowercase()
+        return path.endsWith(".m3u8") || path.endsWith(".mpd") ||
+            isProgressiveFile(u) || isMaskedManifest(path) || isUrlManifest(path) ||
+            u.contains("action=redirect") || path.contains("/api/er/get") ||
+            queryNamesManifest(u)
+    }
+
+    /**
+     * Some players fetch the manifest from an extensionless gateway with the real file
+     * name tucked in the query, e.g. ".../stream.php?path=ab12/index.m3u8&sig=...".
+     */
+    private fun queryNamesManifest(u: String): Boolean {
+        if (!u.contains('?')) return false
+        val query = Uri.decode(u.substringAfter('?')).lowercase()
+        return query.contains(".m3u8") || query.contains(".mpd")
+    }
+
+    /** Some sites disguise the HLS manifest behind a harmless extension. */
+    private fun isMaskedManifest(path: String): Boolean =
+        (path.endsWith(".txt") || path.endsWith(".json")) &&
+            (path.contains("/hls/") || path.contains("master") || path.contains("playlist") ||
+                path.contains("manifest") || path.contains("sublist") || path.contains("chunklist"))
+
+    /** Some player services serve the manifest with no extension at all, behind .../q/<n>. */
+    private fun isUrlManifest(path: String): Boolean {
+        val qIdx = path.lastIndexOf("/q/")
+        return qIdx >= 0 && path.substring(qIdx + 3).toIntOrNull() != null
+    }
+
+    private fun isProgressiveFile(u: String): Boolean {
+        val p = u.substringBefore('?').lowercase()
+        return p.endsWith(".mp4") || p.endsWith(".m4v") || p.endsWith(".webm") ||
+            p.endsWith(".mkv") || p.endsWith(".mov")
+    }
+
+    private fun inferCastKind(u: String): MediaRequestCatalog.Kind {
+        val path = u.substringBefore('?').lowercase()
+        return when {
+            path.endsWith(".mpd") -> MediaRequestCatalog.Kind.DASH
+            path.endsWith(".m3u8") || isMaskedManifest(path) || isUrlManifest(path) -> MediaRequestCatalog.Kind.HLS
+            queryNamesManifest(u) ->
+                if (Uri.decode(u.substringAfter('?')).lowercase().contains(".mpd"))
+                    MediaRequestCatalog.Kind.DASH else MediaRequestCatalog.Kind.HLS
+            else -> MediaRequestCatalog.Kind.PROGRESSIVE
+        }
+    }
+
+    /**
+     * Orders the candidates by how likely they are to be the real stream. No
+     * per-site rules: manifests first (HLS/DASH - the master playlist normally
+     * loads before anything else), single files last.
+     */
+    private fun orderedCandidates(domUrl: String?): List<CastCandidate> {
+        val urls = LinkedHashSet<String>()
+        domUrl?.takeIf { it.isNotEmpty() && !it.startsWith("blob:") }?.let { urls.add(it) }
+        urls.addAll(detectedMedia.keys)
+        //sortedBy is stable, so the detection order survives within each group
+        return urls.map { CastCandidate(it, detectedMedia[it] ?: emptyMap(), inferCastKind(it)) }
+            .sortedBy { if (isProgressiveFile(it.url)) 1 else 0 }
+    }
+
+    /**
+     * Public snapshot of the streams detected on the page, for the toolbar media list.
+     * The page URL itself is only treated as a candidate when it actually points at a media
+     * file: otherwise every ordinary page (e.g. the home page) would list itself as
+     * "PROGRESSIVE".
+     */
+    fun mediaCandidates(): List<MediaCandidate> =
+        orderedCandidates(currentOriginalUrl?.toString()?.takeIf(::isMediaCandidate))
+            .map { MediaCandidate(it.url, it.kind.toCandidateKind()) }
+
+    /** Warms the metadata cache for manifests on the page; plain files carry no parseable metadata. */
+    fun prefetchMediaMetadata() {
+        val page = currentOriginalUrl?.toString() ?: return
+        val userAgent = settings.userAgentString ?: ""
+        detectedMedia.keys.forEach { url ->
+            val kind = inferCastKind(url)
+            if (kind != MediaRequestCatalog.Kind.PROGRESSIVE && MediaMetadataCache.get(url) == null) {
+                val request = MediaRequestCatalog.Request(
+                    url = url, page = page, frame = page, privateMode = false, kind = kind,
+                    headers = detectedMedia[url] ?: emptyMap())
+                MediaMetadataPrefetcher.prefetch(url, kind, MediaRequestContext(request, listOf(request), userAgent))
+            }
+        }
+    }
+
+    /** Plays one detected stream in the configured player, bypassing the page controls. */
+    fun playMediaCandidate(url: String) {
+        playCandidate(CastCandidate(url, detectedMedia[url] ?: emptyMap(), inferCastKind(url)),
+            config.playerKind, 0L)
+    }
+
+    private fun MediaRequestCatalog.Kind.toCandidateKind(): MediaCandidate.Kind = when (this) {
+        MediaRequestCatalog.Kind.HLS -> MediaCandidate.Kind.HLS
+        MediaRequestCatalog.Kind.DASH -> MediaCandidate.Kind.DASH
+        MediaRequestCatalog.Kind.PROGRESSIVE -> MediaCandidate.Kind.PROGRESSIVE
+    }
+
+    /**
+     * Hands one stream to the player selected in the settings. There is no automatic fallback:
+     * a stream that does not play is the user's cue to try a different one from the stream list.
+     */
+    private fun playCandidate(candidate: CastCandidate, kind: PlayerKind, startMs: Long) {
+        when (kind) {
+            PlayerKind.BUILT_IN -> playInInternalPlayer(candidate, startMs)
+            PlayerKind.SYSTEM -> playInSystemPlayer(candidate)
+            PlayerKind.EXTERNAL -> playInExternalPlayer(candidate)
+        }
+    }
+
+    /** Opens the stream in TV Bro's built-in (ExoPlayer) player. */
+    fun playInInternalPlayer(candidate: CastCandidate) = playInInternalPlayer(candidate, 0L)
+
+    /** Opens the stream in TV Bro's built-in (ExoPlayer) player, resuming at [startMs]. */
+    fun playInInternalPlayer(candidate: CastCandidate, startMs: Long) {
+        val activity = callback.getActivity() ?: return
+        val page = currentOriginalUrl?.toString() ?: return
+        val ua = settings.userAgentString.orEmpty()
+        val source = MediaRequestCatalog.Request(
+            url = candidate.url, page = page, frame = page, privateMode = false,
+            kind = candidate.kind, headers = candidate.headers, tabId = -1)
+        val observations = (listOf(source) + detectedMedia.map { (u, h) ->
+            MediaRequestCatalog.Request(u, page, page, false, inferCastKind(u), h, tabId = -1)
+        }).distinctBy { it.url }
+        val requestContext = MediaRequestContext(source, observations, ua)
+        PlaybackFailure.last = null
+        try {
+            NativeVideoActivity.launch(activity,
+                NativeVideoActivity.PlaybackRequest(source, requestContext, startMs, 1f)) { result ->
+                if (result.action == NativeVideoActivity.ReturnAction.FAILED) {
+                    Toast.makeText(context, R.string.native_playback_unavailable, Toast.LENGTH_SHORT).show()
+                }
+            }
+        } catch (e: Exception) {
+            Toast.makeText(context, R.string.cast_no_media, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    /** Opens the stream in the platform MediaPlayer based fallback player. */
+    fun playInSystemPlayer(candidate: CastCandidate) {
+        val activity = callback.getActivity() ?: return
+        val cookie = try {
+            CookieManager.getInstance().getCookie(candidate.url)
+        } catch (e: Exception) { null }
+        PlayerLauncher.openSystem(activity, candidate.url, settings.userAgentString,
+            currentOriginalUrl?.toString(), cookie)
+    }
+
+    /** Hands the stream over to an external player (VLC, MX Player...). */
+    fun playInExternalPlayer(candidate: CastCandidate) {
+        val activity = callback.getActivity() ?: return
+        val cookie = try {
+            CookieManager.getInstance().getCookie(candidate.url)
+        } catch (e: Exception) { null }
+        PlayerLauncher.openExternal(activity, candidate.url, settings.userAgentString,
+            currentOriginalUrl?.toString(), cookie) {
+            //There is no callback telling us whether the other app managed to play
+            //the stream. Streams that need a Referer on every request keep buffering
+            //there forever, and the user comes straight back. So if we are resumed
+            //again after a short while, offer the built-in player, which can play them.
+            externalPlayerStartedAt = System.currentTimeMillis()
+            externalPlayerUrl = candidate.url
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        //the system player closed itself because playback failed; there is no fallback
+        if (PlaybackFailure.last != null) {
+            PlaybackFailure.last = null
+            externalPlayerStartedAt = 0L
+            externalPlayerUrl = null
+            return
+        }
+        val startedAt = externalPlayerStartedAt
+        val url = externalPlayerUrl
+        externalPlayerStartedAt = 0L
+        externalPlayerUrl = null
+        if (startedAt == 0L || url == null) return
+        if (System.currentTimeMillis() - startedAt > EXTERNAL_PLAYER_FAIL_WINDOW) return//watched it
+        val activity = callback.getActivity() ?: return
+        AlertDialog.Builder(activity)
+            .setTitle(R.string.external_playback_failed_title)
+            .setMessage(R.string.external_playback_failed_message)
+            .setPositiveButton(R.string.cast_open_builtin) { _, _ ->
+                playInInternalPlayer(CastCandidate(url, detectedMedia[url] ?: emptyMap(), inferCastKind(url)))
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    //endregion
 }

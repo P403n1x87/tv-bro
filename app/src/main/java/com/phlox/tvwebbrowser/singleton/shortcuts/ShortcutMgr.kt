@@ -91,6 +91,18 @@ class ShortcutMgr private constructor() {
             Shortcut.MEDIA_FAST_FORWARD -> {
                 webEngine?.fastForward()
             }
+            Shortcut.TOGGLE_TABS_PANEL -> {
+                mainActivity.onToggleTabPanel()
+            }
+            Shortcut.SHOW_STREAMS -> {
+                mainActivity.onShowStreams()
+            }
+            Shortcut.SHOW_BOOKMARKS -> {
+                mainActivity.showFavorites()
+            }
+            Shortcut.CLOSE_TAB -> {
+                mainActivity.closeCurrentTab()
+            }
         }
     }
 

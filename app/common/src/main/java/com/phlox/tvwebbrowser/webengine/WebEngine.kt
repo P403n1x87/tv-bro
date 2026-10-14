@@ -49,6 +49,16 @@ interface WebEngine {
     fun stopPlayback()
     fun rewind()
     fun fastForward()
+    /** Streams observed on the current page, most likely real one first. */
+    fun mediaCandidates(): List<MediaCandidate>
+    /** Plays an observed stream in the built-in native player, bypassing page controls. */
+    fun playMediaCandidate(candidate: MediaCandidate)
+    /**
+     * Best-effort, background-only warm-up of the metadata cache for the current page's
+     * streams. Called when the stream list opens so rows can fill in resolution/language
+     * after the list is already visible. Must not block; engines may ignore it.
+     */
+    fun prefetchMediaMetadata() {}
     fun setVirtualCursorMode(enabled: Boolean)
     fun isVirtualCursorMode(): Boolean
     fun getCursorDrawerDelegate(): CursorDrawerDelegate?

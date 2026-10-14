@@ -62,10 +62,11 @@ import com.phlox.tvwebbrowser.activity.IncognitoModeMainActivity
 import com.phlox.tvwebbrowser.activity.downloads.DownloadsActivity
 import com.phlox.tvwebbrowser.activity.history.HistoryActivity
 import com.phlox.tvwebbrowser.activity.main.dialogs.favorites.FavoriteEditorDialog
-import com.phlox.tvwebbrowser.activity.main.dialogs.favorites.FavoritesDialog
+import com.phlox.tvwebbrowser.activity.main.dialogs.media.MediaListAdapter
 import com.phlox.tvwebbrowser.activity.main.dialogs.settings.SettingsDialog
 import com.phlox.tvwebbrowser.activity.main.view.ActionBar
 import com.phlox.tvwebbrowser.activity.main.view.CursorMenuView
+import com.phlox.tvwebbrowser.activity.main.view.bookmarks.BookmarksPanelView
 import com.phlox.tvwebbrowser.activity.main.view.tabs.TabsAdapter.Listener
 import com.phlox.tvwebbrowser.databinding.ActivityMainBinding
 import com.phlox.tvwebbrowser.model.Download
@@ -84,6 +85,7 @@ import com.phlox.tvwebbrowser.utils.VoiceSearchHelper
 import com.phlox.tvwebbrowser.utils.activemodel.ActiveModelsRepository
 import com.phlox.tvwebbrowser.utils.childs
 import com.phlox.tvwebbrowser.utils.sameDay
+import com.phlox.tvwebbrowser.player.MediaDiscoveryNotifier
 import com.phlox.tvwebbrowser.webengine.WebEngine
 import com.phlox.tvwebbrowser.webengine.WebEngineFactory
 import com.phlox.tvwebbrowser.webengine.WebEngineWindowProviderCallback
@@ -117,6 +119,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         const val KEY_PROCESS_ID_TO_KILL = "proc_id_to_kill"
         private const val MY_PERMISSIONS_REQUEST_VOICE_SEARCH_PERMISSIONS = 10008
         private const val COMMON_REQUESTS_START_CODE = 10100
+        private const val MAX_MEDIA_LIST_ITEMS = 20
     }
 
     private lateinit var vb: ActivityMainBinding
@@ -126,6 +129,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
     private lateinit var adblockModel: AdblockModel
     private lateinit var autoUpdateModel: AutoUpdateModel
     private lateinit var uiHandler: Handler
+    private val mediaDiscoveryListener: () -> Unit = { uiHandler.post { updateMediaCounter() } }
     private var isFullscreen: Boolean = false
     private lateinit var prefs: SharedPreferences
     protected val config = AppContext.provideConfig()
@@ -161,37 +165,19 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         tabsModel = ActiveModelsRepository.get(TabsModel::class, this)
         autoUpdateModel = ActiveModelsRepository.get(AutoUpdateModel::class, this)
         uiHandler = Handler()
+        MediaDiscoveryNotifier.addListener(mediaDiscoveryListener)
         prefs = getSharedPreferences(TVBro.MAIN_PREFS_NAME, Context.MODE_PRIVATE)
         vb = ActivityMainBinding.inflate(layoutInflater)
         setContentView(vb.root)
 
         vb.ivMiniatures.visibility = View.INVISIBLE
-        vb.llBottomPanel.visibility = View.INVISIBLE
-        vb.rlActionBar.visibility = View.INVISIBLE
+        vb.rlActionBar.visibility = View.VISIBLE
         vb.progressBar.visibility = View.GONE
 
         vb.vTabs.listener = tabsListener
-
-        vb.ibAdBlock.setOnClickListener { toggleAdBlockForTab() }
-        vb.ibPopupBlock.setOnClickListener { lifecycleScope.launch(Dispatchers.Main) { showPopupBlockOptions() } }
-        vb.ibHome.setOnClickListener { navigate(settingsModel.homePage) }
-        vb.ibBack.setOnClickListener { navigateBack() }
-        vb.ibForward.setOnClickListener {
-            val tab = tabsModel.currentTab.value ?: return@setOnClickListener
-            if (tab.webEngine.canGoForward()) {
-                tab.webEngine.goForward()
-            }
-        }
-        vb.ibRefresh.setOnClickListener { refresh() }
-        vb.ibCloseTab.setOnClickListener { tabsModel.currentTab.value?.apply { closeTab(this) } }
+        vb.vBookmarks.listener = bookmarksListener
 
         vb.vActionBar.callback = this
-
-        vb.llBottomPanel.childs.forEach {
-            it.setOnTouchListener(bottomButtonsOnTouchListener)
-            it.onFocusChangeListener = bottomButtonsFocusListener
-            it.setOnKeyListener(bottomButtonsKeyListener)
-        }
 
         config.userAgentString.subscribe(this.lifecycle, false) {
             for (tab in tabsModel.tabsStates) {
@@ -200,12 +186,19 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         }
 
         config.theme.subscribe(this.lifecycle, false) {
-            when (it) {
-                Config.Theme.BLACK -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-                Config.Theme.WHITE -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
-                else -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+            val mode = when (it) {
+                Config.Theme.BLACK -> AppCompatDelegate.MODE_NIGHT_YES
+                Config.Theme.WHITE -> AppCompatDelegate.MODE_NIGHT_NO
+                else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+            }
+            if (AppCompatDelegate.getDefaultNightMode() != mode) {
+                AppCompatDelegate.setDefaultNightMode(mode)
             }
             WebEngineFactory.onThemeSettingUpdated(it)
+            // MainActivity declares uiMode in android:configChanges, so AppCompat does not recreate
+            // it on a night-mode change and the already-inflated views would keep their old colors.
+            // Recreate explicitly so the top bar and dialogs repaint immediately without a restart.
+            if (!isFinishing && !isDestroyed) recreate()
         }
 
         settingsModel.keepScreenOn.subscribe(this.lifecycle) {
@@ -219,7 +212,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         viewModel.homePageLinks.subscribe(this) {
             Log.i(TAG, "homePageLinks updated")
             val currentUrl = tabsModel.currentTab.value?.url ?: return@subscribe
-            if (Config.HOME_PAGE_URL == currentUrl) {
+            if (Config.isHomePageUrl(currentUrl)) {
                 tabsModel.currentTab.value?.webEngine?.reload()
             }
         }
@@ -232,6 +225,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         }
 
         tabsModel.tabsStates.subscribe(this, false) {
+            vb.vActionBar.setTabsCounter(it.size)
             if (it.isEmpty()) {
                 if (!config.isWebEngineGecko()) {
                     vb.flWebViewContainer.removeAllViews()
@@ -286,8 +280,14 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         }
 
         override fun onTitleSelected(index: Int) {
-            syncTabWithTitles()
-            hideMenuOverlay()
+            val tab = tabByTitleIndex(index)
+            if (tab == null) {
+                syncTabWithTitles()
+            } else if (!tab.selected) {
+                changeTab(tab)
+            }
+            vb.llTabPanel.visibility = View.GONE
+            autoHideMenuOverlay()
         }
 
         override fun onAddNewTabSelected() {
@@ -301,6 +301,37 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
                 needToHideMenuOverlay = false,
                 navigateImmediately = true
             )
+        }
+    }
+
+    private val bookmarksListener = object : BookmarksPanelView.Listener {
+        override fun onToggleThisPageBookmark() {
+            toggleCurrentPageBookmark()
+        }
+
+        override fun onBookmarkSelected(item: FavoriteItem) {
+            item.url?.let { navigate(it) }
+            hideBookmarksPanel()
+        }
+
+        override fun onEditBookmark(item: FavoriteItem) {
+            FavoriteEditorDialog(this@MainActivity, object : FavoriteEditorDialog.Callback {
+                override fun onDone(item: FavoriteItem) {
+                    lifecycleScope.launch(Dispatchers.Main) {
+                        viewModel.onHomePageLinkEdited(item).join()
+                        loadBookmarks()
+                        updateBookmarkState()
+                    }
+                }
+            }, item).show()
+        }
+
+        override fun onDeleteBookmark(item: FavoriteItem) {
+            lifecycleScope.launch(Dispatchers.Main) {
+                viewModel.deleteBookmark(item.id).join()
+                loadBookmarks()
+                updateBookmarkState()
+            }
         }
     }
 
@@ -322,68 +353,121 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         startActivityForResult(
                 Intent(this@MainActivity, HistoryActivity::class.java),
                 REQUEST_CODE_HISTORY_ACTIVITY)
-        hideMenuOverlay()
+        autoHideMenuOverlay()
     }
 
     override fun showFavorites() {
-        val currentTab = tabsModel.currentTab.value
-        val currentPageTitle = currentTab?.title ?: ""
-        val currentPageUrl = currentTab?.url ?: ""
-
-        FavoritesDialog(this@MainActivity, lifecycleScope, object : FavoritesDialog.Callback {
-            override fun onFavoriteChoosen(item: FavoriteItem?) {
-                navigate(item!!.url!!)
-            }
-        }, currentPageTitle, currentPageUrl).show()
-        hideMenuOverlay()
-    }
-
-    private val bottomButtonsOnTouchListener = View.OnTouchListener{ v, e ->
-        when (e.action) {
-            MotionEvent.ACTION_DOWN -> {
-                return@OnTouchListener true
-            }
-            MotionEvent.ACTION_UP -> {
-                hideMenuOverlay(false)
-                v.performClick()
-                return@OnTouchListener true
-            }
-            else -> return@OnTouchListener false
+        if (vb.rlBookmarksPanel.isVisible) {
+            hideBookmarksPanel()
+        } else {
+            showBookmarksPanel()
         }
     }
 
-    private val bottomButtonsFocusListener = View.OnFocusChangeListener { view, hasFocus ->
-        if (hasFocus) {
-            hideMenuOverlay(false)
+    private fun showBookmarksPanel() {
+        vb.llTabPanel.visibility = View.GONE
+        loadBookmarks()
+        vb.rlBookmarksPanel.visibility = View.VISIBLE
+        focusPanel(vb.vBookmarks)
+        updateCurrentPageBookmarkEntry()
+    }
+
+    /** Refreshes the "Add this page" / "Remove from list" row for the current tab. */
+    private fun updateCurrentPageBookmarkEntry() {
+        val url = tabsModel.currentTab.value?.url
+        lifecycleScope.launch(Dispatchers.Main) {
+            val bookmarked = !url.isNullOrBlank() &&
+                    AppDatabase.db.favoritesDao().getByUrl(url) != null
+            vb.vBookmarks.setCurrentPage(url, bookmarked)
         }
     }
 
-    private val bottomButtonsKeyListener = View.OnKeyListener { view, i, keyEvent ->
-        when (keyEvent.keyCode) {
-            KeyEvent.KEYCODE_DPAD_UP -> {
-                if (keyEvent.action == KeyEvent.ACTION_UP) {
-                    hideBottomPanel()
-                    tabsModel.currentTab.value?.webEngine?.getView()?.requestFocus()
+    private fun hideBookmarksPanel() {
+        vb.rlBookmarksPanel.visibility = View.GONE
+    }
+
+    private fun loadBookmarks() {
+        lifecycleScope.launch(Dispatchers.Main) {
+            vb.vBookmarks.setBookmarks(AppDatabase.db.favoritesDao().getAllBookmarks())
+        }
+    }
+
+    private fun addCurrentPageAsBookmark() {
+        val currentTab = tabsModel.currentTab.value ?: return
+        val url = currentTab.url
+        if (url.isNullOrBlank() || Config.isHomePageUrl(url)) return
+        val newItem = FavoriteItem()
+        newItem.title = currentTab.title ?: url
+        newItem.url = url
+        FavoriteEditorDialog(this, object : FavoriteEditorDialog.Callback {
+            override fun onDone(item: FavoriteItem) {
+                lifecycleScope.launch(Dispatchers.Main) {
+                    viewModel.onHomePageLinkEdited(item).join()
+                    loadBookmarks()
+                    updateCurrentPageBookmarkEntry()
+                    updateBookmarkState()
                 }
-                return@OnKeyListener true
+            }
+        }, newItem).show()
+    }
+
+    /**
+     * The bookmarks panel's first row: adds the current page if it is not bookmarked, or removes
+     * the existing bookmark when it already is.
+     */
+    private fun toggleCurrentPageBookmark() {
+        val currentTab = tabsModel.currentTab.value ?: return
+        val url = currentTab.url
+        if (url.isNullOrBlank() || Config.isHomePageUrl(url)) return
+        lifecycleScope.launch(Dispatchers.Main) {
+            val existing = AppDatabase.db.favoritesDao().getByUrl(url)
+            if (existing != null) {
+                viewModel.deleteBookmark(existing.id).join()
+                loadBookmarks()
+                updateCurrentPageBookmarkEntry()
+                updateBookmarkState()
+            } else {
+                addCurrentPageAsBookmark()
             }
         }
-        false
+    }
+
+    /** Updates the toolbar star to reflect whether the current page is bookmarked. */
+    private fun updateBookmarkState() {
+        val url = tabsModel.currentTab.value?.url
+        if (url.isNullOrBlank()) {
+            vb.vActionBar.setBookmarked(false)
+            return
+        }
+        lifecycleScope.launch(Dispatchers.Main) {
+            vb.vActionBar.setBookmarked(AppDatabase.db.favoritesDao().getByUrl(url) != null)
+        }
     }
 
     private fun tabByTitleIndex(index: Int) =
             if (index >= 0 && index < tabsModel.tabsStates.size) tabsModel.tabsStates[index] else null
 
     override fun showSettings() {
-        SettingsDialog(this, settingsModel).show()
+        SettingsDialog(this, settingsModel).apply {
+            // The ad-block toggle is global (config.adBlockEnabled) while the overlay zapper is a
+            // document-start script registered per WebView; re-sync every open tab on dismiss so
+            // the zapper matches the network blocker. Per-tab overrides are preserved.
+            onDismissed = {
+                tabsModel.tabsStates.forEach {
+                    it.webEngine.onUpdateAdblockSetting(it.adblock ?: config.adBlockEnabled)
+                }
+                updateUpdateBadge()
+            }
+        }.show()
     }
 
     override fun onExtendedAddressBarMode() {
-        vb.llBottomPanel.visibility = View.INVISIBLE
+        vb.llTabPanel.visibility = View.GONE
+        vb.rlBookmarksPanel.visibility = View.GONE
     }
 
     override fun onUrlInputDone() {
-        hideMenuOverlay()
+        autoHideMenuOverlay()
     }
 
     fun navigateBack(goHomeIfNoHistory: Boolean = false) {
@@ -392,15 +476,101 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
             currentTab.webEngine.goBack()
         } else if (goHomeIfNoHistory) {
             navigate(settingsModel.homePage)
-        } else if (vb.rlActionBar.visibility != View.VISIBLE) {
-            showMenuOverlay()
-        } else {
-            hideMenuOverlay()
         }
+    }
+
+    override fun onNavigateBack() = navigateBack()
+
+    override fun onNavigateForward() {
+        val tab = tabsModel.currentTab.value ?: return
+        if (tab.webEngine.canGoForward()) {
+            tab.webEngine.goForward()
+        }
+    }
+
+    override fun onReload() = refresh()
+
+    override fun onShowStreams() = showMediaListDialog()
+
+    override fun onToggleTabPanel() {
+        if (vb.llTabPanel.isVisible) {
+            vb.llTabPanel.visibility = View.GONE
+            tabsModel.currentTab.value?.webEngine?.getView()?.requestFocus()
+        } else {
+            vb.rlBookmarksPanel.visibility = View.GONE
+            vb.llTabPanel.visibility = View.VISIBLE
+            focusPanel(vb.vTabs)
+        }
+    }
+
+    /**
+     * Gives a panel that has just been made visible the focus. A plain requestFocus() is not
+     * enough: the panel was GONE, so the views inside it are not laid out yet, and when the device
+     * is in touch mode (a tap anywhere puts it there) a view that is not focusable in touch mode
+     * cannot take focus at all - the panel then stayed unfocused and the D-pad went straight back
+     * to the top bar. requestFocusFromTouch() leaves touch mode first; the post is a second chance
+     * for the case where the first request only marked the panel as "wants focus".
+     */
+    private fun focusPanel(panel: View) {
+        panel.requestFocusFromTouch()
+        panel.post {
+            if (panel.isVisible && !panel.hasFocus()) panel.requestFocus()
+        }
+    }
+
+    override fun onShowMenu() {
+        val currentTab = tabsModel.currentTab.value
+        val items = arrayListOf(
+            getString(R.string.navigate_home),
+            getString(R.string.new_tab),
+            getString(R.string.add_bookmark),
+            getString(R.string.toggle_ads_blocking),
+            getString(R.string.block_popups),
+            getString(R.string.history),
+            getString(R.string.downloads),
+            getString(R.string.incognito_mode),
+            getString(R.string.voice_search),
+            getString(R.string.toggle_theme),
+            getString(R.string.close_tab),
+            getString(R.string.close_application)
+        ).toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.menu)
+            .setItems(items) { _, which ->
+                when (which) {
+                    0 -> navigate(settingsModel.homePage)
+                    1 -> openInNewTab(settingsModel.homePage, tabsModel.tabsStates.size, needToHideMenuOverlay = false, navigateImmediately = true)
+                    2 -> addCurrentPageAsBookmark()
+                    3 -> toggleAdBlockForTab()
+                    4 -> lifecycleScope.launch(Dispatchers.Main) { showPopupBlockOptions() }
+                    5 -> showHistory()
+                    6 -> showDownloads()
+                    7 -> toggleIncognitoMode()
+                    8 -> initiateVoiceSearch()
+                    9 -> toggleTheme()
+                    10 -> currentTab?.let { closeTab(it) }
+                    11 -> closeWindow()
+                }
+            }
+            .show()
+    }
+
+    /**
+     * Cycles the UI theme SYSTEM → WHITE → BLACK → SYSTEM. The actual night-mode switch and the
+     * activity repaint are handled by the `config.theme` subscriber in onCreate.
+     */
+    private fun toggleTheme() {
+        val themes = Config.Theme.entries
+        config.theme.value = themes[(config.theme.value.ordinal + 1) % themes.size]
     }
 
     fun refresh() {
         tabsModel.currentTab.value?.webEngine?.reload()
+    }
+
+    /** Public entry point for the Close tab shortcut (the overflow menu calls [closeTab] directly). */
+    fun closeCurrentTab() {
+        closeTab(tabsModel.currentTab.value)
     }
 
     override fun onDestroy() {
@@ -410,6 +580,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         if (::tabsModel.isInitialized) {
             tabsModel.onDetachActivity()
         }
+        MediaDiscoveryNotifier.removeListener(mediaDiscoveryListener)
         super.onDestroy()
     }
 
@@ -428,13 +599,21 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         vb.progressBarGeneric.visibility = View.VISIBLE
         vb.progressBarGeneric.requestFocus()
         viewModel.loadState().join()
-        tabsModel.loadState().join()
+        if (config.restoreTabsOnStartup) {
+            tabsModel.loadState().join()
+        } else {
+            tabsModel.discardSavedState().join()
+        }
 
         if (!isActive) {
             return@launch
         }
 
         vb.progressBarGeneric.visibility = View.GONE
+
+        // `tabsStates` is retained across activity re-creation (theme toggle), in which case the
+        // observer above is not re-fired, so seed the tab counter here as well.
+        vb.vActionBar.setTabsCounter(tabsModel.tabsStates.size)
 
         if (intent.data == null) {
             if (tabsModel.tabsStates.isEmpty()) {
@@ -468,11 +647,18 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
             autoUpdateModel.updateChecker.versionCheckResult == null &&
                 !autoUpdateModel.lastUpdateNotificationTime.sameDay(Calendar.getInstance())) {
             autoUpdateModel.checkUpdate(false){
+                updateUpdateBadge()
                 if (autoUpdateModel.updateChecker.hasUpdate()) {
                     autoUpdateModel.showUpdateDialogIfNeeded(this@MainActivity)
                 }
             }
         }
+        updateUpdateBadge()
+    }
+
+    /** Keeps the toolbar settings dot in sync with the last update check result. */
+    private fun updateUpdateBadge() {
+        vb.vActionBar.setUpdateAvailable(autoUpdateModel.isUpdateAvailable())
     }
 
     private fun handleIntent(intent: Intent) {
@@ -504,8 +690,8 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         if (navigateImmediately) {
             navigate(url)
         }
-        if (needToHideMenuOverlay && vb.rlActionBar.visibility == View.VISIBLE) {
-            hideMenuOverlay(true)
+        if (needToHideMenuOverlay) {
+            autoHideMenuOverlay(true)
         }
         return tab.webEngine
     }
@@ -524,8 +710,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
             else -> changeTab(tabsModel.tabsStates[position + 1])
         }
         tabsModel.onCloseTab(tab)
-        hideMenuOverlay(true)
-        hideBottomPanel()
+        autoHideMenuOverlay(true)
     }
 
     private fun changeTab(newTab: WebTabState) {
@@ -579,16 +764,37 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
     }
 
     private fun onWebViewUpdated(tab: WebTabState) {
-        vb.ibBack.isEnabled = tab.webEngine.canGoBack() == true
-        vb.ibForward.isEnabled = tab.webEngine.canGoForward() == true
+        vb.vActionBar.setBackEnabled(tab.webEngine.canGoBack() == true)
+        vb.vActionBar.setForwardEnabled(tab.webEngine.canGoForward() == true)
 
-        val adblockEnabled = tab.adblock ?: config.adBlockEnabled
-        vb.ibAdBlock.setImageResource(if (adblockEnabled) R.drawable.ic_adblock_on else R.drawable.ic_adblock_off)
-        vb.tvBlockedAdCounter.visibility = if (adblockEnabled && tab.blockedAds != 0) View.VISIBLE else View.GONE
-        vb.tvBlockedAdCounter.text = tab.blockedAds.toString()
+        updateMediaCounter()
+        updateBookmarkState()
+    }
 
-        vb.tvBlockedPopupCounter.visibility = if (tab.blockedPopups != 0) View.VISIBLE else View.GONE
-        vb.tvBlockedPopupCounter.text = tab.blockedPopups.toString()
+    private fun updateMediaCounter() {
+        val count = tabsModel.currentTab.value?.webEngine?.mediaCandidates()?.size ?: 0
+        vb.vActionBar.setMediaCounter(count)
+    }
+
+    private fun showMediaListDialog() {
+        val tab = tabsModel.currentTab.value
+        val candidates = tab?.webEngine?.mediaCandidates().orEmpty()
+        if (candidates.isEmpty()) {
+            Toast.makeText(this, R.string.media_list_empty, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val listed = candidates.take(MAX_MEDIA_LIST_ITEMS)
+        val adapter = MediaListAdapter(this, listed)
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(R.string.media_list_title)
+            .setAdapter(adapter) { _, which ->
+                if (tab != null) tab.webEngine.playMediaCandidate(listed[which])
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        dialog.setOnDismissListener { adapter.release() }
+        dialog.show()
+        tab?.webEngine?.prefetchMediaMetadata()
     }
 
     private fun onDownloadRequested(url: String, referer: String, originalDownloadFileName: String, userAgent: String?, mimeType: String? = null,
@@ -667,7 +873,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
                 if (url != null) {
                     navigate(url)
                 }
-                hideMenuOverlay()
+                autoHideMenuOverlay()
             }
             REQUEST_CODE_UNKNOWN_APP_SOURCES -> if (autoUpdateModel.needToShowUpdateDlgAgain) {
                 autoUpdateModel.showUpdateDialogIfNeeded(this)
@@ -690,6 +896,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
 
     override fun onResume() {
         super.onResume()
+        updateUpdateBadge()
         val intentFilter = IntentFilter("android.net.conn.CONNECTIVITY_CHANGE")
         registerReceiver(mConnectivityChangeReceiver, intentFilter)
         tabsModel.currentTab.value?.webEngine?.onResume()
@@ -899,59 +1106,38 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
             vb.flWebViewContainer.cursorDrawerDelegate.handleBackNavigation()
         } else if (isFullscreen) {
             tabsModel.currentTab.value?.webEngine?.hideFullscreenView()
-        } else if (vb.llBottomPanel.isVisible && !vb.rlActionBar.isVisible) {
-            hideBottomPanel()
+        } else if (vb.rlBookmarksPanel.isVisible) {
+            hideBookmarksPanel()
+        } else if (vb.llTabPanel.isVisible) {
+            vb.llTabPanel.visibility = View.GONE
+        } else if (vb.flWebViewContainer.hasFocus()) {
+            //Focus is on the page: BACK must give the remote a way back to the UI,
+            //otherwise the user is stuck in the WebView with no focused control.
+            showMenuOverlay()
         } else {
             toggleMenu()
         }
     }
 
+    fun applyToolbarOverlayStyle() {
+        vb.rlActionBar.setBackgroundColor(ContextCompat.getColor(this, R.color.top_bar_background))
+        vb.rlActionBar.elevation = 5f * resources.displayMetrics.density
+        vb.vActionBar.setOverlayTransparency(false)
+        vb.vTabs.setOverlayTransparency(false)
+    }
+
     private fun showMenuOverlay() {
-        vb.ivMiniatures.visibility = View.VISIBLE
-        vb.llBottomPanel.visibility = View.VISIBLE
-        vb.flWebViewContainer.visibility = View.INVISIBLE
-        val currentTab = tabsModel.currentTab.value
-        if (currentTab != null) {
-            lifecycleScope.launch {
-                currentTab.thumbnail = currentTab.webEngine.renderThumbnail(currentTab.thumbnail)
-                displayThumbnail(currentTab)
-            }
-        }
-
-        vb.llBottomPanel.translationY = vb.llBottomPanel.height.toFloat()
-        vb.llBottomPanel.alpha = 0f
-        vb.llBottomPanel.animate()
-                .setDuration(300)
-                .setInterpolator(DecelerateInterpolator())
-                .translationY(0f)
-                .alpha(1f)
-                .withEndAction {
-                    vb.vActionBar.catchFocus()
-                }
-                .start()
-
-        vb.vActionBar.dismissExtendedAddressBarMode()
-
+        if (isFullscreen) return
+        applyToolbarOverlayStyle()
+        vb.flWebViewContainer.visibility = View.VISIBLE
+        vb.ivMiniatures.visibility = View.INVISIBLE
         vb.rlActionBar.visibility = View.VISIBLE
-        vb.rlActionBar.translationY = -vb.rlActionBar.height.toFloat()
-        vb.rlActionBar.alpha = 0f
-        vb.rlActionBar.animate()
-                .translationY(0f)
-                .alpha(1f)
-                .setDuration(300)
-                .setInterpolator(DecelerateInterpolator())
-                .start()
-
-        vb.ivMiniatures.layoutParams = vb.ivMiniatures.layoutParams.apply { this.height = vb.flWebViewContainer.height }
-        vb.ivMiniatures.translationY = 0f
-        vb.ivMiniatures.animate()
-                .translationY(vb.rlActionBar.height.toFloat())
-                .setDuration(300)
-                .setInterpolator(DecelerateInterpolator())
-                .start()
+        vb.vActionBar.dismissExtendedAddressBarMode()
+        vb.vActionBar.catchFocus()
     }
 
     private suspend fun displayThumbnail(currentTab: WebTabState?) {
+        if (config.keepToolbarOpen) return
         if (currentTab != null) {
             if (tabByTitleIndex(vb.vTabs.current) != currentTab) return
             vb.llMiniaturePlaceholder.visibility = View.INVISIBLE
@@ -979,45 +1165,14 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         }
     }
 
+    private fun autoHideMenuOverlay(hideBottomButtons: Boolean = true) {
+    }
+
     private fun hideMenuOverlay(hideBottomButtons: Boolean = true) {
-        if (vb.rlActionBar.visibility == View.INVISIBLE) {
-            return
-        }
+        vb.llTabPanel.visibility = View.GONE
         if (hideBottomButtons) {
-            hideBottomPanel()
+            tabsModel.currentTab.value?.webEngine?.getView()?.requestFocus()
         }
-
-        vb.rlActionBar.animate()
-                .translationY(-vb.rlActionBar.height.toFloat())
-                .alpha(0f)
-                .setDuration(300)
-                .setInterpolator(DecelerateInterpolator())
-                .withEndAction {
-                    vb.rlActionBar.visibility = View.INVISIBLE
-                }
-                .start()
-
-        if (vb.llMiniaturePlaceholder.visibility == View.VISIBLE) {
-            vb.llMiniaturePlaceholder.visibility = View.INVISIBLE
-            vb.ivMiniatures.visibility = View.VISIBLE
-        }
-
-        vb.ivMiniatures.translationY = vb.rlActionBar.height.toFloat()
-        vb.ivMiniatures.animate()
-                .translationY(0f)
-                .setDuration(300)
-                .setInterpolator(DecelerateInterpolator())
-                .withEndAction {
-                    vb.ivMiniatures.visibility = View.INVISIBLE
-                    vb.rlActionBar.visibility = View.INVISIBLE
-                    vb.ivMiniatures.setImageResource(0)
-                    syncTabWithTitles()
-                    vb.flWebViewContainer.visibility = View.VISIBLE
-                    if (hideBottomButtons) {
-                        tabsModel.currentTab.value?.webEngine?.getView()?.requestFocus()
-                    }
-                }
-                .start()
     }
 
     private fun syncTabWithTitles() {
@@ -1032,19 +1187,6 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         }
     }
 
-    private fun hideBottomPanel() {
-        if (vb.llBottomPanel.visibility != View.VISIBLE) return
-        vb.llBottomPanel.animate()
-                .setDuration(300)
-                .setInterpolator(AccelerateInterpolator())
-                .translationY(vb.llBottomPanel.height.toFloat())
-                .withEndAction {
-                    vb.llBottomPanel.translationY = 0f
-                    vb.llBottomPanel.visibility = View.INVISIBLE
-                }
-                .start()
-    }
-
     private fun onDownloadStarted(fileName: String) {
         Utils.showToast(this, getString(R.string.download_started,
                 Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).toString() + File.separator + fileName))
@@ -1052,7 +1194,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
     }
 
     override fun initiateVoiceSearch() {
-        hideMenuOverlay()
+        autoHideMenuOverlay()
         voiceSearchHelper.initiateVoiceSearch(object : VoiceSearchHelper.Callback {
             override fun onResult(text: String?) {
                 if (text == null) {
@@ -1060,7 +1202,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
                     return
                 }
                 search(text)
-                hideMenuOverlay()
+                autoHideMenuOverlay()
             }
         })
     }
@@ -1156,7 +1298,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
             vb.vTabs.onFavIconUpdated(tab)
         }
 
-        override fun shouldOverrideUrlLoading(url: String): Boolean {
+        override fun shouldOverrideUrlLoading(url: String, isAutomaticRedirect: Boolean): Boolean {
             tab.lastLoadingUrl = url
 
             val uri = try {
@@ -1174,6 +1316,9 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
             if (URLUtil.isNetworkUrl(url) || uri.scheme.equals("javascript", true) ||
                     uri.scheme.equals("data", true) || uri.scheme.equals("about", true) ||
                     uri.scheme.equals("blob", true)) {
+                if (isAutomaticRedirect && shouldBlockAutomaticRedirect(url)) {
+                    return true
+                }
                 Log.d(TAG, "shouldOverrideUrlLoading: network url: $url")
                 return false
             }
@@ -1206,6 +1351,34 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
                 Log.e(TAG, "shouldOverrideUrlLoading: ", e)
                 true
             }
+        }
+
+        private fun shouldBlockAutomaticRedirect(url: String): Boolean {
+            if (!config.blockAutomaticRedirects || !config.adBlockEnabled) return false
+            val current = tab.url.takeIf { it.isNotBlank() } ?: tab.lastLoadingUrl ?: return false
+            if (!isDifferentSite(url, current)) return false
+            Log.i(TAG, "blockAutomaticRedirect: $url -> blocked")
+            onBlockedAd(url)
+            return true
+        }
+
+        private fun isDifferentSite(url: String, current: String): Boolean {
+            if (url == current) return false
+            val a = siteDomain(Uri.parse(url).host)
+            val b = siteDomain(Uri.parse(current).host)
+            return a != null && b != null && a != b
+        }
+
+        private fun siteDomain(host: String?): String? {
+            if (host.isNullOrBlank()) return null
+            val labels = host.lowercase().removePrefix("www.").split('.')
+            if (labels.size <= 2) return labels.joinToString(".")
+            val ccBase = setOf("co", "com", "org", "net", "edu", "gov", "ac", "ne", "or", "nom", "uk", "ca",
+                "us", "au", "nz", "jp", "in", "za", "br", "ar", "mx", "tr", "cn", "sg", "hk", "tw", "kr",
+                "it", "fr", "de", "es", "pl", "ru", "se", "no", "fi", "dk", "nl", "be", "ch", "at", "ie",
+                "pt", "gr", "il", "cz", "sk", "hu", "ro", "bg", "hr", "rs", "ua", "dev", "io", "app")
+            val base = if (labels[labels.size - 2] in ccBase) 3 else 2
+            return labels.takeLast(base).joinToString(".")
         }
 
         override fun onPageStarted(url: String?) {
@@ -1261,14 +1434,13 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         }
 
         override fun isAdBlockingEnabled(): Boolean {
-            tabsModel.currentTab.value?.adblock?.apply {
-                return this
-            }
-            return  config.adBlockEnabled
+            // Use this callback's own tab, not whichever tab happens to be current: the WebView
+            // callback is per-tab and is queried while a tab may not be selected yet.
+            return tab.adblock ?: config.adBlockEnabled
         }
 
         override fun isDialogsBlockingEnabled(): Boolean {
-            if (tab.url == Config.HOME_PAGE_URL) return false
+            if (Config.isHomePageUrl(tab.url)) return false
             return shouldBlockNewWindow(dialog = true, userGesture = false)
         }
 
@@ -1287,15 +1459,11 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
             Log.i(TAG, "onBlockedAd: $uri")
             if (!config.adBlockEnabled) return
             tab.blockedAds++
-            vb.tvBlockedAdCounter.visibility = if (tab.blockedAds > 0) View.VISIBLE else View.GONE
-            vb.tvBlockedAdCounter.text = tab.blockedAds.toString()
         }
 
         override fun onBlockedDialog(newTab: Boolean) {
             tab.blockedPopups++
             runOnUiThread {
-                vb.tvBlockedPopupCounter.visibility = if (tab.blockedPopups > 0) View.VISIBLE else View.GONE
-                vb.tvBlockedPopupCounter.text = tab.blockedPopups.toString()
                 val msg = getString(if (newTab) R.string.new_tab_blocked else R.string.popup_dialog_blocked)
                 NotificationView.showBottomRight(vb.rlRoot, R.drawable.ic_block_popups, msg)
             }
@@ -1369,31 +1537,27 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
             this@MainActivity.initiateVoiceSearch()
         }
 
-        override fun onEditHomePageBookmarkSelected(index: Int) {
+        override fun onEditHomePageBookmarkSelected(favoriteId: Long) {
             lifecycleScope.launch {
-                val bookmark = viewModel.homePageLinks.firstOrNull { it.order == index }
-                var favoriteItem: FavoriteItem? = bookmark?.favoriteId?.let {
-                    AppDatabase.db.favoritesDao().getById(it)
-                }
-
-                if (favoriteItem == null) {
-                    favoriteItem = FavoriteItem()
-                    favoriteItem.title = bookmark?.title
-                    favoriteItem.url = bookmark?.url
-                    favoriteItem.order = index
-                    favoriteItem.homePageBookmark = true
-                    onEditHomePageBookmark(favoriteItem)
-                } else {
-                    AlertDialog.Builder(this@MainActivity)
-                        .setTitle(R.string.bookmarks)
-                        .setItems(arrayOf(getString(R.string.edit), getString(R.string.delete))) { _, which ->
-                            when (which) {
-                                0 -> onEditHomePageBookmark(favoriteItem)
-                                1 -> viewModel.removeHomePageLink(bookmark!!)
+                val favoriteItem = AppDatabase.db.favoritesDao().getById(favoriteId) ?: return@launch
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle(R.string.bookmarks)
+                    .setItems(arrayOf(getString(R.string.edit), getString(R.string.delete))) { _, which ->
+                        when (which) {
+                            0 -> onEditHomePageBookmark(favoriteItem)
+                            1 -> {
+                                val bookmark = viewModel.homePageLinks.firstOrNull { it.favoriteId == favoriteId }
+                                if (bookmark != null) {
+                                    viewModel.removeHomePageLink(bookmark)
+                                } else {
+                                    lifecycleScope.launch {
+                                        AppDatabase.db.favoritesDao().delete(favoriteId)
+                                    }
+                                }
                             }
                         }
-                        .show()
-                }
+                    }
+                    .show()
             }
         }
 
@@ -1401,9 +1565,16 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
             return viewModel.homePageLinks
         }
 
+        override fun getHomePageHistoryLinks(): List<HomePageLink> {
+            return viewModel.homePageHistoryLinks
+        }
+
         override fun onPrepareForFullscreen() {
             //window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
             //        WindowManager.LayoutParams.FLAG_FULLSCREEN)
+            isFullscreen = true
+            vb.rlActionBar.visibility = View.GONE
+            vb.llTabPanel.visibility = View.GONE
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             window.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                     or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
@@ -1411,7 +1582,6 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
                     or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                     or View.SYSTEM_UI_FLAG_FULLSCREEN
                     or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY)
-            isFullscreen = true
         }
 
         override fun onExitFullscreen() {
@@ -1422,6 +1592,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
             window.decorView.systemUiVisibility =
                 View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
             isFullscreen = false
+            vb.rlActionBar.visibility = View.VISIBLE
         }
 
         override fun onVisited(url: String) {

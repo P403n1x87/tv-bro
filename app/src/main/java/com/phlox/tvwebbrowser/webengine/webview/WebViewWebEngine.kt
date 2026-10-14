@@ -17,6 +17,7 @@ import com.phlox.tvwebbrowser.model.WebTabState
 import com.phlox.tvwebbrowser.utils.Utils
 import com.phlox.tvwebbrowser.webengine.WebEngine
 import com.phlox.tvwebbrowser.webengine.WebEngineFactory
+import com.phlox.tvwebbrowser.webengine.MediaCandidate
 import com.phlox.tvwebbrowser.webengine.WebEngineProvider
 import com.phlox.tvwebbrowser.webengine.WebEngineProviderCallback
 import com.phlox.tvwebbrowser.webengine.WebEngineWindowProviderCallback
@@ -169,6 +170,16 @@ class WebViewWebEngine(val tab: WebTabState) : WebEngine, CursorDrawerDelegate.C
         webView?.evaluateJavascript("tvBroFastForward()", null)
     }
 
+    override fun mediaCandidates(): List<MediaCandidate> = webView?.mediaCandidates() ?: emptyList()
+
+    override fun playMediaCandidate(candidate: MediaCandidate) {
+        webView?.playMediaCandidate(candidate.url)
+    }
+
+    override fun prefetchMediaMetadata() {
+        webView?.prefetchMediaMetadata()
+    }
+
     override suspend fun renderThumbnail(bitmap: Bitmap?): Bitmap? {
         return webView?.renderThumbnail(bitmap)
     }
@@ -182,6 +193,10 @@ class WebViewWebEngine(val tab: WebTabState) : WebEngine, CursorDrawerDelegate.C
         parent.removeAllViews()
         parent.addView(webView)
         viewParent?.cursorDrawerDelegate?.callback = this
+        // The WebView is constructed before its callback is attached, so the ad-block state read
+        // at construction time is always false and the overlay zapper never gets registered.
+        // Re-apply now that the callback (and its per-tab adblock setting) is available.
+        webView?.onUpdateAdblockSetting(callback.isAdBlockingEnabled())
         onResume()
     }
 
@@ -293,8 +308,8 @@ class WebViewWebEngine(val tab: WebTabState) : WebEngine, CursorDrawerDelegate.C
             callback?.onReceivedIcon(icon)
         }
 
-        override fun shouldOverrideUrlLoading(url: String): Boolean {
-            return callback?.shouldOverrideUrlLoading(url) ?: false
+        override fun shouldOverrideUrlLoading(url: String, isAutomaticRedirect: Boolean): Boolean {
+            return callback?.shouldOverrideUrlLoading(url, isAutomaticRedirect) ?: false
         }
 
         override fun onPageStarted(url: String?) {

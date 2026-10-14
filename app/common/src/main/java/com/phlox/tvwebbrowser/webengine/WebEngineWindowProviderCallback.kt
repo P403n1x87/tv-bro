@@ -23,7 +23,7 @@ interface WebEngineWindowProviderCallback {
     fun requestPermissions(array: Array<String>): Int
     fun onShowFileChooser(intent: Intent): Boolean
     fun onReceivedIcon(icon: Bitmap)
-    fun shouldOverrideUrlLoading(url: String): Boolean
+    fun shouldOverrideUrlLoading(url: String, isAutomaticRedirect: Boolean = false): Boolean
     fun onPageStarted(url: String?)
     fun onPageFinished(url: String?)
     fun onPageCertificateError(url: String?)
@@ -40,8 +40,9 @@ interface WebEngineWindowProviderCallback {
     fun onShareUrlRequested(url: String)
     fun onOpenInExternalAppRequested(url: String)
     fun initiateVoiceSearch()
-    fun onEditHomePageBookmarkSelected(index: Int)
+    fun onEditHomePageBookmarkSelected(favoriteId: Long)
     fun getHomePageLinks(): List<HomePageLink>
+    fun getHomePageHistoryLinks(): List<HomePageLink>
     fun onPrepareForFullscreen()
     fun onExitFullscreen()
     fun onVisited(url: String)

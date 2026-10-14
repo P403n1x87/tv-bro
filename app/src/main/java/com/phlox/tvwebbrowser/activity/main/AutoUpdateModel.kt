@@ -20,7 +20,7 @@ import java.util.*
 class AutoUpdateModel: ActiveModel() {
     val config = AppContext.provideConfig()
     var needToShowUpdateDlgAgain: Boolean = false
-    val updateChecker = UpdateChecker(BuildConfig.VERSION_CODE)
+    val updateChecker = UpdateChecker(BuildConfig.VERSION_NAME)
     var lastUpdateNotificationTime: Calendar
     var needAutoCheckUpdates: Boolean
         get() = config.autoCheckUpdates && BuildConfig.BUILT_IN_AUTO_UPDATE
@@ -36,8 +36,13 @@ class AutoUpdateModel: ActiveModel() {
         if (updateChecker.versionCheckResult == null || force) {
             launch(Dispatchers.IO) {
                 try {
-                    updateChecker.check("https://raw.githubusercontent.com/truefedex/tv-bro/master/latest_version.json",
-                        arrayOf(config.updateChannel))
+                    updateChecker.checkGitHubReleases(
+                        BuildConfig.UPDATE_REPO,
+                        arrayOf(config.updateChannel),
+                        BuildConfig.FLAVOR_appstore,
+                        BuildConfig.FLAVOR_webengine,
+                        Build.SUPPORTED_ABIS[0]
+                    )
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
@@ -113,4 +118,10 @@ class AutoUpdateModel: ActiveModel() {
     fun saveAutoCheckUpdates(need: Boolean) {
         config.autoCheckUpdates = need
     }
+
+    /**
+     * True when the user has update checking enabled and the last check found something newer. Drives
+     * the toolbar settings badge and the marked About category, so they match the About page rows.
+     */
+    fun isUpdateAvailable(): Boolean = needAutoCheckUpdates && updateChecker.hasUpdate()
 }

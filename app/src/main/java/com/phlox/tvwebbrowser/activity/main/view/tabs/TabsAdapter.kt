@@ -2,6 +2,7 @@ package com.phlox.tvwebbrowser.activity.main.view.tabs
 
 import android.os.Handler
 import android.os.Looper
+import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -34,6 +35,14 @@ class TabsAdapter(private val tabsView: TabsView) : RecyclerView.Adapter<TabView
     var listener: Listener? = null
     val uiHandler = Handler(Looper.getMainLooper())
     var checkedView: CheckableContainer? = null
+    var transparentBackground: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            notifyDataSetChanged()
+        }
+    private val tabBackgroundRes: Int
+        get() = R.drawable.tab_panel_item_bg_selector
 
     interface Listener {
         fun onTitleChanged(index: Int)
@@ -70,6 +79,7 @@ class TabsAdapter(private val tabsView: TabsView) : RecyclerView.Adapter<TabView
 
         fun bind(tabState: WebTabState, position: Int) {
             vb.root.tag = tabState
+            vb.root.setBackgroundResource(tabBackgroundRes)
 
             vb.tvTitle.text = tabState.title
 
@@ -82,7 +92,7 @@ class TabsAdapter(private val tabsView: TabsView) : RecyclerView.Adapter<TabView
             vb.ivFavicon.setImageResource(R.drawable.ic_launcher)
 
             val url = tabState.url
-            if (url != Config.HOME_PAGE_URL && url != Config.HOME_URL_ALIAS) {
+            if (!Config.isHomePageUrl(url)) {
                 val scope = (itemView.activity as AppCompatActivity).lifecycleScope
                 scope.launch(Dispatchers.Main) {
                     val favicon = FaviconsPool.get(url)
@@ -111,6 +121,26 @@ class TabsAdapter(private val tabsView: TabsView) : RecyclerView.Adapter<TabView
 
             vb.root.setOnClickListener {
                 listener?.onTitleSelected(tabState.position)
+            }
+
+            vb.ibCloseTabItem.setOnClickListener {
+                listener?.closeTab(tabState)
+            }
+
+            //DPAD: the close button sits inside the item's bounds, so the default
+            //focus search treats it as "not to the right" and never reaches it.
+            //Move focus explicitly so the remote can highlight and use it.
+            vb.root.setOnKeyListener { _, keyCode, event ->
+                if (event.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                    vb.ibCloseTabItem.requestFocus()
+                    true
+                } else false
+            }
+            vb.ibCloseTabItem.setOnKeyListener { _, keyCode, event ->
+                if (event.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                    vb.root.requestFocus()
+                    true
+                } else false
             }
 
             vb.root.setOnLongClickListener {
