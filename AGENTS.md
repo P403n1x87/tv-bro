@@ -480,17 +480,41 @@
   env vars still win when set (CI), and with no keystore at all release builds stay unsigned.
   `.gitignore` covers `*.keystore`/`*.jks`, so the file is never committed — back it up, and never
   regenerate it or existing installs can no longer be updated.
-- Cutting a release is just pushing a tag: `git tag v2.1.7 && git push origin v2.1.7`.
-  `.github/workflows/release.yml` builds on **every PR** (and on manual `workflow_dispatch`) with the
-  same pipeline as a release — except that signing and publishing are conditional on a tag ref
-  (`if: startsWith(github.ref, 'refs/tags/')`) — so a broken build or a bad version cannot reach a
-  tag. On a `v*` tag it validates the tag is `vX.Y.Z`, passes it through as `-PversionName`, builds
-  the `p403n1x87` geckoIncluded (ABI splits) and geckoExcluded APKs, asserts each APK really carries
-  that `versionName` (`aapt dump badging`) and is signed (AGP's `-unsigned` suffix is rejected, since
-  the updater cannot map such a name to an ABI), renames them
-  `tvbro-<version>-p403n1x87-gecko{Included,Excluded}[-<abi>].apk` and publishes the GitHub Release
-  (a tag with a suffix, e.g. `v2.2.0-rc.1`, is published as a pre-release). PR/manual builds derive
-  the version from git instead (e.g. `2.1.6-dev.3`) and upload the APKs as a workflow artifact.
+- Cutting a release is done with `gh release create`, not by tagging by hand:
+  `gh release create v3.0.1 --target master` (add `--draft` to keep it hidden until the APKs are in,
+  and edit `RELEASE_NOTES.md` *before* releasing — the workflow replaces the release body with it).
+  `gh` creates the tag with *your* token, so it triggers the `push: tags: ['v*']` run; a tag created
+  by a workflow's own `GITHUB_TOKEN` would not. That run finds the release by tag — drafts included,
+  because `getReleaseByTag` 404s for them and the action falls back to a bounded scan of recent
+  releases — overwrites its body from `RELEASE_NOTES.md`, attaches the four APKs (replacing same-named
+  assets) and, since it passes no `draft`, publishes the release at the end. A published
+  `gh release create` is therefore empty for the ~7 minutes the build takes and complete afterwards;
+  the in-app updater ignores releases without a matching APK, so that window is harmless. Pushing a
+  tag yourself (`git tag v3.0.1 && git push origin v3.0.1`) still works and converges on the same
+  pipeline. `.github/workflows/release.yml` also runs on **every PR**, with the same pipeline minus
+  publishing (`if: startsWith(github.ref, 'refs/tags/')` on the verify/rename/release steps; only the
+  non-publishing runs upload the workflow artifact) — so a broken build or a bad version cannot reach
+  a release. On a release run it validates the version is `X.Y.Z`, builds the `p403n1x87`
+  geckoIncluded (ABI splits) and geckoExcluded APKs, asserts each APK really carries that
+  `versionName` (`aapt dump badging`) and is signed (AGP's `-unsigned` suffix is rejected, since the
+  updater cannot map such a name to an ABI), renames them
+  `tvbro-<version>-p403n1x87-gecko{Included,Excluded}[-<abi>].apk` and publishes the GitHub Release,
+  whose body is `RELEASE_NOTES.md` (a version suffix, e.g. `2.2.0-rc.1`, is published as a
+  pre-release). PR/master/plain manual builds derive the version from git instead (e.g. `2.1.6-dev.3`).
+- The build is Gradle-cached: `gradle/actions/setup-gradle@v4` caches Gradle User Home (the wrapper
+  distribution, the Java toolchains and the resolved dependencies, GeckoView included) and
+  `org.gradle.caching=true` in `gradle.properties` turns on the build cache. Measured on the
+  `ci/release-workflow` PR: attempt 1 (cold) 398s, rerun (warm) 267s→29s and 73s→4s, ~1.7GB of caches
+  written. GitHub scopes caches per ref and a `pull_request` cache lives on `refs/pull/<n>/merge`, so
+  in GitHub's words it "can only be restored by re-runs of the pull request... cannot be restored by
+  the base branch" — hence the workflow also runs on `push: branches: [master]`, purely to write the
+  cache in the default branch's scope, which PR and tag runs do restore. That is why `cache-read-only`
+  is left at the action's default (write on the default branch, read-only elsewhere): one useful cache
+  entry instead of one per PR.
+- The Actions workflows of this fork had to be enabled once (`PUT
+  /repos/P403n1x87/tv-bro/actions/permissions {"enabled": true}`, the same thing the Actions UI
+  banner does): a fork starts out with its workflows suppressed, so `gh workflow list` was empty and
+  the first PR ran no checks at all. If a re-created fork ever shows no workflows, that is the reason.
 - Because the tag *is* the version, the in-app updater keeps working by construction: it matches a
   release tag `vX.Y.Z` against `BuildConfig.VERSION_NAME`.
 - Caveat for the `generic`/`google` flavors: they update from `truefedex/tv-bro` releases, whose
