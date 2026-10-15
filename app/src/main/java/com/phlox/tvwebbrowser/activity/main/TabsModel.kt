@@ -101,9 +101,15 @@ class TabsModel : ActiveModel() {
         }
     }
 
+    /**
+     * Drops every tab of the current browsing mode: the list is cleared (and the selection with
+     * it — nothing is selected when no tab exists), the rows are deleted from the repository and
+     * the tab files go away in the background.
+     */
     fun onCloseAllTabs() = modelScope.launch(Dispatchers.Main) {
         val tabsClone = ArrayList(tabsStates)
         tabsStates.clear()
+        currentTab.value = null
         tabsRepository.deleteAll(config.incognitoMode)
         withContext(Dispatchers.IO) {
             tabsClone.forEach { it.removeFiles() }

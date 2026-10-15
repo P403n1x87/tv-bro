@@ -155,6 +155,37 @@ class MainActivityViewModel: ActiveModel() {
         }
     }
 
+    /**
+     * Flips the incognito mode — the intent behind the toolbar/menu entry and the cleanup the
+     * "close app" flow runs when it happens inside an incognito process.
+     *
+     * Leaving the mode wipes the previous session first, in a fixed order the model owns:
+     * the engine's session data, then the open tabs (closed by the caller through
+     * [clearOpenTabs], since the tab model is not a dependency of this one), then the isolated
+     * WebView data directories. The engine-specific work is injected because only the view layer
+     * knows which engine factory is in use and how to reach its windows.
+     *
+     * @return the mode the process has to be switched into (unchanged when no process switch
+     * follows, e.g. the close-app flow, which only needs the cleanup).
+     */
+    suspend fun toggleIncognitoMode(
+        clearEngineSession: suspend () -> Unit,
+        clearOpenTabs: suspend () -> Unit,
+    ): Boolean {
+        val becomingIncognitoMode = !config.incognitoMode
+        if (!becomingIncognitoMode) {
+            if (!config.isWebEngineGecko()) {
+                clearEngineSession()
+            }
+            clearOpenTabs()
+            if (!config.isWebEngineGecko()) {
+                clearIncognitoData().join()
+            }
+        }
+        config.incognitoMode = becomingIncognitoMode
+        return becomingIncognitoMode
+    }
+
     fun prepareSwitchToIncognito() {
         Log.d(TAG, "prepareSwitchToIncognito")
         if (AppContext.provideConfig().isWebEngineGecko()) return
