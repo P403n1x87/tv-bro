@@ -178,4 +178,13 @@ class TabsModel : ActiveModel() {
         hostConfig.popupBlockLevel = newLevel
         hostsRepository.update(hostConfig)
     }
+
+    /**
+     * Moves the tab at [from] to [to]. The tab panel asks for this instead of swapping the list
+     * itself, so the list mutation (and the position persistence it triggers) stays in the model.
+     */
+    fun moveTab(from: Int, to: Int) {
+        if (from !in tabsStates.indices || to !in tabsStates.indices || from == to) return
+        tabsStates.swap(from, to)
+    }
 }

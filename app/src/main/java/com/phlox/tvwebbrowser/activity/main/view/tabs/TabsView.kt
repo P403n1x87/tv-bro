@@ -17,7 +17,6 @@ import com.phlox.tvwebbrowser.activity.main.view.RowFocusPanel
 import com.phlox.tvwebbrowser.activity.main.view.tabs.TabsAdapter.Listener
 import com.phlox.tvwebbrowser.databinding.ViewTabsBinding
 import com.phlox.tvwebbrowser.model.WebTabState
-import com.phlox.tvwebbrowser.utils.activemodel.ActiveModelsRepository
 import com.phlox.tvwebbrowser.utils.observable.ObservableList
 
 class TabsView @JvmOverloads constructor(
@@ -37,6 +36,16 @@ class TabsView @JvmOverloads constructor(
 
   private var overlayTransparent = false
 
+  /**
+   * Binds the models this panel renders. Called by the owner (the composition root), so the view
+   * never reaches into the model container itself.
+   */
+  fun bind(tabsModel: TabsModel, settingsModel: SettingsModel) {
+    this.tabsModel = tabsModel
+    this.settingsModel = settingsModel
+    adapter.tabsModel = tabsModel
+  }
+
   fun setOverlayTransparency(transparent: Boolean) {
     if (overlayTransparent == transparent) return
     overlayTransparent = transparent
@@ -49,11 +58,8 @@ class TabsView @JvmOverloads constructor(
       init()
   }
 
-  fun init() {
+  private fun init() {
     if (isInEditMode) return
-    tabsModel = ActiveModelsRepository.get(TabsModel::class, context)
-    settingsModel = ActiveModelsRepository.get(SettingsModel::class, context)
-    adapter.tabsModel = tabsModel
     vb.rvTabs.layoutManager = LinearLayoutManager(context, RecyclerView.VERTICAL, false)
     vb.btnAdd.setOnClickListener{
       listener?.onAddNewTabSelected()
@@ -62,7 +68,7 @@ class TabsView @JvmOverloads constructor(
 
   override fun onAttachedToWindow() {
     super.onAttachedToWindow()
-    if (isInEditMode) return
+    if (isInEditMode || !::tabsModel.isInitialized) return
     tabsModel.tabsStates.subscribe(listChangeObserver)
     tabsModel.currentTab.subscribe(currentTabObserver)
     vb.rvTabs.adapter = adapter
@@ -70,7 +76,7 @@ class TabsView @JvmOverloads constructor(
 
   override fun onDetachedFromWindow() {
     super.onDetachedFromWindow()
-    if (isInEditMode) return
+    if (isInEditMode || !::tabsModel.isInitialized) return
     tabsModel.tabsStates.unsubscribe(listChangeObserver)
     tabsModel.currentTab.unsubscribe(currentTabObserver)
   }
@@ -93,13 +99,9 @@ class TabsView @JvmOverloads constructor(
             listener?.openInNewTab(settingsModel.homePage, 0)
           }
           //Move left
-          3 -> if (tabIndex > 0) {
-            tabsModel.tabsStates.swap(tabIndex, tabIndex - 1)
-          }
+          3 -> tabsModel.moveTab(tabIndex, tabIndex - 1)
           //Move right
-          4 -> if (tabIndex < (tabsModel.tabsStates.size - 1)) {
-            tabsModel.tabsStates.swap(tabIndex, tabIndex + 1)
-          }
+          4 -> tabsModel.moveTab(tabIndex, tabIndex + 1)
         }
       }
       .show()

@@ -178,6 +178,8 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
 
         vb.vTabs.listener = tabsListener
         vb.vBookmarks.listener = bookmarksListener
+        // The composition root hands the models to the views; the views never locate them.
+        vb.vTabs.bind(tabsModel, settingsModel)
 
         vb.vActionBar.callback = this
 
