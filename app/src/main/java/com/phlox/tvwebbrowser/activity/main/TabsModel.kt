@@ -7,7 +7,9 @@ import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.TVBro
 import com.phlox.tvwebbrowser.model.HostConfig
 import com.phlox.tvwebbrowser.model.WebTabState
+import com.phlox.tvwebbrowser.repository.HostsRepository
 import com.phlox.tvwebbrowser.repository.Repositories
+import com.phlox.tvwebbrowser.repository.TabsRepository
 import com.phlox.tvwebbrowser.utils.Utils
 import com.phlox.tvwebbrowser.utils.activemodel.ActiveModel
 import com.phlox.tvwebbrowser.utils.observable.ObservableList
@@ -19,7 +21,17 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.net.URL
 
-class TabsModel : ActiveModel() {
+/**
+ * The open tabs of the current browsing mode.
+ *
+ * The data-layer gateways are constructor parameters with production defaults, so a test can hand
+ * it repositories over an in-memory database; [com.phlox.tvwebbrowser.utils.activemodel.ActiveModelsRepository]
+ * builds the no-argument constructor it synthesises.
+ */
+class TabsModel(
+    private val tabsRepository: TabsRepository = Repositories.tabs,
+    private val hostsRepository: HostsRepository = Repositories.hosts,
+) : ActiveModel() {
     companion object {
         var TAG: String = TabsModel::class.java.simpleName
     }
@@ -29,10 +41,6 @@ class TabsModel : ActiveModel() {
     val tabsStates = ObservableList<WebTabState>()
     private val config = AppContext.provideConfig()
     private var incognitoMode = config.incognitoMode
-
-    // Data-layer gateways (see the repository package): the model must not open Room itself.
-    private val tabsRepository = Repositories.tabs
-    private val hostsRepository = Repositories.hosts
 
     init {
         tabsStates.subscribe({
@@ -119,6 +127,18 @@ class TabsModel : ActiveModel() {
             tabsRepository.delete(tab)
             launch { tab.removeFiles() }
         }
+    }
+
+    /**
+     * The "toggle ad blocking for this tab" intent: the tab's own override becomes the opposite of
+     * what is currently effective for it — the override when it has one, the browser-wide default
+     * ([defaultEnabled]) otherwise. The new value is returned so the caller can push it into the
+     * tab's engine and repaint.
+     */
+    fun onToggleAdBlock(tab: WebTabState, defaultEnabled: Boolean): Boolean {
+        val newState = !(tab.adblock ?: defaultEnabled)
+        tab.adblock = newState
+        return newState
     }
 
     /**

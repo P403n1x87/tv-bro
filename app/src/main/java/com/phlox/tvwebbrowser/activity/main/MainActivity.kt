@@ -892,14 +892,11 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
     }
 
     private fun toggleAdBlockForTab() {
-        tabsModel.currentTab.value?.apply {
-            val currentState = adblock ?: adblockModel.adBlockEnabled
-            val newState = !currentState
-            adblock = newState
-            webEngine.onUpdateAdblockSetting(newState)
-            onWebViewUpdated(this)
-            refresh()
-        }
+        val tab = tabsModel.currentTab.value ?: return
+        val enabled = tabsModel.onToggleAdBlock(tab, adblockModel.adBlockEnabled)
+        tab.webEngine.onUpdateAdblockSetting(enabled)
+        onWebViewUpdated(tab)
+        refresh()
     }
 
     private suspend fun showPopupBlockOptions() {
