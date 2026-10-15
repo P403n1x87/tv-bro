@@ -20,6 +20,7 @@ import com.phlox.tvwebbrowser.activity.downloads.ActiveDownloadsModel
 import com.phlox.tvwebbrowser.model.Download
 import com.phlox.tvwebbrowser.repository.Repositories
 import com.phlox.tvwebbrowser.utils.activemodel.ActiveModelsRepository
+import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.util.*
 import java.util.concurrent.Executors
@@ -50,7 +51,7 @@ class DownloadService : Service() {
         }
 
         override fun onError(task: DownloadTask, responseCode: Int, responseMessage: String) {
-            Repositories.downloads.update(task.downloadInfo)
+            runBlocking { Repositories.downloads.update(task.downloadInfo) }
             handler.post {
                 model.notifyListenersAboutError(task, responseCode, responseMessage)
                 onTaskEnded(task)
@@ -58,7 +59,7 @@ class DownloadService : Service() {
         }
 
         override fun onDone(task: DownloadTask) {
-            Repositories.downloads.update(task.downloadInfo)
+            runBlocking { Repositories.downloads.update(task.downloadInfo) }
             handler.post {
                 model.notifyListenersAboutDownloadProgress(task)
                 onTaskEnded(task)
