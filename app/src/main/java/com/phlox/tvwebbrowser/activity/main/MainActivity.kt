@@ -174,7 +174,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         vb.vTabs.listener = tabsListener
         vb.vBookmarks.listener = bookmarksListener
         // The composition root hands the models to the views; the views never locate them.
-        vb.vTabs.bind(tabsModel, settingsModel)
+        vb.vTabs.bind(tabsModel)
 
         vb.vActionBar.callback = this
 
@@ -309,13 +309,13 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         }
 
         override fun onAddNewTabSelected() {
-            openInNewTab(settingsModel.homePage, tabsModel.tabsStates.size)
+            onNewTabRequested(tabsModel.tabsStates.size)
         }
 
         override fun closeTab(tabState: WebTabState?) = this@MainActivity.closeTab(tabState)
 
-        override fun openInNewTab(url: String, tabIndex: Int) {
-            this@MainActivity.openInNewTab(url, tabIndex,
+        override fun onNewTabRequested(tabIndex: Int) {
+            this@MainActivity.openInNewTab(settingsModel.homePage, tabIndex,
                 needToHideMenuOverlay = false,
                 navigateImmediately = true
             )

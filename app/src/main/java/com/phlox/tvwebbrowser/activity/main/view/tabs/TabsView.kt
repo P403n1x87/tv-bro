@@ -10,7 +10,6 @@ import android.widget.RelativeLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.phlox.tvwebbrowser.R
-import com.phlox.tvwebbrowser.activity.main.SettingsModel
 import com.phlox.tvwebbrowser.activity.main.TabsModel
 import com.phlox.tvwebbrowser.activity.main.view.PanelRowFocusDelegate
 import com.phlox.tvwebbrowser.activity.main.view.RowFocusPanel
@@ -30,19 +29,17 @@ class TabsView @JvmOverloads constructor(
 
   private lateinit var tabsModel: TabsModel
   private val adapter: TabsAdapter = TabsAdapter(this)
-  private lateinit var settingsModel: SettingsModel
   var current: Int by adapter::current
   var listener: Listener? by adapter::listener
 
   private var overlayTransparent = false
 
   /**
-   * Binds the models this panel renders. Called by the owner (the composition root), so the view
+   * Binds the model this panel renders. Called by the owner (the composition root), so the view
    * never reaches into the model container itself.
    */
-  fun bind(tabsModel: TabsModel, settingsModel: SettingsModel) {
+  fun bind(tabsModel: TabsModel) {
     this.tabsModel = tabsModel
-    this.settingsModel = settingsModel
     adapter.tabsModel = tabsModel
   }
 
@@ -89,14 +86,14 @@ class TabsView @JvmOverloads constructor(
         when (i) {
           //Open new Tab
           0 -> {
-            listener?.openInNewTab(settingsModel.homePage, tabIndex + 1)
+            listener?.onNewTabRequested(tabIndex + 1)
           }
           //Close current
           1 -> listener?.closeTab(tab)
           //Close all
           2 -> {
             tabsModel.onCloseAllTabs()
-            listener?.openInNewTab(settingsModel.homePage, 0)
+            listener?.onNewTabRequested(0)
           }
           //Move left
           3 -> tabsModel.moveTab(tabIndex, tabIndex - 1)
