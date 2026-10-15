@@ -1,20 +1,29 @@
 package com.phlox.tvwebbrowser.activity.history
 
 import com.phlox.tvwebbrowser.model.HistoryItem
+import com.phlox.tvwebbrowser.repository.HistoryRepository
 import com.phlox.tvwebbrowser.repository.Repositories
 import com.phlox.tvwebbrowser.utils.observable.ObservableValue
 import com.phlox.tvwebbrowser.utils.activemodel.ActiveModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-class HistoryModel: ActiveModel() {
+/**
+ * The stored page visits, as a lazily paginated window: the view appends what it gets and asks for
+ * the next window with the offset of what it already shows.
+ *
+ * The data-layer gateway is a constructor parameter with a production default, so a test can hand
+ * it a repository over an in-memory database.
+ */
+class HistoryModel(
+    private val history: HistoryRepository = Repositories.history,
+): ActiveModel() {
     val lastLoadedItems = ObservableValue<List<HistoryItem>>(ArrayList())
     private var loading = false
     var searchQuery = ""
 
-    private val history = Repositories.history
-
-    fun loadItems(eraseOldResults: Boolean, offset: Long = 0) = modelScope.launch(Dispatchers.Main) {
+    /** Loads the window at [offset] — or, with a [searchQuery] set, the matches for it. */
+    fun loadItems(offset: Long = 0) = modelScope.launch(Dispatchers.Main) {
         if (loading) {
             return@launch
         }

@@ -43,7 +43,7 @@ class HistoryActivity : AppCompatActivity(), AdapterView.OnItemClickListener, Ad
 
         override fun onScroll(view: AbsListView, firstVisibleItem: Int, visibleItemCount: Int, totalItemCount: Int) {
             if (totalItemCount != 0 && firstVisibleItem + visibleItemCount >= totalItemCount - 1 && "" == historyModel.searchQuery) {
-                historyModel.loadItems(false, adapter!!.realCount)
+                historyModel.loadItems(adapter!!.realCount)
             }
         }
     }
@@ -70,7 +70,7 @@ class HistoryActivity : AppCompatActivity(), AdapterView.OnItemClickListener, Ad
             vb.listView.requestFocus()
         }
 
-        historyModel.loadItems(false)
+        historyModel.loadItems()
     }
 
     private fun showDeleteDialog(deleteAll: Boolean) {
@@ -107,7 +107,7 @@ class HistoryActivity : AppCompatActivity(), AdapterView.OnItemClickListener, Ad
                             }
                             adapter!!.erase()
                             historyModel.searchQuery = text
-                            historyModel.loadItems(true)
+                            historyModel.loadItems()
                         }
                     })
                 }

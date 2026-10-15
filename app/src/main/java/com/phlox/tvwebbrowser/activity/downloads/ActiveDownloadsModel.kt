@@ -7,15 +7,17 @@ import com.phlox.tvwebbrowser.TVBro
 import com.phlox.tvwebbrowser.model.Download
 import com.phlox.tvwebbrowser.service.downloads.DownloadTask
 import com.phlox.tvwebbrowser.service.downloads.FileDownloadTask
+import com.phlox.tvwebbrowser.repository.DownloadsRepository
 import com.phlox.tvwebbrowser.repository.Repositories
 import com.phlox.tvwebbrowser.utils.observable.ObservableList
 import com.phlox.tvwebbrowser.utils.activemodel.ActiveModel
 import java.io.File
 
-class ActiveDownloadsModel: ActiveModel() {
+class ActiveDownloadsModel(
+    private val downloads: DownloadsRepository = Repositories.downloads,
+): ActiveModel() {
     val activeDownloads = ObservableList<DownloadTask>()
     private val listeners = java.util.ArrayList<Listener>()
-    private val downloads = Repositories.downloads
 
     interface Listener {
         fun onDownloadUpdated(downloadInfo: Download)
