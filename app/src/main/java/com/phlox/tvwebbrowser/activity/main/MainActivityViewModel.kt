@@ -11,6 +11,8 @@ import com.phlox.tvwebbrowser.model.FavoriteItem
 import com.phlox.tvwebbrowser.model.HistoryItem
 import com.phlox.tvwebbrowser.model.HomePageLink
 import com.phlox.tvwebbrowser.model.WebTabState
+import com.phlox.tvwebbrowser.repository.FavoritesRepository
+import com.phlox.tvwebbrowser.repository.HistoryRepository
 import com.phlox.tvwebbrowser.repository.Repositories
 import com.phlox.tvwebbrowser.utils.UpdateChecker
 import com.phlox.tvwebbrowser.utils.activemodel.ActiveModel
@@ -27,7 +29,17 @@ import java.net.URL
 import java.util.Calendar
 import java.util.Locale
 
-class MainActivityViewModel: ActiveModel() {
+/**
+ * Presentation model of the main screen.
+ *
+ * The data-layer gateways are constructor parameters with production defaults, so a test can hand
+ * it repositories over an in-memory database; [com.phlox.tvwebbrowser.utils.activemodel.ActiveModelsRepository]
+ * builds the no-argument constructor it synthesises.
+ */
+class MainActivityViewModel(
+    private val favorites: FavoritesRepository = Repositories.favorites,
+    private val history: HistoryRepository = Repositories.history,
+): ActiveModel() {
     companion object {
         var TAG: String = MainActivityViewModel::class.java.simpleName
         const val WEB_VIEW_DATA_FOLDER = "app_webview"
@@ -42,10 +54,6 @@ class MainActivityViewModel: ActiveModel() {
     val homePageLinks = ObservableList<HomePageLink>()
     val homePageHistoryLinks = ObservableList<HomePageLink>()
     val config = AppContext.provideConfig()
-
-    // Data-layer gateways. The view model must not reach into Room itself, see the repository package.
-    private val favorites = Repositories.favorites
-    private val history = Repositories.history
 
     /** Stored bookmarks, owned here so the view only renders them. */
     val bookmarks = ObservableList<FavoriteItem>()

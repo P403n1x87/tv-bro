@@ -54,7 +54,10 @@ object ActiveModelsRepository {
     val className = clazz.qualifiedName ?: throw IllegalStateException("clazz should have name!")
     var modelHolder: StateModelHolder? = holdersMap[className]
     if (modelHolder == null) {
-      modelHolder = StateModelHolder(clazz.java.constructors.first().newInstance() as ActiveModel)
+      // The declared no-argument constructor, not just the first one: a model whose primary
+      // constructor parameters all have defaults (dependencies that can be injected in tests)
+      // gets a synthetic no-argument constructor from Kotlin, but also keeps the full one.
+      modelHolder = StateModelHolder(clazz.java.getDeclaredConstructor().newInstance() as ActiveModel)
       holdersMap[className] = modelHolder
     }
     if (!modelHolder.users.contains(user)) {
