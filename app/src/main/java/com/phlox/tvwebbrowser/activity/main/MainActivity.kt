@@ -333,15 +333,18 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         }
 
         override fun onEditBookmark(item: FavoriteItem) {
-            FavoriteEditorDialog(this@MainActivity, object : FavoriteEditorDialog.Callback {
-                override fun onDone(item: FavoriteItem) {
-                    lifecycleScope.launch(Dispatchers.Main) {
-                        viewModel.onHomePageLinkEdited(item).join()
-                        loadBookmarks()
-                        updateBookmarkState()
-                    }
+            FavoriteEditorDialog(
+                this@MainActivity,
+                initialTitle = item.title,
+                initialUrl = item.url,
+                newBookmark = item.id == 0L,
+            ) { title, url ->
+                lifecycleScope.launch(Dispatchers.Main) {
+                    viewModel.onHomePageLinkEdited(item, title, url).join()
+                    loadBookmarks()
+                    updateBookmarkState()
                 }
-            }, item).show()
+            }.show()
         }
 
         override fun onDeleteBookmark(item: FavoriteItem) {
@@ -422,17 +425,18 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         val url = currentTab.url
         if (url.isNullOrBlank() || Config.isHomePageUrl(url)) return
         val newItem = FavoriteItem()
-        newItem.title = currentTab.title ?: url
-        newItem.url = url
-        FavoriteEditorDialog(this, object : FavoriteEditorDialog.Callback {
-            override fun onDone(item: FavoriteItem) {
-                lifecycleScope.launch(Dispatchers.Main) {
-                    viewModel.onHomePageLinkEdited(item).join()
-                    loadBookmarks()
-                    updateBookmarkState()
-                }
+        FavoriteEditorDialog(
+            this,
+            initialTitle = currentTab.title ?: url,
+            initialUrl = url,
+            newBookmark = true,
+        ) { title, editedUrl ->
+            lifecycleScope.launch(Dispatchers.Main) {
+                viewModel.onHomePageLinkEdited(newItem, title, editedUrl).join()
+                loadBookmarks()
+                updateBookmarkState()
             }
-        }, newItem).show()
+        }.show()
     }
 
     /**
@@ -1167,11 +1171,14 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
     }
 
     private fun onEditHomePageBookmark(favoriteItem: FavoriteItem) {
-        FavoriteEditorDialog(this, object : FavoriteEditorDialog.Callback {
-            override fun onDone(item: FavoriteItem) {
-                viewModel.onHomePageLinkEdited(item)
-            }
-        }, favoriteItem).show()
+        FavoriteEditorDialog(
+            this,
+            initialTitle = favoriteItem.title,
+            initialUrl = favoriteItem.url,
+            newBookmark = favoriteItem.id == 0L,
+        ) { title, url ->
+            viewModel.onHomePageLinkEdited(favoriteItem, title, url)
+        }.show()
     }
 
     private inner class WebEngineCallback(val tab: WebTabState) : WebEngineWindowProviderCallback {

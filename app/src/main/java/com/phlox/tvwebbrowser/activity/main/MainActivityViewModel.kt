@@ -318,7 +318,14 @@ class MainActivityViewModel(
 
     suspend fun getBookmarkById(id: Long): FavoriteItem? = favorites.byId(id)
 
-    fun onHomePageLinkEdited(item: FavoriteItem) = modelScope.launch {
+    /**
+     * The "bookmark edited" intent: [item] (a new bookmark when its id is 0, an existing one
+     * otherwise) is saved with the values the editor reported, and the observable home-page links
+     * are kept in sync.
+     */
+    fun onHomePageLinkEdited(item: FavoriteItem, title: String, url: String) = modelScope.launch {
+        item.title = title
+        item.url = url
         if (item.id == 0L) {
             val lastInsertRowId = favorites.add(item)
             item.id = lastInsertRowId

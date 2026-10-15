@@ -6,6 +6,7 @@ import android.os.Looper
 import androidx.room.Room
 import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.Config
+import com.phlox.tvwebbrowser.model.FavoriteItem
 import com.phlox.tvwebbrowser.model.WebTabState
 import com.phlox.tvwebbrowser.repository.FavoritesRepository
 import com.phlox.tvwebbrowser.repository.HistoryRepository
@@ -37,6 +38,7 @@ import java.util.concurrent.Executor
 class MainActivityViewModelTest {
 
     private lateinit var db: AppDatabase
+    private lateinit var favorites: FavoritesRepository
     private lateinit var history: HistoryRepository
     private lateinit var viewModel: MainActivityViewModel
 
@@ -52,8 +54,9 @@ class MainActivityViewModelTest {
             .setTransactionExecutor(directExecutor)
             .build()
         history = HistoryRepository(db.historyDao())
+        favorites = FavoritesRepository(db.favoritesDao())
         viewModel = MainActivityViewModel(
-            favorites = FavoritesRepository(db.favoritesDao()),
+            favorites = favorites,
             history = history,
         )
     }
@@ -140,5 +143,38 @@ class MainActivityViewModelTest {
         advance(1)
 
         assertEquals("The real title", saved().single().title)
+    }
+
+    @Test
+    fun aNewBookmarkIsSavedWithTheEditedValues() {
+        val item = FavoriteItem()
+
+        viewModel.onHomePageLinkEdited(item, "Edited title", "https://edited.example/")
+        advance(1)
+
+        val stored = runBlocking { favorites.allBookmarks().single() }
+        assertEquals("Edited title", stored.title)
+        assertEquals("https://edited.example/", stored.url)
+        assertEquals("the generated id is handed back", stored.id, item.id)
+        assertEquals(
+            listOf("https://edited.example/"),
+            viewModel.homePageLinks.map { it.url }
+        )
+    }
+
+    @Test
+    fun editingAnExistingBookmarkUpdatesItInsteadOfAddingASecondOne() {
+        val item = FavoriteItem()
+        viewModel.onHomePageLinkEdited(item, "Before", "https://before.example/")
+        advance(1)
+
+        viewModel.onHomePageLinkEdited(item, "After", "https://after.example/")
+        advance(1)
+
+        val stored = runBlocking { favorites.allBookmarks() }
+        assertEquals(1, stored.size)
+        assertEquals("After", stored.single().title)
+        assertEquals("https://after.example/", stored.single().url)
+        assertEquals(listOf("https://after.example/"), viewModel.homePageLinks.map { it.url })
     }
 }

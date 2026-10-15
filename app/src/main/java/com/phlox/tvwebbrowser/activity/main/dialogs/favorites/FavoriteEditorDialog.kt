@@ -9,12 +9,22 @@ import android.widget.ImageButton
 import android.widget.TextView
 
 import com.phlox.tvwebbrowser.R
-import com.phlox.tvwebbrowser.model.FavoriteItem
+import com.phlox.tvwebbrowser.domain.UrlNormalizer
 
 /**
  * Created by PDT on 13.09.2016.
+ *
+ * A form: it shows the title/url it was opened with and reports the edited values. It deliberately
+ * knows nothing about the bookmark behind them — the owner applies the values and persists them
+ * through its model.
  */
-class FavoriteEditorDialog(context: Context, private val callback: Callback, private val item: FavoriteItem) : Dialog(context) {
+class FavoriteEditorDialog(
+    context: Context,
+    private val initialTitle: String?,
+    private val initialUrl: String?,
+    private val newBookmark: Boolean,
+    private val callback: Callback,
+) : Dialog(context) {
     private val tvTitle: TextView
     private val tvUrl: TextView
     private val etTitle: EditText
@@ -24,16 +34,17 @@ class FavoriteEditorDialog(context: Context, private val callback: Callback, pri
     private val btnDone: Button
     private val btnCancel: Button
 
-    interface Callback {
-        fun onDone(item: FavoriteItem)
+    fun interface Callback {
+        /** The edited values, with the url already made absolute. */
+        fun onDone(title: String, url: String)
     }
 
     init {
         setCancelable(true)
-        setTitle(if (item.id == 0L) R.string.new_bookmark else R.string.edit)
+        setTitle(if (newBookmark) R.string.new_bookmark else R.string.edit)
         setContentView(R.layout.dialog_new_favorite_item)
         findViewById<TextView>(R.id.tvDialogTitle).text =
-            context.getString(if (item.id == 0L) R.string.new_bookmark else R.string.edit)
+            context.getString(if (newBookmark) R.string.new_bookmark else R.string.edit)
         tvTitle = findViewById<View>(R.id.tvTitle) as TextView
         tvUrl = findViewById<View>(R.id.tvUrl) as TextView
         etTitle = findViewById<View>(R.id.etTitle) as EditText
@@ -58,21 +69,17 @@ class FavoriteEditorDialog(context: Context, private val callback: Callback, pri
         }
 
         btnDone.setOnClickListener {
-            this@FavoriteEditorDialog.item.title = etTitle.text.toString()
-            var urlStr = etUrl.text.toString()
-            //add https:// if url not starts with any schema
-            if (!urlStr.matches( Regex("^[A-Za-z]+://.*$"))) {
-                urlStr = "https://$urlStr"
-            }
-            this@FavoriteEditorDialog.item.url = urlStr
-            callback.onDone(this@FavoriteEditorDialog.item)
+            callback.onDone(
+                etTitle.text.toString(),
+                UrlNormalizer.withAbsoluteScheme(etUrl.text.toString()),
+            )
             dismiss()
         }
         btnCancel.setOnClickListener { dismiss() }
 
-        tvTitle.text = item.title
-        etTitle.setText(item.title)
-        tvUrl.text = item.url
-        etUrl.setText(item.url)
+        tvTitle.text = initialTitle
+        etTitle.setText(initialTitle)
+        tvUrl.text = initialUrl
+        etUrl.setText(initialUrl)
     }
 }
