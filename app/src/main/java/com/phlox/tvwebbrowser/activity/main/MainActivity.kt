@@ -70,13 +70,14 @@ import com.phlox.tvwebbrowser.activity.main.view.RowFocusPanel
 import com.phlox.tvwebbrowser.activity.main.view.bookmarks.BookmarksPanelView
 import com.phlox.tvwebbrowser.activity.main.view.tabs.TabsAdapter.Listener
 import com.phlox.tvwebbrowser.databinding.ActivityMainBinding
+import com.phlox.tvwebbrowser.domain.NavigationPolicy
+import com.phlox.tvwebbrowser.domain.PopupPolicy
 import com.phlox.tvwebbrowser.model.Download
 import com.phlox.tvwebbrowser.model.FavoriteItem
 import com.phlox.tvwebbrowser.model.HomePageLink
 import com.phlox.tvwebbrowser.model.HostConfig
 import com.phlox.tvwebbrowser.model.WebTabState
 import com.phlox.tvwebbrowser.service.downloads.DownloadService
-import com.phlox.tvwebbrowser.singleton.AppDatabase
 import com.phlox.tvwebbrowser.singleton.shortcuts.ShortcutMgr
 import com.phlox.tvwebbrowser.utils.BackNavigationEventsAdapter
 import com.phlox.tvwebbrowser.utils.DownloadUtils
@@ -1319,9 +1320,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
                 return true
             }
 
-            if (URLUtil.isNetworkUrl(url) || uri.scheme.equals("javascript", true) ||
-                    uri.scheme.equals("data", true) || uri.scheme.equals("about", true) ||
-                    uri.scheme.equals("blob", true)) {
+            if (NavigationPolicy.shouldLoadInEngine(uri.scheme, URLUtil.isNetworkUrl(url))) {
                 if (isAutomaticRedirect && shouldBlockAutomaticRedirect(url)) {
                     return true
                 }
@@ -1329,7 +1328,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
                 return false
             }
 
-            if (uri.scheme.equals("intent", true)) {
+            if (NavigationPolicy.isIntentScheme(uri.scheme)) {
                 Log.d(TAG, "shouldOverrideUrlLoading: intent url: $url")
                 onOpenInExternalAppRequested(url)
                 return true
@@ -1360,31 +1359,19 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         }
 
         private fun shouldBlockAutomaticRedirect(url: String): Boolean {
-            if (!config.blockAutomaticRedirects || !config.adBlockEnabled) return false
-            val current = tab.url.takeIf { it.isNotBlank() } ?: tab.lastLoadingUrl ?: return false
-            if (!isDifferentSite(url, current)) return false
-            Log.i(TAG, "blockAutomaticRedirect: $url -> blocked")
-            onBlockedAd(url)
-            return true
-        }
-
-        private fun isDifferentSite(url: String, current: String): Boolean {
-            if (url == current) return false
-            val a = siteDomain(Uri.parse(url).host)
-            val b = siteDomain(Uri.parse(current).host)
-            return a != null && b != null && a != b
-        }
-
-        private fun siteDomain(host: String?): String? {
-            if (host.isNullOrBlank()) return null
-            val labels = host.lowercase().removePrefix("www.").split('.')
-            if (labels.size <= 2) return labels.joinToString(".")
-            val ccBase = setOf("co", "com", "org", "net", "edu", "gov", "ac", "ne", "or", "nom", "uk", "ca",
-                "us", "au", "nz", "jp", "in", "za", "br", "ar", "mx", "tr", "cn", "sg", "hk", "tw", "kr",
-                "it", "fr", "de", "es", "pl", "ru", "se", "no", "fi", "dk", "nl", "be", "ch", "at", "ie",
-                "pt", "gr", "il", "cz", "sk", "hu", "ro", "bg", "hr", "rs", "ua", "dev", "io", "app")
-            val base = if (labels[labels.size - 2] in ccBase) 3 else 2
-            return labels.takeLast(base).joinToString(".")
+            val blocked = NavigationPolicy.shouldBlockAutomaticRedirect(
+                requestedUrl = url,
+                currentUrl = tab.url,
+                lastLoadingUrl = tab.lastLoadingUrl,
+                blockAutomaticRedirects = config.blockAutomaticRedirects,
+                adBlockEnabled = config.adBlockEnabled,
+                hostOf = { u -> Uri.parse(u).host }
+            )
+            if (blocked) {
+                Log.i(TAG, "blockAutomaticRedirect: $url -> blocked")
+                onBlockedAd(url)
+            }
+            return blocked
         }
 
         override fun onPageStarted(url: String?) {
@@ -1452,13 +1439,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
 
         override fun shouldBlockNewWindow(dialog: Boolean, userGesture: Boolean): Boolean {
             val hostConfig = runBlocking(Dispatchers.Main.immediate){ tabsModel.findHostConfig(tab, false) }
-            val currentBlockPopupsLevelValue = hostConfig?.popupBlockLevel ?: HostConfig.DEFAULT_BLOCK_POPUPS_VALUE
-            return when (currentBlockPopupsLevelValue) {
-                HostConfig.POPUP_BLOCK_NONE -> false
-                HostConfig.POPUP_BLOCK_DIALOGS -> dialog
-                HostConfig.POPUP_BLOCK_NEW_AUTO_OPENED_TABS -> dialog || !userGesture
-                else -> true
-            }
+            return PopupPolicy.shouldBlockNewWindow(dialog, userGesture, hostConfig?.popupBlockLevel)
         }
 
         override fun onBlockedAd(uri: String) {
