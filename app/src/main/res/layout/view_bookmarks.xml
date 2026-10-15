@@ -12,6 +12,7 @@
         android:minHeight="64dp"
         android:orientation="horizontal"
         android:focusable="true"
+        android:visibility="gone"
         android:paddingStart="6dp"
         android:paddingEnd="6dp"
         android:background="@drawable/tab_panel_item_bg_selector"

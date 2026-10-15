@@ -8,6 +8,8 @@ import android.view.LayoutInflater
 import android.widget.RelativeLayout
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.phlox.tvwebbrowser.activity.main.view.PanelRowFocusDelegate
+import com.phlox.tvwebbrowser.activity.main.view.RowFocusPanel
 import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.databinding.ViewBookmarksBinding
@@ -16,9 +18,18 @@ import com.phlox.tvwebbrowser.model.FavoriteItem
 class BookmarksPanelView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null
-) : RelativeLayout(context, attrs) {
+) : RelativeLayout(context, attrs), RowFocusPanel {
 
     private val vb = ViewBookmarksBinding.inflate(LayoutInflater.from(context), this)
+
+    private val rowFocus = PanelRowFocusDelegate(this) {
+        // "Add this page" is a plain child, always laid out; the first bookmark is a RecyclerView
+        // row, which findViewHolderForAdapterPosition only returns once the current dataset has
+        // been laid out (after setBookmarks that means the next layout pass, and never a child
+        // left over from the previous opening of the panel).
+        if (vb.llAddThisPage.isVisible) vb.llAddThisPage
+        else vb.rvBookmarks.findViewHolderForAdapterPosition(0)?.itemView
+    }
 
     private val adapterListener = object : BookmarksAdapter.Listener {
         override fun onBookmarkClick(item: FavoriteItem) {
@@ -56,11 +67,11 @@ class BookmarksPanelView @JvmOverloads constructor(
     /**
      * Shows the first entry only when [url] is a real web page (not the home page). The entry reads
      * "Add this page" normally, or "Remove from list" with a filled star when the page is already
-     * bookmarked.
+     * bookmarked. This settles the row's visibility as well, so the focus hand-off can be asked for
+     * once this (and [setBookmarks]) has run.
      */
     fun setCurrentPage(url: String?, bookmarked: Boolean) {
-        val canAdd = url != null && url.isNotBlank() &&
-                !Config.isHomePageUrl(url) && url.startsWith("http", true)
+        val canAdd = canAddThisPage(url)
         vb.llAddThisPage.isVisible = canAdd
         if (!canAdd) return
         vb.tvAddThisPage.setText(if (bookmarked) R.string.remove_from_list else R.string.add_this_page)
@@ -69,6 +80,9 @@ class BookmarksPanelView @JvmOverloads constructor(
             else R.drawable.ic_star_border_grey_900_36dp
         )
     }
+
+    private fun canAddThisPage(url: String?): Boolean = url != null && url.isNotBlank() &&
+            !Config.isHomePageUrl(url) && url.startsWith("http", true)
 
     fun setBookmarks(items: List<FavoriteItem>) {
         adapter.setItems(items)
@@ -87,21 +101,12 @@ class BookmarksPanelView @JvmOverloads constructor(
             .show()
     }
 
+    override fun requestRowFocus() = rowFocus.requestRowFocus()
+
     override fun onFocusChanged(gainFocus: Boolean, direction: Int, previouslyFocusedRect: Rect?) {
         super.onFocusChanged(gainFocus, direction, previouslyFocusedRect)
-        if (gainFocus) {
-            // The panel is made VISIBLE and focused in the same frame, so the RecyclerView may
-            // still have no laid-out rows. Post so the first row can take focus once layout has
-            // run; without it focus stays on this full-size container and the D-pad escapes back
-            // to the top bar instead of moving through the list.
-            post { focusFirstRow() }
-        }
-    }
-
-    private fun focusFirstRow() {
-        if (!isAttachedToWindow || !hasFocus()) return
-        val target = if (vb.llAddThisPage.isVisible) vb.llAddThisPage
-            else vb.rvBookmarks.getChildAt(0) ?: return
-        target.requestFocus()
+        // The container itself only keeps the focus while no row could take it (e.g. an empty list
+        // on the home page); once the focus moves on, stop trying.
+        if (!gainFocus) rowFocus.cancel()
     }
 }

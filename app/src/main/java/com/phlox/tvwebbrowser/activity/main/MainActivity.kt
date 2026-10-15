@@ -66,6 +66,7 @@ import com.phlox.tvwebbrowser.activity.main.dialogs.media.MediaListAdapter
 import com.phlox.tvwebbrowser.activity.main.dialogs.settings.SettingsDialog
 import com.phlox.tvwebbrowser.activity.main.view.ActionBar
 import com.phlox.tvwebbrowser.activity.main.view.CursorMenuView
+import com.phlox.tvwebbrowser.activity.main.view.RowFocusPanel
 import com.phlox.tvwebbrowser.activity.main.view.bookmarks.BookmarksPanelView
 import com.phlox.tvwebbrowser.activity.main.view.tabs.TabsAdapter.Listener
 import com.phlox.tvwebbrowser.databinding.ActivityMainBinding
@@ -366,30 +367,34 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
 
     private fun showBookmarksPanel() {
         vb.llTabPanel.visibility = View.GONE
-        loadBookmarks()
         vb.rlBookmarksPanel.visibility = View.VISIBLE
+        // Give the panel the focus straight away; the remote then cannot escape to the top bar while
+        // the bookmarks are being read.
         focusPanel(vb.vBookmarks)
-        updateCurrentPageBookmarkEntry()
+        lifecycleScope.launch(Dispatchers.Main) {
+            // Read the content first and hand the focus to a row only afterwards: the rows, and the
+            // "Add this page" entry (which is hidden again for the home page), are final by then, so
+            // the hand-off needs at most the one layout pass that creates them.
+            loadBookmarks()
+            updateCurrentPageBookmarkEntry()
+            vb.vBookmarks.requestRowFocus()
+        }
     }
 
     /** Refreshes the "Add this page" / "Remove from list" row for the current tab. */
-    private fun updateCurrentPageBookmarkEntry() {
+    private suspend fun updateCurrentPageBookmarkEntry() {
         val url = tabsModel.currentTab.value?.url
-        lifecycleScope.launch(Dispatchers.Main) {
-            val bookmarked = !url.isNullOrBlank() &&
-                    AppDatabase.db.favoritesDao().getByUrl(url) != null
-            vb.vBookmarks.setCurrentPage(url, bookmarked)
-        }
+        val bookmarked = !url.isNullOrBlank() &&
+                AppDatabase.db.favoritesDao().getByUrl(url) != null
+        vb.vBookmarks.setCurrentPage(url, bookmarked)
     }
 
     private fun hideBookmarksPanel() {
         vb.rlBookmarksPanel.visibility = View.GONE
     }
 
-    private fun loadBookmarks() {
-        lifecycleScope.launch(Dispatchers.Main) {
-            vb.vBookmarks.setBookmarks(AppDatabase.db.favoritesDao().getAllBookmarks())
-        }
+    private suspend fun loadBookmarks() {
+        vb.vBookmarks.setBookmarks(AppDatabase.db.favoritesDao().getAllBookmarks())
     }
 
     private fun addCurrentPageAsBookmark() {
@@ -500,6 +505,9 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
             vb.rlBookmarksPanel.visibility = View.GONE
             vb.llTabPanel.visibility = View.VISIBLE
             focusPanel(vb.vTabs)
+            // The tabs are already in the adapter, so the only thing missing is the layout pass that
+            // creates the rows; ask for the current row straight away.
+            vb.vTabs.requestRowFocus()
         }
     }
 
@@ -507,15 +515,16 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
      * Gives a panel that has just been made visible the focus. A plain requestFocus() is not
      * enough: the panel was GONE, so the views inside it are not laid out yet, and when the device
      * is in touch mode (a tap anywhere puts it there) a view that is not focusable in touch mode
-     * cannot take focus at all - the panel then stayed unfocused and the D-pad went straight back
-     * to the top bar. requestFocusFromTouch() leaves touch mode first; the post is a second chance
-     * for the case where the first request only marked the panel as "wants focus".
+     * cannot take focus at all - the panel then stayed unfocused and the D-pad went straight back to
+     * the top bar. requestFocusFromTouch() leaves touch mode first, so the container takes the focus
+     * synchronously and a D-pad press can never escape that way.
+     *
+     * The container is only a fallback though: the focus then moves down to a real row via
+     * [RowFocusPanel.requestRowFocus], which the caller triggers once the panel's content is settled
+     * - the bookmarks panel only asks for it after the list has been read from the database.
      */
     private fun focusPanel(panel: View) {
         panel.requestFocusFromTouch()
-        panel.post {
-            if (panel.isVisible && !panel.hasFocus()) panel.requestFocus()
-        }
     }
 
     override fun onShowMenu() {
