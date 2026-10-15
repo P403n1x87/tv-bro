@@ -120,7 +120,8 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
     private lateinit var vb: ActivityMainBinding
     private lateinit var viewModel: MainActivityViewModel
     private lateinit var tabsModel: TabsModel
-    private lateinit var settingsModel: SettingsModel
+    /** Composition root for the settings: also read by [com.phlox.tvwebbrowser.activity.IncognitoModeMainActivity]. */
+    protected lateinit var settingsModel: SettingsModel
     private lateinit var adblockModel: AdblockModel
     private lateinit var autoUpdateModel: AutoUpdateModel
     private lateinit var uiHandler: Handler
@@ -140,6 +141,8 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Read straight from Config: this runs before the models are composed (and, in the
+        // process-switch case below, before this activity really starts).
         val incognitoMode = config.incognitoMode
         Log.d(TAG, "onCreate incognitoMode: $incognitoMode")
         if (incognitoMode xor (this is IncognitoModeMainActivity)) {
@@ -179,8 +182,8 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
 
         // The cursor menu asks the host about (and reports back) the "direct navigation" hint
         // instead of reading global config itself.
-        vb.vCursorMenu.shouldSuppressDirectNavigationHint = { config.directNavigationModeHintSuppress }
-        vb.vCursorMenu.onDirectNavigationHintSuppressed = { config.directNavigationModeHintSuppress = true }
+        vb.vCursorMenu.shouldSuppressDirectNavigationHint = { settingsModel.directNavigationModeHintSuppress }
+        vb.vCursorMenu.onDirectNavigationHintSuppressed = { settingsModel.directNavigationModeHintSuppress = true }
 
         settingsModel.userAgentString.subscribe(this.lifecycle, false) {
             for (tab in tabsModel.tabsStates) {
@@ -355,7 +358,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
     override fun closeWindow() {
         Log.d(TAG, "closeWindow")
         lifecycleScope.launch {
-            if (config.incognitoMode) {
+            if (settingsModel.incognitoMode) {
                 toggleIncognitoMode(andSwitchProcess = false)
             }
             finish()
@@ -697,7 +700,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         if (url == null) {
             return null
         }
-        val tab = WebTabState(url = url, incognito = config.incognitoMode)
+        val tab = WebTabState(url = url, incognito = settingsModel.incognitoMode)
         createWebView(tab) ?: return null
         tabsModel.tabsStates.add(index, tab)
         changeTab(tab)
@@ -1422,7 +1425,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
                 onBlockedDialog(!dialog)
                 return null
             }
-            val tab = WebTabState(incognito = config.incognitoMode)
+            val tab = WebTabState(incognito = settingsModel.incognitoMode)
             val webView = createWebView(tab) ?: return null
             val currentTab = this@MainActivity.tabsModel.currentTab.value ?: return null
             val index = tabsModel.tabsStates.indexOf(currentTab) + 1
@@ -1544,7 +1547,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         override fun onVisited(url: String) {
             val tab = tabsModel.currentTab.value ?: return
 
-            if (!config.incognitoMode) {
+            if (!settingsModel.incognitoMode) {
                 viewModel.logVisitedHistory(tab.title, url, tab.faviconHash)
             }
         }

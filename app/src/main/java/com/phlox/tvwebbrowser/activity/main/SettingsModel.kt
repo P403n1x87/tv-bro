@@ -36,6 +36,11 @@ class SettingsModel : ActiveModel() {
             get() = config.keepScreenOn
     }//makeObservable(config::keepScreenOn)
 
+    //One-shot hints the user dismissed for good ("don't show again"): the screens flip them here,
+    //so no view writes those Config flags directly.
+    var incognitoModeHintSuppress by config::incognitoModeHintSuppress
+    var directNavigationModeHintSuppress by config::directNavigationModeHintSuppress
+
     fun setSearchEngineURL(url: String) {
         config.searchEngineURL.value = url
         if (homePageMode == Config.HomePageMode.SEARCH_ENGINE) {
