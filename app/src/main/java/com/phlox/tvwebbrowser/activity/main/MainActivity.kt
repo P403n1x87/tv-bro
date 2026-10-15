@@ -923,11 +923,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
     fun navigate(url: String) {
         Log.d(TAG, "navigate: $url")
         vb.vActionBar.setAddressBoxTextColor(ContextCompat.getColor(this@MainActivity, R.color.default_url_color))
-        val tab = tabsModel.currentTab.value
-        if (tab != null) {
-            tab.url = url
-            tab.webEngine.loadUrl(url)
-        } else {
+        if (!tabsModel.navigateTo(url)) {
             openInNewTab(url, 0, needToHideMenuOverlay = true, navigateImmediately = true)
         }
     }
@@ -1248,7 +1244,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         }
 
         override fun onReceivedTitle(title: String) {
-            tab.title = title
+            tabsModel.onPageTitleUpdated(tab, title)
             vb.vTabs.onTabTitleUpdated(tab)
             viewModel.onTabTitleUpdated(tab)
         }
@@ -1280,7 +1276,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         }
 
         override fun shouldOverrideUrlLoading(url: String, isAutomaticRedirect: Boolean): Boolean {
-            tab.lastLoadingUrl = url
+            tabsModel.onNavigationRequested(tab, url)
 
             val uri = try {
                 Uri.parse(url)
@@ -1350,17 +1346,10 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
 
         override fun onPageStarted(url: String?) {
             onWebViewUpdated(tab)
-            val webViewUrl = tab.webEngine.url
-            if (webViewUrl != null) {
-                tab.url = webViewUrl
-            } else if (url != null) {
-                tab.url = url
-            }
+            tabsModel.onPageStarted(tab, tab.webEngine.url, url)
             if (tabByTitleIndex(vb.vTabs.current) == tab) {
                 vb.vActionBar.setAddressBoxText(tab.url)
             }
-            tab.blockedAds = 0
-            tab.blockedPopups = 0
         }
 
         override fun onPageFinished(url: String?) {
@@ -1368,19 +1357,12 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
                 return
             }
             onWebViewUpdated(tab)
-
-            val webViewUrl = tab.webEngine.url
-            if (webViewUrl != null) {
-                tab.url = webViewUrl
-            } else if (url != null) {
-                tab.url = url
-            }
+            tabsModel.onPageFinished(tab, tab.webEngine.url, url)
             if (tabByTitleIndex(vb.vTabs.current) == tab) {
                 vb.vActionBar.setAddressBoxText(tab.url)
             }
 
             //thumbnail
-            tabsModel.tabsStates.onEach { if (it != tab) it.thumbnail = null }
             lifecycleScope.launch {
                 val newThumbnail = tab.webEngine.renderThumbnail(tab.thumbnail)
                 if (newThumbnail != null) {
@@ -1425,11 +1407,11 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         override fun onBlockedAd(uri: String) {
             Log.i(TAG, "onBlockedAd: $uri")
             if (!adblockModel.adBlockEnabled) return
-            tab.blockedAds++
+            tabsModel.onAdBlocked(tab)
         }
 
         override fun onBlockedDialog(newTab: Boolean) {
-            tab.blockedPopups++
+            tabsModel.onDialogBlocked(tab)
             runOnUiThread {
                 val msg = getString(if (newTab) R.string.new_tab_blocked else R.string.popup_dialog_blocked)
                 NotificationView.showBottomRight(vb.rlRoot, R.drawable.ic_block_popups, msg)
@@ -1461,7 +1443,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
 
         override fun onScaleChanged(oldScale: Float, newScale: Float) {
             Log.d(TAG, "onScaleChanged: oldScale: $oldScale newScale: $newScale")
-            tab.scale = newScale
+            tabsModel.onScaleChanged(tab, newScale)
         }
 
         override fun onCopyTextToClipboardRequested(url: String) {

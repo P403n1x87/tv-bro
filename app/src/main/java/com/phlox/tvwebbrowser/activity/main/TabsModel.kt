@@ -152,6 +152,66 @@ class TabsModel : ActiveModel() {
         newTab.webEngine.setNetworkAvailable(Utils.isNetworkConnected(TVBro.instance))
     }
 
+    /**
+     * Loads [url] in the current tab — the model intent behind the address box and the external
+     * "open in browser" entries. Returns false when no tab is selected, so the caller can fall back
+     * to opening one.
+     */
+    fun navigateTo(url: String): Boolean {
+        val tab = currentTab.value ?: return false
+        onPageUrlUpdated(tab, url, null)
+        tab.webEngine.loadUrl(url)
+        return true
+    }
+
+    /** The engine is about to load [url] in [tab]; remembered as the redirect-blocker's fallback. */
+    fun onNavigationRequested(tab: WebTabState, url: String) {
+        tab.lastLoadingUrl = url
+    }
+
+    /**
+     * Page lifecycle events reported by the per-tab engine callback. The engine knows the final url
+     * after redirects, so its value wins and the url the callback reported is only a fallback; the
+     * blocked-ad/popup counters restart with every new document.
+     */
+    fun onPageStarted(tab: WebTabState, engineUrl: String?, callbackUrl: String?) {
+        onPageUrlUpdated(tab, engineUrl, callbackUrl)
+        tab.blockedAds = 0
+        tab.blockedPopups = 0
+    }
+
+    fun onPageFinished(tab: WebTabState, engineUrl: String?, callbackUrl: String?) {
+        onPageUrlUpdated(tab, engineUrl, callbackUrl)
+        // A settled page invalidates the thumbnails of the other tabs (the one that just finished
+        // keeps its own: it is about to be re-rendered right away).
+        tabsStates.onEach { if (it != tab) it.thumbnail = null }
+    }
+
+    /** The engine knows the document title; the tabs panel repaints the row from the new value. */
+    fun onPageTitleUpdated(tab: WebTabState, title: String) {
+        tab.title = title
+    }
+
+    fun onAdBlocked(tab: WebTabState) {
+        tab.blockedAds++
+    }
+
+    fun onDialogBlocked(tab: WebTabState) {
+        tab.blockedPopups++
+    }
+
+    /** The engine reports a page-scale change; kept on the tab so it survives switching. */
+    fun onScaleChanged(tab: WebTabState, newScale: Float) {
+        tab.scale = newScale
+    }
+
+    private fun onPageUrlUpdated(tab: WebTabState, engineUrl: String?, callbackUrl: String?) {
+        val url = engineUrl ?: callbackUrl
+        if (url != null) {
+            tab.url = url
+        }
+    }
+
     suspend fun findHostConfig(tab: WebTabState, createIfNotFound: Boolean): HostConfig? {
         Log.d(WebTabState.TAG, "findOrCreateHostConfig")
         val currentHostName = try {
