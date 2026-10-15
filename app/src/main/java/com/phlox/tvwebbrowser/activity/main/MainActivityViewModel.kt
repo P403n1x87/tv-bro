@@ -11,11 +11,12 @@ import com.phlox.tvwebbrowser.model.FavoriteItem
 import com.phlox.tvwebbrowser.model.HistoryItem
 import com.phlox.tvwebbrowser.model.HomePageLink
 import com.phlox.tvwebbrowser.model.WebTabState
-import com.phlox.tvwebbrowser.singleton.AppDatabase
+import com.phlox.tvwebbrowser.repository.Repositories
 import com.phlox.tvwebbrowser.utils.UpdateChecker
 import com.phlox.tvwebbrowser.utils.activemodel.ActiveModel
 import com.phlox.tvwebbrowser.utils.deleteDirectory
 import com.phlox.tvwebbrowser.utils.observable.ObservableList
+import com.phlox.tvwebbrowser.utils.observable.ObservableValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -41,6 +42,15 @@ class MainActivityViewModel: ActiveModel() {
     val homePageLinks = ObservableList<HomePageLink>()
     val homePageHistoryLinks = ObservableList<HomePageLink>()
     val config = AppContext.provideConfig()
+
+    // Data-layer gateways. The view model must not reach into Room itself, see the repository package.
+    private val favorites = Repositories.favorites
+    private val history = Repositories.history
+
+    /** Stored bookmarks, owned here so the view only renders them. */
+    val bookmarks = ObservableList<FavoriteItem>()
+    /** Whether the current page is bookmarked; drives the toolbar star and the panel's first row. */
+    val currentPageBookmarked = ObservableValue(false)
 
     fun loadState() = modelScope.launch(Dispatchers.Main) {
         Log.d(TAG, "loadState")
@@ -69,14 +79,14 @@ class MainActivityViewModel: ActiveModel() {
 
     private suspend fun initHistory() {
         Log.d(TAG, "initHistory")
-        val count = AppDatabase.db.historyDao().count()
+        val count = history.count()
         if (count > 5000) {
             val c = Calendar.getInstance()
             c.add(Calendar.MONTH, -3)
-            AppDatabase.db.historyDao().deleteWhereTimeLessThan(c.time.time)
+            history.deleteOlderThan(c.time.time)
         }
         try {
-            val result = AppDatabase.db.historyDao().last()
+            val result = history.latest()
             if (result.isNotEmpty()) {
                 lastHistoryItem = result[0]
             }
@@ -90,10 +100,10 @@ class MainActivityViewModel: ActiveModel() {
         val config = AppContext.provideConfig()
         if (config.homePageMode == Config.HomePageMode.HOME_PAGE) {
             homePageLinks.replaceAll(
-                AppDatabase.db.favoritesDao().getAllBookmarks()
+                favorites.allBookmarks()
                     .map { HomePageLink.fromBookmarkItem(it) })
             homePageHistoryLinks.replaceAll(
-                AppDatabase.db.historyDao().last(8)
+                history.latest(8)
                     .map { HomePageLink.fromHistoryItem(it) })
         }
     }
@@ -125,8 +135,8 @@ class MainActivityViewModel: ActiveModel() {
             // shows up once in history with its latest visit time (and storage stays bounded by
             // distinct URLs rather than repeat visits). Done inside the debounced job so a cancelled
             // visit never deletes the previously saved row.
-            AppDatabase.db.historyDao().deleteByUrl(item.url)
-            item.id = AppDatabase.db.historyDao().insert(item)
+            history.deleteByUrl(item.url)
+            item.id = history.add(item)
             item.saved = true
         }
     }
@@ -139,7 +149,7 @@ class MainActivityViewModel: ActiveModel() {
             lastHistoryItem.title = tab.title
             if (lastHistoryItem.saved) {
                 modelScope.launch(Dispatchers.Main) {
-                    AppDatabase.db.historyDao().updateTitle(lastHistoryItem.id, lastHistoryItem.title)
+                    history.updateTitle(lastHistoryItem.id, lastHistoryItem.title)
                 }
             }
         }
@@ -237,25 +247,45 @@ class MainActivityViewModel: ActiveModel() {
     fun removeHomePageLink(bookmark: HomePageLink) = modelScope.launch {
         homePageLinks.remove(bookmark)
         bookmark.favoriteId?.let {
-            AppDatabase.db.favoritesDao().delete(it)
+            favorites.delete(it)
         }
     }
 
     fun deleteBookmark(favoriteId: Long) = modelScope.launch {
-        AppDatabase.db.favoritesDao().delete(favoriteId)
+        favorites.delete(favoriteId)
         val index = homePageLinks.indexOfFirst { it.favoriteId == favoriteId }
         if (index != -1) {
             homePageLinks.removeAt(index)
         }
     }
 
+    /**
+     * Reads the stored bookmarks into [bookmarks]; the view reacts to the observable, so it never
+     * queries the repository (or Room) itself.
+     */
+    suspend fun loadBookmarks() {
+        bookmarks.replaceAll(favorites.allBookmarks())
+    }
+
+    /**
+     * Recomputes [currentPageBookmarked] for [url]. Called on page load, tab switch and after any
+     * bookmark mutation; the toolbar star and the panel's "Add this page" row follow the observable.
+     */
+    suspend fun refreshBookmarkState(url: String?) {
+        currentPageBookmarked.value = !url.isNullOrBlank() && favorites.isBookmarked(url)
+    }
+
+    suspend fun getBookmarkByUrl(url: String): FavoriteItem? = favorites.byUrl(url)
+
+    suspend fun getBookmarkById(id: Long): FavoriteItem? = favorites.byId(id)
+
     fun onHomePageLinkEdited(item: FavoriteItem) = modelScope.launch {
         if (item.id == 0L) {
-            val lastInsertRowId = AppDatabase.db.favoritesDao().insert(item)
+            val lastInsertRowId = favorites.add(item)
             item.id = lastInsertRowId
             homePageLinks.add(HomePageLink.fromBookmarkItem(item))
         } else {
-            AppDatabase.db.favoritesDao().update(item)
+            favorites.update(item)
             val index = homePageLinks.indexOfFirst { it.favoriteId == item.id }
             if (index != -1) {
                 homePageLinks[index] = HomePageLink.fromBookmarkItem(item)
@@ -268,7 +298,7 @@ class MainActivityViewModel: ActiveModel() {
         val favoriteId = link.favoriteId ?: return
         if (link.validUntil == null) return
         modelScope.launch {
-            AppDatabase.db.favoritesDao().markAsUseful(favoriteId)
+            favorites.markAsUseful(favoriteId)
         }
     }
 }

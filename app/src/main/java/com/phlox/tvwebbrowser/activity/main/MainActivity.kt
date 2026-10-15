@@ -218,6 +218,14 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
             }
         }
 
+        // Bookmark state is owned by the view model; the view only renders it.
+        viewModel.bookmarks.subscribe(this, false) { vb.vBookmarks.setBookmarks(it) }
+
+        viewModel.currentPageBookmarked.subscribe(this, false) { bookmarked ->
+            vb.vBookmarks.setCurrentPage(tabsModel.currentTab.value?.url, bookmarked)
+            vb.vActionBar.setBookmarked(bookmarked)
+        }
+
         tabsModel.currentTab.subscribe(this) {
             vb.vActionBar.setAddressBoxText(it?.url ?: "")
             it?.let {
@@ -376,17 +384,9 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
             // "Add this page" entry (which is hidden again for the home page), are final by then, so
             // the hand-off needs at most the one layout pass that creates them.
             loadBookmarks()
-            updateCurrentPageBookmarkEntry()
+            updateBookmarkState()
             vb.vBookmarks.requestRowFocus()
         }
-    }
-
-    /** Refreshes the "Add this page" / "Remove from list" row for the current tab. */
-    private suspend fun updateCurrentPageBookmarkEntry() {
-        val url = tabsModel.currentTab.value?.url
-        val bookmarked = !url.isNullOrBlank() &&
-                AppDatabase.db.favoritesDao().getByUrl(url) != null
-        vb.vBookmarks.setCurrentPage(url, bookmarked)
     }
 
     private fun hideBookmarksPanel() {
@@ -394,7 +394,18 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
     }
 
     private suspend fun loadBookmarks() {
-        vb.vBookmarks.setBookmarks(AppDatabase.db.favoritesDao().getAllBookmarks())
+        viewModel.loadBookmarks()
+    }
+
+    /**
+     * Asks the view model to recompute whether the current page is bookmarked. The toolbar star and
+     * the panel's "Add this page" / "Remove from list" row follow [MainActivityViewModel.currentPageBookmarked].
+     */
+    private fun updateBookmarkState() {
+        val url = tabsModel.currentTab.value?.url
+        lifecycleScope.launch(Dispatchers.Main) {
+            viewModel.refreshBookmarkState(url)
+        }
     }
 
     private fun addCurrentPageAsBookmark() {
@@ -409,7 +420,6 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
                 lifecycleScope.launch(Dispatchers.Main) {
                     viewModel.onHomePageLinkEdited(item).join()
                     loadBookmarks()
-                    updateCurrentPageBookmarkEntry()
                     updateBookmarkState()
                 }
             }
@@ -425,27 +435,14 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         val url = currentTab.url
         if (url.isNullOrBlank() || Config.isHomePageUrl(url)) return
         lifecycleScope.launch(Dispatchers.Main) {
-            val existing = AppDatabase.db.favoritesDao().getByUrl(url)
+            val existing = viewModel.getBookmarkByUrl(url)
             if (existing != null) {
                 viewModel.deleteBookmark(existing.id).join()
                 loadBookmarks()
-                updateCurrentPageBookmarkEntry()
                 updateBookmarkState()
             } else {
                 addCurrentPageAsBookmark()
             }
-        }
-    }
-
-    /** Updates the toolbar star to reflect whether the current page is bookmarked. */
-    private fun updateBookmarkState() {
-        val url = tabsModel.currentTab.value?.url
-        if (url.isNullOrBlank()) {
-            vb.vActionBar.setBookmarked(false)
-            return
-        }
-        lifecycleScope.launch(Dispatchers.Main) {
-            vb.vActionBar.setBookmarked(AppDatabase.db.favoritesDao().getByUrl(url) != null)
         }
     }
 
@@ -1548,7 +1545,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
 
         override fun onEditHomePageBookmarkSelected(favoriteId: Long) {
             lifecycleScope.launch {
-                val favoriteItem = AppDatabase.db.favoritesDao().getById(favoriteId) ?: return@launch
+                val favoriteItem = viewModel.getBookmarkById(favoriteId) ?: return@launch
                 AlertDialog.Builder(this@MainActivity)
                     .setTitle(R.string.bookmarks)
                     .setItems(arrayOf(getString(R.string.edit), getString(R.string.delete))) { _, which ->
@@ -1559,9 +1556,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
                                 if (bookmark != null) {
                                     viewModel.removeHomePageLink(bookmark)
                                 } else {
-                                    lifecycleScope.launch {
-                                        AppDatabase.db.favoritesDao().delete(favoriteId)
-                                    }
+                                    viewModel.deleteBookmark(favoriteId)
                                 }
                             }
                         }
