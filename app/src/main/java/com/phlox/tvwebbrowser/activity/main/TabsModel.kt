@@ -92,7 +92,27 @@ class TabsModel : ActiveModel() {
         }
     }
 
-    fun onCloseTab(tab: WebTabState) {
+    /**
+     * The "close tab" intent (the tab panel's X, the Close tab menu entry and the close-tab
+     * shortcut all forward here): [tab] goes away and the selection moves on with it — to its
+     * left neighbour, or to a fresh tab (opened through [openNewTab]) when it was the only one.
+     * Materialising an engine view for the tab that becomes current is view business, hence the
+     * two callbacks.
+     */
+    fun onCloseTab(tab: WebTabState, switchTo: (WebTabState) -> Unit, openNewTab: () -> Unit) {
+        val position = tabsStates.indexOf(tab)
+        if (currentTab.value == tab) {
+            currentTab.value = null
+        }
+        when {
+            tabsStates.size == 1 -> openNewTab()
+            position > 0 -> switchTo(tabsStates[position - 1])
+            else -> switchTo(tabsStates[position + 1])
+        }
+        removeTab(tab)
+    }
+
+    private fun removeTab(tab: WebTabState) {
         tab.webEngine.onDetachFromWindow(completely = true, destroyTab = true)
         tabsStates.remove(tab)
         modelScope.launch(Dispatchers.Main) {

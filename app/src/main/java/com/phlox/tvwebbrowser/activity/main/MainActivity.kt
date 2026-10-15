@@ -715,18 +715,11 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
 
     private fun closeTab(tab: WebTabState?) {
         if (tab == null) return
-        val position = tabsModel.tabsStates.indexOf(tab)
-        if (tabsModel.currentTab.value == tab) {
-            tabsModel.currentTab.value = null
-        }
-        when {
-            tabsModel.tabsStates.size == 1 -> openInNewTab(settingsModel.homePage, 0, needToHideMenuOverlay = true, navigateImmediately = true)
-
-            position > 0 -> changeTab(tabsModel.tabsStates[position - 1])
-
-            else -> changeTab(tabsModel.tabsStates[position + 1])
-        }
-        tabsModel.onCloseTab(tab)
+        tabsModel.onCloseTab(
+            tab,
+            switchTo = { changeTab(it) },
+            openNewTab = { openInNewTab(settingsModel.homePage, 0, needToHideMenuOverlay = true, navigateImmediately = true) },
+        )
         autoHideMenuOverlay(true)
     }
 
