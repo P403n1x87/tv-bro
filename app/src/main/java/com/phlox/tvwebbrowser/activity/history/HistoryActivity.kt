@@ -16,7 +16,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.databinding.ActivityHistoryBinding
-import com.phlox.tvwebbrowser.singleton.AppDatabase
 import com.phlox.tvwebbrowser.utils.BaseAnimationListener
 import com.phlox.tvwebbrowser.utils.Utils
 import com.phlox.tvwebbrowser.utils.VoiceSearchHelper
@@ -82,10 +81,10 @@ class HistoryActivity : AppCompatActivity(), AdapterView.OnItemClickListener, Ad
                 .setPositiveButton(android.R.string.ok) { _, _ ->
                     lifecycleScope.launch(Dispatchers.Main) {
                         if (deleteAll) {
-                            AppDatabase.db.historyDao().deleteWhereTimeLessThan(Long.MAX_VALUE)
+                            historyModel.deleteAll()
                             adapter!!.erase()
                         } else {
-                            AppDatabase.db.historyDao().delete(*(adapter!!.selectedItems).toTypedArray())
+                            historyModel.delete(adapter!!.selectedItems)
                             adapter!!.remove(adapter!!.selectedItems)
                         }
                     }
@@ -187,7 +186,7 @@ class HistoryActivity : AppCompatActivity(), AdapterView.OnItemClickListener, Ad
         pm.menu.add(R.string.delete)
         pm.setOnMenuItemClickListener {
             lifecycleScope.launch(Dispatchers.Main) {
-                AppDatabase.db.historyDao().delete(v.historyItem!!)
+                historyModel.delete(v.historyItem!!)
                 adapter!!.remove(v.historyItem!!)
             }
             true

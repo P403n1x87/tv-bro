@@ -7,7 +7,7 @@ import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.TVBro
 import com.phlox.tvwebbrowser.model.HostConfig
 import com.phlox.tvwebbrowser.model.WebTabState
-import com.phlox.tvwebbrowser.singleton.AppDatabase
+import com.phlox.tvwebbrowser.repository.Repositories
 import com.phlox.tvwebbrowser.utils.Utils
 import com.phlox.tvwebbrowser.utils.activemodel.ActiveModel
 import com.phlox.tvwebbrowser.utils.observable.ObservableList
@@ -31,6 +31,10 @@ class TabsModel : ActiveModel() {
     private val config = AppContext.provideConfig()
     private var incognitoMode = config.incognitoMode
 
+    // Data-layer gateways (see the repository package): the model must not open Room itself.
+    private val tabsRepository = Repositories.tabs
+    private val hostsRepository = Repositories.hosts
+
     init {
         tabsStates.subscribe({
             //auto-update positions on any list change
@@ -44,8 +48,7 @@ class TabsModel : ActiveModel() {
             if (positionsChanged) {
                 val tabsListClone = listOf(*tabsStates.toTypedArray())
                 modelScope.launch(Dispatchers.Main) {
-                    val tabsDao = AppDatabase.db.tabsDao()
-                    tabsDao.updatePositions(tabsListClone)
+                    tabsRepository.updatePositions(tabsListClone)
                 }
             }
         }, false)
@@ -61,15 +64,13 @@ class TabsModel : ActiveModel() {
                 return@launch
             }
         }
-        val tabsDao = AppDatabase.db.tabsDao()
-        tabsStates.replaceAll(tabsDao.getAll(config.incognitoMode))
+        tabsStates.replaceAll(tabsRepository.all(config.incognitoMode))
         loaded = true
     }
 
     fun discardSavedState() = modelScope.launch(Dispatchers.Main) {
         loaded = true
-        val tabsDao = AppDatabase.db.tabsDao()
-        tabsDao.deleteAll(config.incognitoMode)
+        tabsRepository.deleteAll(config.incognitoMode)
         withContext(Dispatchers.IO) {
             tabWvStatesDir()?.deleteRecursively()
         }
@@ -79,17 +80,16 @@ class TabsModel : ActiveModel() {
         AppContext.get().filesDir?.let { File(it, WebTabState.TAB_WVSTATES_DIR) }
 
     suspend fun saveTab(tab: WebTabState) {
-        val tabsDB = AppDatabase.db.tabsDao()
         if (tab.selected) {
-            tabsDB.unselectAll(config.incognitoMode)
+            tabsRepository.unselectAll(config.incognitoMode)
         }
         withContext(Dispatchers.IO) {
             tab.saveWebViewStateToFile()
         }
         if (tab.id != 0L) {
-            tabsDB.update(tab)
+            tabsRepository.update(tab)
         } else {
-            tab.id = tabsDB.insert(tab)
+            tab.id = tabsRepository.insert(tab)
         }
     }
 
@@ -97,8 +97,7 @@ class TabsModel : ActiveModel() {
         tab.webEngine.onDetachFromWindow(completely = true, destroyTab = true)
         tabsStates.remove(tab)
         modelScope.launch(Dispatchers.Main) {
-            val tabsDB = AppDatabase.db.tabsDao()
-            tabsDB.delete(tab)
+            tabsRepository.delete(tab)
             launch { tab.removeFiles() }
         }
     }
@@ -106,8 +105,7 @@ class TabsModel : ActiveModel() {
     fun onCloseAllTabs() = modelScope.launch(Dispatchers.Main) {
         val tabsClone = ArrayList(tabsStates)
         tabsStates.clear()
-        val tabsDB = AppDatabase.db.tabsDao()
-        tabsDB.deleteAll(config.incognitoMode)
+        tabsRepository.deleteAll(config.incognitoMode)
         withContext(Dispatchers.IO) {
             tabsClone.forEach { it.removeFiles() }
         }
@@ -165,11 +163,10 @@ class TabsModel : ActiveModel() {
         }
         var hostConfig = tab.cachedHostConfig
         if (hostConfig == null || hostConfig.hostName != currentHostName) {
-            val db = com.phlox.tvwebbrowser.singleton.AppDatabase.db.hostsDao()
-            hostConfig = db.findByHostName(currentHostName)
+            hostConfig = hostsRepository.findByHostName(currentHostName)
             if (hostConfig == null && createIfNotFound) {
                 hostConfig = HostConfig(currentHostName)
-                hostConfig.id = db.insert(hostConfig)
+                hostConfig.id = hostsRepository.upsert(hostConfig)
             }
             tab.cachedHostConfig = hostConfig
         }
@@ -179,6 +176,6 @@ class TabsModel : ActiveModel() {
     suspend fun changePopupBlockingLevel(newLevel: Int, tab: WebTabState) {
         val hostConfig = findHostConfig(tab,true) ?: return
         hostConfig.popupBlockLevel = newLevel
-        AppDatabase.db.hostsDao().update(hostConfig)
+        hostsRepository.update(hostConfig)
     }
 }
