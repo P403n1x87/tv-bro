@@ -466,12 +466,12 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
 
     override fun showSettings() {
         SettingsDialog(this, SettingsDeps(settingsModel, adblockModel, autoUpdateModel)).apply {
-            // The ad-block toggle is global (config.adBlockEnabled) while the overlay zapper is a
+            // The ad-block toggle is global (adblockModel.adBlockEnabled) while the overlay zapper is a
             // document-start script registered per WebView; re-sync every open tab on dismiss so
             // the zapper matches the network blocker. Per-tab overrides are preserved.
             onDismissed = {
                 tabsModel.tabsStates.forEach {
-                    it.webEngine.onUpdateAdblockSetting(it.adblock ?: config.adBlockEnabled)
+                    it.webEngine.onUpdateAdblockSetting(it.adblock ?: adblockModel.adBlockEnabled)
                 }
                 updateUpdateBadge()
             }
@@ -620,7 +620,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         vb.progressBarGeneric.visibility = View.VISIBLE
         vb.progressBarGeneric.requestFocus()
         viewModel.loadState().join()
-        if (config.restoreTabsOnStartup) {
+        if (settingsModel.restoreTabsOnStartup) {
             tabsModel.loadState().join()
         } else {
             tabsModel.discardSavedState().join()
@@ -772,9 +772,9 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
             return null
         }
 
-        var ua = config.userAgentString.value
+        var ua = settingsModel.userAgentString.value
         if (ua?.contains("TV Bro/1.0 ") == true) {//legacy ua string - now default one should be used
-            config.userAgentString.value = null
+            settingsModel.userAgentString.value = null
             ua = null
         }
         if (ua != null) {
@@ -935,7 +935,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
 
     private fun toggleAdBlockForTab() {
         tabsModel.currentTab.value?.apply {
-            val currentState = adblock ?: config.adBlockEnabled
+            val currentState = adblock ?: adblockModel.adBlockEnabled
             val newState = !currentState
             adblock = newState
             webEngine.onUpdateAdblockSetting(newState)
@@ -990,7 +990,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
                 return
             }
 
-            val searchUrl = config.searchEngineURL.value.replace("[query]", query!!)
+            val searchUrl = settingsModel.searchEngineURL.replace("[query]", query!!)
             navigate(searchUrl)
         }
     }
@@ -1377,8 +1377,8 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
                 requestedUrl = url,
                 currentUrl = tab.url,
                 lastLoadingUrl = tab.lastLoadingUrl,
-                blockAutomaticRedirects = config.blockAutomaticRedirects,
-                adBlockEnabled = config.adBlockEnabled,
+                blockAutomaticRedirects = adblockModel.blockAutomaticRedirects,
+                adBlockEnabled = adblockModel.adBlockEnabled,
                 hostOf = { u -> Uri.parse(u).host }
             )
             if (blocked) {
@@ -1443,7 +1443,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         override fun isAdBlockingEnabled(): Boolean {
             // Use this callback's own tab, not whichever tab happens to be current: the WebView
             // callback is per-tab and is queried while a tab may not be selected yet.
-            return tab.adblock ?: config.adBlockEnabled
+            return tab.adblock ?: adblockModel.adBlockEnabled
         }
 
         override fun isDialogsBlockingEnabled(): Boolean {
@@ -1458,7 +1458,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
 
         override fun onBlockedAd(uri: String) {
             Log.i(TAG, "onBlockedAd: $uri")
-            if (!config.adBlockEnabled) return
+            if (!adblockModel.adBlockEnabled) return
             tab.blockedAds++
         }
 
@@ -1585,7 +1585,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
 
         override fun onExitFullscreen() {
             //window.setFlags(0, WindowManager.LayoutParams.FLAG_FULLSCREEN)
-            if (!config.keepScreenOn) {
+            if (!settingsModel.keepScreenOn.value) {
                 window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             }
             window.decorView.systemUiVisibility =
