@@ -1412,7 +1412,13 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         }
 
         override fun shouldBlockNewWindow(dialog: Boolean, userGesture: Boolean): Boolean {
-            val hostConfig = runBlocking(Dispatchers.Main.immediate){ tabsModel.findHostConfig(tab, false) }
+            // Synchronous callback: the popup decision has to be returned now, so the (normally
+            // suspending) host lookup is bridged with a plain runBlocking. That form runs the
+            // coroutine on an event loop owned by *this* thread, which joinBlocking() pumps itself
+            // while it waits. An explicit dispatcher must not be used here: the lookup resumes from
+            // Room's query executor, and a dispatcher like Dispatchers.Main.immediate would post the
+            // resumption to a queue that this blocked thread never drains again (deadlock/ANR).
+            val hostConfig = runBlocking { tabsModel.findHostConfig(tab, false) }
             return PopupPolicy.shouldBlockNewWindow(dialog, userGesture, hostConfig?.popupBlockLevel)
         }
 
