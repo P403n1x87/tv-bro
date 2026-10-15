@@ -184,6 +184,11 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
 
         vb.vActionBar.callback = this
 
+        // The cursor menu asks the host about (and reports back) the "direct navigation" hint
+        // instead of reading global config itself.
+        vb.vCursorMenu.shouldSuppressDirectNavigationHint = { config.directNavigationModeHintSuppress }
+        vb.vCursorMenu.onDirectNavigationHintSuppressed = { config.directNavigationModeHintSuppress = true }
+
         settingsModel.userAgentString.subscribe(this.lifecycle, false) {
             for (tab in tabsModel.tabsStates) {
                 tab.webEngine.userAgentString = it
