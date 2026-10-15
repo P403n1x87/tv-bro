@@ -66,6 +66,7 @@ import com.phlox.tvwebbrowser.activity.main.view.RowFocusPanel
 import com.phlox.tvwebbrowser.activity.main.view.bookmarks.BookmarksPanelView
 import com.phlox.tvwebbrowser.activity.main.view.tabs.TabsAdapter.Listener
 import com.phlox.tvwebbrowser.databinding.ActivityMainBinding
+import com.phlox.tvwebbrowser.domain.AddressInputPolicy
 import com.phlox.tvwebbrowser.domain.NavigationPolicy
 import com.phlox.tvwebbrowser.domain.PopupPolicy
 import com.phlox.tvwebbrowser.model.Download
@@ -96,11 +97,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.InputStream
-import java.io.UnsupportedEncodingException
 import java.net.URL
-import java.net.URLEncoder
 import java.util.Calendar
-import java.util.Locale
 import kotlin.system.exitProcess
 
 
@@ -925,26 +923,15 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
     }
 
     override fun search(aText: String) {
-        var text = aText
-        val trimmedLowercased = text.trim { it <= ' ' }.lowercase(Locale.ROOT)
-        if (Patterns.WEB_URL.matcher(text).matches() || trimmedLowercased.startsWith("http://") || trimmedLowercased.startsWith("https://")) {
-            if (!text.lowercase(Locale.ROOT).contains("://")) {
-                text = "https://$text"
-            }
-            navigate(text)
-        } else {
-            var query: String? = null
-            try {
-                query = URLEncoder.encode(text, "utf-8")
-            } catch (e1: UnsupportedEncodingException) {
-                e1.printStackTrace()
-                Utils.showToast(this, R.string.error)
-                return
-            }
-
-            val searchUrl = settingsModel.searchEngineURL.replace("[query]", query!!)
-            navigate(searchUrl)
+        val url = AddressInputPolicy.resolveUrl(
+            aText,
+            settingsModel.searchEngineURL,
+        ) { Patterns.WEB_URL.matcher(it).matches() }
+        if (url == null) {
+            Utils.showToast(this, R.string.error)
+            return
         }
+        navigate(url)
     }
 
     override fun toggleIncognitoMode() {
