@@ -198,20 +198,50 @@
   (`MediaManifestReader`, extracted from `NativeMediaResolver.readManifest`, which now also populates
   the cache). `MediaCandidate` itself is unchanged. Verified on emulator: local HLS master →
   `1920×1080`, `en/fr`; DASH MPD → `1920×1080`, `en/fr · 1:02:03`.
-- **The side panels always take the focus when they open (also after a touch).**
+- **The side panels always take the focus when they open (also after a touch), and always land on a
+  row — not on the container, and never back in the top bar.**
   `MainActivity.focusPanel(panel)` replaces the plain `requestFocus()` in `showBookmarksPanel()`
   and `onToggleTabPanel()`: it calls `panel.requestFocusFromTouch()` — which leaves touch mode first,
-  the reason the D-pad sometimes had no panel to navigate (a tap anywhere puts the device in touch
-  mode and a view that is not focusable in touch mode *cannot* take focus, so the request silently
-  failed and the next D-pad press escaped to the top bar) — and keeps a `post { }` fallback in case
-  the first request only marks the panel as "wants focus". `BookmarksPanelView.onFocusChanged` now
-  hands the focus to the first row from a `post { }` too, exactly like `TabsView.focusCurrentTabRow()`
-  does, because the panel is made VISIBLE and focused in the same frame and the `RecyclerView` may
-  still have no laid-out rows; it also calls `super.onFocusChanged()` on gain now (the old code only
-  called it when *losing* focus). Verified on emulator, both after `input tap` (touch mode) and with
-  pure D-pad: `Tabs` shortcut → the current tab row focused, RIGHT → the row's close `X`, LEFT →
-  row, DOWN → `+`, UP → row; `Bookmarks` shortcut (bound to `KEYCODE_F6`) → "Add this page" focused,
-  DOWN → first bookmark, UP → back.
+  so the container takes the focus synchronously and a D-pad press can never escape straight back to
+  the top bar (a tap anywhere puts the device in touch mode, and a view that is not focusable in
+  touch mode *cannot* take focus, so the old plain `requestFocus()` silently failed).
+  The container is only a fallback though: the focus must move down to a real row, which the new
+  `RowFocusPanel` interface + `PanelRowFocusDelegate` (`activity/main/view/RowFocusPanel.kt`) do —
+  together with the two callers. `focusPanel()` deliberately only *claims* the container; the row
+  hand-off is a separate step, `RowFocusPanel.requestRowFocus()`, that each caller triggers once the
+  panel's content is settled: the tabs panel right away (the tabs already are in the adapter), the
+  bookmarks panel only after `loadBookmarks()`/`updateCurrentPageBookmarkEntry()` have finished
+  reading from the database. That order is what keeps it deterministic; the earlier version retried
+  the hand-off on every `OnGlobalLayoutListener` pass, which papered over two things that should
+  really be synchronised:
+  - *the data*: the bookmarks list and the "Add this page" entry come from Room. Focusing a row that
+    a later async update hides (e.g. "Add this page" is hidden again once the bookmarked lookup says
+    the current page is on the home page) drops the focus altogether, and the framework restores it
+    to a toolbar button (`ibRefresh`/`ibBack`, the reported symptom). Reading the content before
+    asking for the row removes the race, so `setCanAddCurrentPage()` and its duplicate visibility
+    logic are gone and `loadBookmarks()`/`updateCurrentPageBookmarkEntry()` are `suspend` now.
+  - *the layout*: a `RecyclerView` row only exists after the panel — just made VISIBLE — has been
+    laid out, and there is no synchronous way to focus a view that does not exist yet. The delegate
+    therefore tries at once and, if the row is not there yet, exactly once more from an
+    `OnPreDrawListener` (runs after measure/layout, before the frame is drawn), then gives up with
+    the container still focused. Bounded on purpose: a panel with nothing to focus (an empty
+    bookmarks list) must not keep a listener and itself spinning.
+  The row is looked up with `RecyclerView.findViewHolderForAdapterPosition(...)`, not
+  `getChildAt(0)`: the latter can return a child left over from the previous time the panel was
+  opened, which the pending `notifyDataSetChanged` layout then detaches — focus dropped, back to the
+  toolbar. `findViewHolderForAdapterPosition()` returns null for all positions until the current
+  dataset has actually been laid out, so the delegate waits instead of focusing a doomed child.
+  `llAddThisPage` is `visibility="gone"` by default now (its presence is data-driven). Both panels
+  `cancel()` the hand-off from `onFocusChanged(!gainFocus)`; both call `super.onFocusChanged()`
+  always now (the old code only called it when *losing* focus). There is no `post { }` fallback left
+  in `focusPanel()` — it could pull the focus back up to the container after the delegate had already
+  moved it onto a row.
+  Verified on emulator, on **both engines**, after `input tap` (touch mode) and with pure D-pad:
+  home page → star → first bookmark row focused (and `llAddThisPage` correctly absent) and stays
+  focused past the async bookmark refresh; closing and reopening the panel, and reopening it after
+  navigating home, land on a row as well (the stale-child case); normal page → star → `llAddThisPage`
+  focused and stays; DOWN → next row, UP → back, BACK → panel closed; with 2 tabs → tab button → the
+  *current* tab row focused, RIGHT → that row's close `X`, LEFT → row, UP → previous row.
 - **WebView stream detection: manifests hidden behind extensionless gateways, and signed variants.**
   The WebView engine only sees request URLs (no response MIME, unlike Gecko), so a manifest fetched
   from an extensionless gateway with the real file name in the query
