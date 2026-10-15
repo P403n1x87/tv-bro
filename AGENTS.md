@@ -2,8 +2,58 @@
 
 ## Branch / context
 - Work in progress on branch `feat/stream-player`: native video playback handoff for WebView + GeckoView (shared `:app:player` module).
+- Work in progress on branch `refactor/mvvm`: phased, behaviour-preserving move of the app to MVVM
+  (repository layer, presentation models, `domain/` decisions, tests) — see the Architecture
+  section below. Committed step by step, **not pushed**.
+
+## Architecture: the MVVM refactor (branch `refactor/mvvm`)
+- Conventions: models stay `ActiveModel`s (the custom `ActiveModelsRepository`/observables are kept —
+  no Hilt, no androidx `ViewModel`/`StateFlow`). Views render observable state and forward input;
+  they never open Room, never locate a model, never write state that a model owns. Decisions that
+  carry behaviour live in `domain/` (plain Kotlin + plain JUnit), not in views.
+- Layers: `repository/` (one class per DAO, every method `suspend`) → presentation models
+  (`MainActivityViewModel`, `TabsModel`, `SettingsModel`, `AdblockModel`, `AutoUpdateModel`,
+  `HistoryModel`, `DownloadsHistoryModel`, `ActiveDownloadsModel`) → activities/views. No activity
+  or view references `AppDatabase`/`Repositories` any more; the only remaining direct users are the
+  service layer (`TVBro`, `DownloadService`, `DownloadTask`).
+- Models take their repositories as **constructor parameters with production defaults**
+  (`private val history: HistoryRepository = Repositories.history`), so a test injects a repository
+  over an in-memory database. `ActiveModelsRepository.get` builds the *declared* no-arg constructor
+  (`getDeclaredConstructor()`), which Kotlin synthesises exactly when every primary-constructor
+  parameter has a default — keep that shape when adding a dependency to a model.
+- Model intents that need view work take it as a call-time lambda
+  (`TabsModel.onCloseTab(tab, switchTo, openNewTab)`, `TabsModel.onToggleAdBlock(tab, defaultEnabled)`
+  returns the new value for the caller to push into the engine). Models never hold a view/activity
+  reference and never call each other — the caller passes the other model's value in
+  (`toggleAdBlockForTab` passes `adblockModel.adBlockEnabled`).
+- Settings pages (and other views) assigning a model property (`settingsModel.restoreTabsOnStartup = it`)
+  is the accepted "view assigns = intent" pattern; the model owns the write and the persistence.
+- `domain/`: `NavigationPolicy`, `PopupPolicy`, `SiteDomains`, `AddressInputPolicy`, `UrlNormalizer`,
+  `LinkActionPolicy` — extracted out of `MainActivity`/`WebEngineCallback`, each with a unit test.
+  Prefer extracting a decision here over testing a framework-heavy model directly.
+- Test setup (Robolectric + Room): `@Config(sdk = [26], application = Application::class)`,
+  `AppContext.init(app, Config(app.getSharedPreferences(...)))` in `@Before`, and
+  `Room.inMemoryDatabaseBuilder(...).allowMainThreadQueries()` with **direct** executors
+  (`Executor { it.run() }`) so a query completes inline and nothing races the main thread; advance
+  the main-looper clock with `shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(n))` to
+  let `delay`s (the 5s history debounce) elapse. `org.robolectric.annotation.Config` clashes with
+  the app's `Config`, so import the Robolectric one as an alias.
+- Not done yet: `WebEngineCallback` is still a ~420-line `inner class` of `MainActivity` (engine
+  adapter holding the new-tab index policy, permissions/intents, fullscreen window flags); lifting it
+  out needs a host interface. `SearchEngineConfigDialogFactory` (the old `SettingsActivity` path)
+  still reads `config` directly.
 
 ## Known issues / TODO
+- **History search only matches exact titles/urls (open, not fixed).**
+  `HistoryDao.search` is `SELECT * FROM history WHERE (title LIKE :titleQuery) OR (url LIKE :urlQuery)`
+  but the callers pass the typed query verbatim, so without `%` wildcards the match is an exact
+  (case-insensitive for ASCII) string comparison: the History screen's voice search finds a page only
+  when the whole title or url was spoken. The `val search = "%$searchQuery%"` wrapping the old Java
+  `HistoryModel` used was lost when it was ported to Kotlin. One-line fix in
+  `HistoryRepository.search` (`dao.search("%$query%", "%$query%")`); deliberately **not** applied
+  during the refactor, which is behaviour-preserving by rule. `HistoryModelTest`
+  (`aSearchQueryIsMatchedAgainstTheStoredTitleOrUrl`) pins today's behaviour so the fix is a conscious
+  change.
 - **Toolbar auto-hidden after every action — FIXED.**
   Added `Config.keepToolbarOpen` (`KEEP_TOOLBAR_OPEN_KEY`, default `true`), setting string
   `keep_toolbar_open`, exposed as a switch on the Appearance settings page
