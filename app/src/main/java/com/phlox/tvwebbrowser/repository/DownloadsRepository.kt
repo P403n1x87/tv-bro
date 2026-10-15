@@ -6,9 +6,9 @@ import com.phlox.tvwebbrowser.model.dao.DownloadDao
 /**
  * The single gateway to the download log. See [FavoritesRepository] for the rationale.
  *
- * [add] and [update] are intentionally *not* `suspend`: the DAO runs them from the download worker
- * threads, not from a coroutine. That matches the pre-existing behaviour and is revisited together
- * with the main-thread-query cleanup.
+ * [add] and [update] are intentionally *not* `suspend`: they are called from `DownloadTask.run()`
+ * on the download worker pool, outside any coroutine. Room no longer allows main-thread queries, so
+ * calling them from the UI thread now throws instead of silently blocking it.
  */
 class DownloadsRepository(private val dao: DownloadDao) {
 

@@ -10,11 +10,10 @@ import com.phlox.tvwebbrowser.model.dao.HostsDao
 class HostsRepository(private val dao: HostsDao) {
 
     /**
-     * Deliberately non-`suspend`: the favicon pool reads the host config from a synchronous
-     * WebView/Gecko callback. Kept as-is here so this pass stays behaviour preserving; the
-     * main-thread-query cleanup will revisit it.
+     * Suspending like the rest of the data layer: its caller, [com.phlox.tvwebbrowser.singleton.FaviconsPool],
+     * reads the host config from inside a coroutine, so Room runs the query off the main thread.
      */
-    fun findByHostName(name: String): HostConfig? = dao.findByHostName(name)
+    suspend fun findByHostName(name: String): HostConfig? = dao.findByHostName(name)
 
     suspend fun upsert(config: HostConfig): Long = dao.insert(config)
 

@@ -92,7 +92,7 @@ class TVBro : Application(), Application.ActivityLifecycleCallbacks {
         val cookieManager = CookieManager()
         CookieHandler.setDefault(cookieManager)
         FaviconsPool.databaseDelegate = object : FaviconsPool.DatabaseDelegate {
-            override fun findByHostName(host: String): HostConfig? {
+            override suspend fun findByHostName(host: String): HostConfig? {
                 return Repositories.hosts.findByHostName(host)
             }
 

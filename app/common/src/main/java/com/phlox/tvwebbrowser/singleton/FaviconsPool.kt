@@ -24,7 +24,7 @@ object FaviconsPool {
     var databaseDelegate: DatabaseDelegate = object : DatabaseDelegate {}
 
     interface DatabaseDelegate {
-        fun findByHostName(host: String): HostConfig? = null
+        suspend fun findByHostName(host: String): HostConfig? = null
         suspend fun update(hostConfig: HostConfig) {}
         suspend fun insert(newHostConfig: HostConfig) {}
     }
