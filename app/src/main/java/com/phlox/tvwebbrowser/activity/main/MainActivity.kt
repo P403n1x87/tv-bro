@@ -184,13 +184,13 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
 
         vb.vActionBar.callback = this
 
-        config.userAgentString.subscribe(this.lifecycle, false) {
+        settingsModel.userAgentString.subscribe(this.lifecycle, false) {
             for (tab in tabsModel.tabsStates) {
                 tab.webEngine.userAgentString = it
             }
         }
 
-        config.theme.subscribe(this.lifecycle, false) {
+        settingsModel.theme.subscribe(this.lifecycle, false) {
             val mode = when (it) {
                 Config.Theme.BLACK -> AppCompatDelegate.MODE_NIGHT_YES
                 Config.Theme.WHITE -> AppCompatDelegate.MODE_NIGHT_NO
@@ -212,6 +212,12 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
             } else {
                 window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             }
+        }
+
+        // The toolbar overlay style follows the setting live, so the settings page never touches the
+        // activity to restyle it.
+        settingsModel.keepToolbarOpen.subscribe(this.lifecycle) {
+            applyToolbarOverlayStyle()
         }
 
         viewModel.homePageLinks.subscribe(this) {
@@ -567,11 +573,11 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
 
     /**
      * Cycles the UI theme SYSTEM → WHITE → BLACK → SYSTEM. The actual night-mode switch and the
-     * activity repaint are handled by the `config.theme` subscriber in onCreate.
+     * activity repaint are handled by the `settingsModel.theme` subscriber in onCreate.
      */
     private fun toggleTheme() {
         val themes = Config.Theme.entries
-        config.theme.value = themes[(config.theme.value.ordinal + 1) % themes.size]
+        settingsModel.setTheme(themes[(settingsModel.theme.value.ordinal + 1) % themes.size])
     }
 
     fun refresh() {
@@ -1147,7 +1153,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
     }
 
     private suspend fun displayThumbnail(currentTab: WebTabState?) {
-        if (config.keepToolbarOpen) return
+        if (settingsModel.keepToolbarOpen.value) return
         if (currentTab != null) {
             if (tabByTitleIndex(vb.vTabs.current) != currentTab) return
             vb.llMiniaturePlaceholder.visibility = View.INVISIBLE

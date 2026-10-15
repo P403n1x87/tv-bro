@@ -63,4 +63,75 @@ class SettingsModel : ActiveModel() {
             }
         }
     }
+
+    //Browsing
+    /** The configured search engine URL; the built-in default while unset. */
+    val searchEngineURL: String get() = config.searchEngineURL.value
+
+    /** Observable so the host can push a new user agent string to every open tab. */
+    val userAgentString: ObservableValue<String?> get() = config.userAgentString
+
+    var restoreTabsOnStartup: Boolean
+        get() = config.restoreTabsOnStartup
+        set(value) { config.restoreTabsOnStartup = value }
+
+    fun setUserAgentString(userAgent: String?) {
+        config.userAgentString.value = userAgent
+    }
+
+    //Appearance
+    val theme: ObservableValue<Config.Theme> get() = config.theme
+
+    fun setTheme(theme: Config.Theme) {
+        config.theme.value = theme
+    }
+
+    var algorithmicDarkening: Boolean
+        get() = config.webviewUseAlgorithmicDarkeningWithDarkUiMode
+        set(value) { config.webviewUseAlgorithmicDarkeningWithDarkUiMode = value }
+
+    /** Observable because the changed value restyles the toolbar the host is showing right now. */
+    var keepToolbarOpen = object : ObservableValue<Boolean>(config.keepToolbarOpen) {
+        override var value: Boolean = config.keepToolbarOpen
+            set(value) {
+                config.keepToolbarOpen = value
+                field = value
+                notifyObservers()
+            }
+            get() = config.keepToolbarOpen
+    }
+
+    //Playback
+    var allowAutoplayMedia: Boolean
+        get() = config.allowAutoplayMedia
+        set(value) { config.allowAutoplayMedia = value }
+
+    var playerKind: Config.PlayerKind
+        get() = config.playerKind
+        set(value) { config.playerKind = value }
+
+    //Controls
+    var disableMotionAxesDpadNavigation: Boolean
+        get() = config.disableMotionAxesDpadNavigation
+        set(value) { config.disableMotionAxesDpadNavigation = value }
+
+    var cursorMaxSpeedPercent: Int
+        get() = config.cursorMaxSpeedPercent
+        set(value) { config.cursorMaxSpeedPercent = value }
+
+    var cursorAccelerationPercent: Int
+        get() = config.cursorAccelerationPercent
+        set(value) { config.cursorAccelerationPercent = value }
+
+    //Advanced
+    var webEngine: String
+        get() = config.webEngine
+        set(value) { config.webEngine = value }
+
+    var webEngineDebug: Boolean
+        get() = config.webEngineDebug
+        set(value) { config.webEngineDebug = value }
+
+    //About
+    val incognitoMode: Boolean get() = config.incognitoMode
 }

@@ -2,8 +2,6 @@ package com.phlox.tvwebbrowser.activity.main.dialogs.settings
 
 import android.content.Context
 import androidx.fragment.app.FragmentActivity
-import com.phlox.tvwebbrowser.AppContext
-import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.utils.activity
 import java.text.SimpleDateFormat
@@ -15,7 +13,6 @@ class AdsSettingsView(
 ) : SettingsPageView(context) {
 
     private val adblockModel = deps.adblock
-    private val config = AppContext.provideConfig()
 
     init {
         adblockModel.clientLoading.subscribe(activity as FragmentActivity) { rebuild() }
@@ -29,9 +26,9 @@ class AdsSettingsView(
                 iconRes = R.drawable.ic_settings_block_24dp,
                 titleRes = R.string.settings_block_ads,
                 summaryRes = R.string.settings_block_ads_summary,
-                isChecked = { config.adBlockEnabled },
+                isChecked = { adblockModel.adBlockEnabled },
                 onCheckedChange = { enabled ->
-                    config.adBlockEnabled = enabled
+                    adblockModel.adBlockEnabled = enabled
                     post { rebuild() }
                 }
             )
@@ -40,20 +37,20 @@ class AdsSettingsView(
             SettingsItem.TextInput(
                 iconRes = R.drawable.ic_settings_link_24dp,
                 titleRes = R.string.settings_ad_block_url,
-                value = { config.adBlockListURL.value },
+                value = { adblockModel.adBlockListUrl },
                 hint = { context.getString(R.string.url) },
                 onCommit = { url ->
-                    config.adBlockListURL.value = url.trim().ifEmpty { Config.DEFAULT_ADBLOCK_LIST_URL }
+                    adblockModel.setAdBlockListUrl(url)
                     post { rebuild() }
                 },
-                visible = { config.adBlockEnabled }
+                visible = { adblockModel.adBlockEnabled }
             )
         )
         add(
             SettingsItem.Info(
                 titleRes = R.string.last_update,
                 value = { lastUpdateText() },
-                visible = { config.adBlockEnabled }
+                visible = { adblockModel.adBlockEnabled }
             )
         )
         add(
@@ -62,7 +59,7 @@ class AdsSettingsView(
                 titleRes = R.string.settings_update_ad_block_list,
                 isInProgress = { adblockModel.clientLoading.value },
                 onClick = { adblockModel.loadAdBlockList(true) },
-                visible = { config.adBlockEnabled }
+                visible = { adblockModel.adBlockEnabled }
             )
         )
         add(
@@ -70,15 +67,16 @@ class AdsSettingsView(
                 iconRes = R.drawable.ic_settings_link_24dp,
                 titleRes = R.string.settings_block_redirects,
                 summaryRes = R.string.settings_block_redirects_summary,
-                isChecked = { config.blockAutomaticRedirects },
-                onCheckedChange = { config.blockAutomaticRedirects = it }
+                isChecked = { adblockModel.blockAutomaticRedirects },
+                onCheckedChange = { adblockModel.blockAutomaticRedirects = it }
             )
         )
     }
 
     private fun lastUpdateText(): CharSequence {
-        if (config.adBlockListLastUpdate == 0L) return context.getString(R.string.never)
+        val lastUpdate = adblockModel.adBlockListLastUpdate
+        if (lastUpdate == 0L) return context.getString(R.string.never)
         return SimpleDateFormat("hh:mm dd MMMM yyyy", Locale.getDefault())
-            .format(Date(config.adBlockListLastUpdate))
+            .format(Date(lastUpdate))
     }
 }

@@ -34,9 +34,9 @@ class SettingsDialog(context: Context, val deps: SettingsDeps) :
                     R.id.btnGeneralTab -> GeneralSettingsView(context, deps)
                     R.id.btnAdsTab -> AdsSettingsView(context, deps)
                     R.id.btnAppearanceTab -> AppearanceSettingsView(context, deps)
-                    R.id.btnPlaybackTab -> PlaybackSettingsView(context)
-                    R.id.btnControlsTab -> ControlsSettingsView(context)
-                    R.id.btnAdvancedTab -> AdvancedSettingsView(context)
+                    R.id.btnPlaybackTab -> PlaybackSettingsView(context, deps)
+                    R.id.btnControlsTab -> ControlsSettingsView(context, deps)
+                    R.id.btnAdvancedTab -> AdvancedSettingsView(context, deps)
                     else -> {
                         val view = VersionSettingsView(context, deps)
                         view.callback = this@SettingsDialog

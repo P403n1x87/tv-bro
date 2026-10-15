@@ -179,7 +179,7 @@ class VersionSettingsView(
 
     private fun loadUrl(url: String) {
         callback?.onNeedToCloseSettings()
-        val activityClass = if (settingsModel.config.incognitoMode)
+        val activityClass = if (settingsModel.incognitoMode)
             IncognitoModeMainActivity::class.java else MainActivity::class.java
         val intent = Intent(activity, activityClass)
         intent.data = url.toUri()

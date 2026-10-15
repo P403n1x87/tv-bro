@@ -6,6 +6,7 @@ import com.brave.adblock.AdBlockClient
 import com.brave.adblock.AdBlockClient.FilterOption
 import com.brave.adblock.Utils
 import com.phlox.tvwebbrowser.AppContext
+import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.TVBro
 import com.phlox.tvwebbrowser.utils.activemodel.ActiveModel
 import com.phlox.tvwebbrowser.utils.observable.ObservableValue
@@ -125,4 +126,21 @@ class AdblockModel : ActiveModel() {
         }
         return FilterOption.UNKNOWN
     }
+
+    //Protection settings (the Ads & privacy settings page renders and writes these)
+    var adBlockEnabled: Boolean
+        get() = config.adBlockEnabled
+        set(value) { config.adBlockEnabled = value }
+
+    val adBlockListUrl: String get() = config.adBlockListURL.value
+
+    fun setAdBlockListUrl(url: String) {
+        config.adBlockListURL.value = url.trim().ifEmpty { Config.DEFAULT_ADBLOCK_LIST_URL }
+    }
+
+    val adBlockListLastUpdate: Long get() = config.adBlockListLastUpdate
+
+    var blockAutomaticRedirects: Boolean
+        get() = config.blockAutomaticRedirects
+        set(value) { config.blockAutomaticRedirects = value }
 }
