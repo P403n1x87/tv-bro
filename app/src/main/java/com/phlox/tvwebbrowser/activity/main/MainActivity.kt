@@ -64,6 +64,7 @@ import com.phlox.tvwebbrowser.activity.history.HistoryActivity
 import com.phlox.tvwebbrowser.activity.main.dialogs.favorites.FavoriteEditorDialog
 import com.phlox.tvwebbrowser.activity.main.dialogs.media.MediaListAdapter
 import com.phlox.tvwebbrowser.activity.main.dialogs.settings.SettingsDialog
+import com.phlox.tvwebbrowser.activity.main.dialogs.settings.SettingsDeps
 import com.phlox.tvwebbrowser.activity.main.view.ActionBar
 import com.phlox.tvwebbrowser.activity.main.view.CursorMenuView
 import com.phlox.tvwebbrowser.activity.main.view.RowFocusPanel
@@ -453,7 +454,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
             if (index >= 0 && index < tabsModel.tabsStates.size) tabsModel.tabsStates[index] else null
 
     override fun showSettings() {
-        SettingsDialog(this, settingsModel).apply {
+        SettingsDialog(this, SettingsDeps(settingsModel, adblockModel, autoUpdateModel)).apply {
             // The ad-block toggle is global (config.adBlockEnabled) while the overlay zapper is a
             // document-start script registered per WebView; re-sync every open tab on dismiss so
             // the zapper matches the network blocker. Per-tab overrides are preserved.

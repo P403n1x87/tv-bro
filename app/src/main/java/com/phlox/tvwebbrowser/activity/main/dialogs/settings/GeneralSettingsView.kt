@@ -1,19 +1,17 @@
 package com.phlox.tvwebbrowser.activity.main.dialogs.settings
 
 import android.content.Context
-import android.util.AttributeSet
 import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.activity.main.SettingsModel
-import com.phlox.tvwebbrowser.utils.activemodel.ActiveModelsRepository
 import com.phlox.tvwebbrowser.utils.activity
 
-class GeneralSettingsView @JvmOverloads constructor(
-    context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
-) : SettingsPageView(context, attrs, defStyleAttr) {
+class GeneralSettingsView(
+    context: Context, private val deps: SettingsDeps
+) : SettingsPageView(context) {
 
-    private val settingsModel = ActiveModelsRepository.get(SettingsModel::class, activity!!)
+    private val settingsModel = deps.settings
     private val config = AppContext.provideConfig()
 
     private val engineTitles get() = Config.SearchEnginesTitles.toList()

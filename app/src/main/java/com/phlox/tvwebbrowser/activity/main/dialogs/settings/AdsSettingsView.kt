@@ -1,23 +1,20 @@
 package com.phlox.tvwebbrowser.activity.main.dialogs.settings
 
 import android.content.Context
-import android.util.AttributeSet
 import androidx.fragment.app.FragmentActivity
 import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.R
-import com.phlox.tvwebbrowser.activity.main.AdblockModel
-import com.phlox.tvwebbrowser.utils.activemodel.ActiveModelsRepository
 import com.phlox.tvwebbrowser.utils.activity
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class AdsSettingsView @JvmOverloads constructor(
-    context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
-) : SettingsPageView(context, attrs, defStyleAttr) {
+class AdsSettingsView(
+    context: Context, private val deps: SettingsDeps
+) : SettingsPageView(context) {
 
-    private val adblockModel = ActiveModelsRepository.get(AdblockModel::class, activity!!)
+    private val adblockModel = deps.adblock
     private val config = AppContext.provideConfig()
 
     init {
