@@ -67,6 +67,7 @@ import com.phlox.tvwebbrowser.activity.main.view.bookmarks.BookmarksPanelView
 import com.phlox.tvwebbrowser.activity.main.view.tabs.TabsAdapter.Listener
 import com.phlox.tvwebbrowser.databinding.ActivityMainBinding
 import com.phlox.tvwebbrowser.domain.AddressInputPolicy
+import com.phlox.tvwebbrowser.domain.LinkActionPolicy
 import com.phlox.tvwebbrowser.domain.NavigationPolicy
 import com.phlox.tvwebbrowser.domain.PopupPolicy
 import com.phlox.tvwebbrowser.model.Download
@@ -1561,12 +1562,8 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         override fun suggestActionsForLink(baseUri: String?, linkUri: String?, srcUri: String?,
                                            title: String?, altText: String?, textContent: String?,
                                            x: Int, y: Int) {
-            var s = linkUri ?: srcUri
-            if (s != null && s.startsWith("\"") && s.endsWith("\"")) {
-                s = s.substring(1, s.length - 1)
-            }
-            val url = s
-            val isHTTPUrl = url != null && (url.startsWith("http://") || url.startsWith("https://"))
+            val url = LinkActionPolicy.targetUrl(linkUri, srcUri)
+            val isHTTPUrl = LinkActionPolicy.isHttpUrl(url)
             val anchor = View(this@MainActivity)
             val lp = FrameLayout.LayoutParams(1, 1)
             lp.setMargins(x, y, 0, 0)
