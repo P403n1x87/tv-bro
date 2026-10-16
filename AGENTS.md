@@ -33,6 +33,9 @@ the model/host seam polish. Work on a feature branch; **open a PR only when aske
   pass repository fakes (existing tests build in-memory Room instances).
 - Deliberate exception to view purity: `MainActivity` reads `config` for pre-model engine checks
   (`incognitoMode`, `isWebEngineGecko()`).
+- First architecture margin is closed; the next one is (a) the `MainActivity.onCreate`/lifecycle body,
+  (b) global `TVBro.instance`/`AppContext.get()` coupling (~38 sites, incl. models), (c)
+  integration-test coverage. Details/evidence: `docs/architecture/ARCHITECTURE-REVIEW.md`.
 
 ## Build / test
 - Linux: JDK 21 exported, plus JDK 17 at `/usr/lib/jvm/java-17-openjdk-amd64` (`buildSrc` pins

@@ -44,13 +44,28 @@ This review analyzes the new architecture against core software design principle
 | Doc/diagram drift | Diagrams missed the new collaborators/seams | **Done**: PlantUML sources updated and png/svg/pdf re-rendered; docs list the new pieces. | Done |
 | `Config` grab-bag | Mixes preference storage with pure decision logic | **Done**: `isHomePageUrl`/`isWebEngineGecko` moved to `domain/HomePagePolicy`/`WebEnginePolicy`; the unused `isWebEngineNotSet` dropped. | Done |
 
-## Known Deferred
-- None. All behavior-affecting items landed with their tests.
+## Known Deferred (the next margin)
+The polish pass above is complete, but it is the *first* margin, not the end. A fresh pass over the
+tree (numbers as of commit `1ce745b`) shows the remaining improvements are a different kind of work —
+mostly large, invasive or test-shape changes rather than small extractions. Ordered by value/effort:
+
+| # | Area | Evidence | Effort / value |
+|---|---|---|---|
+| 1 | `MainActivity.onCreate` is the last big function | 166 LOC; the activity is 1163 LOC / 75 `override fun` / 16 `lateinit`, implementing 5 host interfaces. A `StartupCoordinator`/`SessionComposer` (activity as host) would shrink it. | Medium / medium — composition root, so returns diminish and wiring legibility must not regress. |
+| 2 | Global service-locator coupling | 38 sites across 24 non-test files (`TVBro.instance`, `AppContext.get()`), including models that otherwise take ctor deps (`TabsModel`, `MainActivityViewModel`, `ActiveDownloadsModel`, `WebViewDataDirManager`). "Default + override" DI still reaches a global. | High / high — the deepest coupling; threading a `Services`/`AppContext` through ctors touches the reflection DI contract. |
+| 3 | `Config` grab-bag | 14 KB, ~60 members, 65 `Config.` call sites under `activity/`; still mixes SharedPreferences storage with decisions (item 7 moved only two pure predicates). | High / medium |
+| 4 | `runBlocking` on the UI path | `MainActivity:782` (`saveTab`), `WebEngineCallback:222` (`findHostConfig`); plus the download service/task. Bridges suspend repos into sync engine callbacks — correct today, jank/ANR risk surface. | Low–medium / medium |
+| 5 | `WebEngineCallbackHost` is wide | 335-LOC adapter with a many-member host interface (ISP smell) | Medium / low–medium |
+| 6 | Test shape, not count | 160 tests, all unit (`app/src/test`); there is **no `androidTest`/Robolectric** for panel focus, D-pad, toolbar URL box or back handling. | Medium / high for regression safety |
+| 7 | Packaging | `:app:common` is 4092 LOC (Config + singletons + utils + cursor widgets); `WebTabState` carries global refs. Gecko only sees `:app:common` (correct), but `common` is a grab-bag. | High / low–medium |
 
 ## Recommendation
-The refactor, the follow-up polish pass and the deferred improvements are complete: the main screen
-is decomposed into constructor-injected collaborators, models own their state without touching
-Activity/dialog classes, the host seams (`TabViewHost`, `AutoUpdateHost`, `DownloadHost`,
-`WebViewDataDirManager`) are the only UI escape hatches, and the pure decisions live in `domain/`.
-Keep new UI side effects behind such a seam rather than in a model.
+The first margin is closed: the main screen is decomposed into constructor-injected collaborators,
+models own their state without touching Activity/dialog classes, the host seams (`TabViewHost`,
+`AutoUpdateHost`, `DownloadHost`, `WebViewDataDirManager`) are the only UI escape hatches, and the
+pure decisions live in `domain/`. Keep new UI side effects behind such a seam rather than in a model.
+
+The next margin is (in order) the `MainActivity` composition/lifecycle body, the global
+service-locator coupling, and integration-test coverage — not more unit tests or more small
+extractions.
 
