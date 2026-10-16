@@ -60,6 +60,7 @@ class TabsModelTest {
             HostsRepository(db.hostsDao()),
             config,
             filesDir = { app.filesDir },
+            cacheDir = { app.cacheDir },
             networkAvailable = { true },
         )
     }

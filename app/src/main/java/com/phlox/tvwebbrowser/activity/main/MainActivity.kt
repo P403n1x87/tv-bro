@@ -196,6 +196,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         )
         thumbnailPresenter = TabThumbnailPresenter(
             vb, uiHandler, lifecycleScope,
+            cacheDir = { cacheDir },
             keepToolbarOpen = { settingsModel.keepToolbarOpen.value },
             isCurrentTab = { tabByTitleIndex(vb.vTabs.current) == it },
         )
@@ -1037,7 +1038,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         lifecycleScope.launch {
             val newThumbnail = tab.webEngine.renderThumbnail(tab.thumbnail)
             if (newThumbnail != null) {
-                tab.updateThumbnail(this@MainActivity, newThumbnail)
+                tab.updateThumbnail(cacheDir, newThumbnail)
                 if (vb.rlActionBar.visibility == View.VISIBLE && tab == tabsModel.currentTab.value) {
                     thumbnailPresenter.display(tab)
                 }
