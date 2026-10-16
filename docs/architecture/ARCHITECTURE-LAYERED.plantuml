@@ -8,7 +8,12 @@ skinparam ranksep 40
 title TV-Bro Architecture - Layered View
 
 package "1. UI Layer" {
-  [MainActivity\n(implements WebEngineCallbackHost\n+ lifecycle + panels + permissions)] as MA
+  [MainActivity\n(implements WebEngineCallbackHost\n+ lifecycle + wiring)] as MA
+  [PanelController\n(side panels + row focus)] as PC
+  [ToolbarController\n(overlay + fullscreen)] as TC
+  [MediaListPresenter\n(stream list dialog)] as MLP
+  [PermissionOrchestrator\n(permission/result routing)] as PO
+  [IntentHandler\n(deep links + history result)] as IH
   [HistoryActivity\n(list + search + multi-select)] as HA
   [DownloadsActivity\n(active + history + actions)] as DA
   [ActionBar/View Layer\n(TabsView, BookmarksPanelView, ActionBar)] as AB
@@ -70,6 +75,11 @@ package "7. Service/Application" {
 }
 
 ' Dependencies (top -> down, UI depends on models via AMR/observables)
+MA --> PC
+MA --> TC
+MA --> MLP
+MA --> PO
+MA --> IH
 MA --> AMR
 HA --> AMR
 DA --> AMR

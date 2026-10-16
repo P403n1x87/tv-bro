@@ -7,6 +7,11 @@ title TV-Bro Architecture (post-MVVM refactor)
 
 package "UI (Activities/Views)" {
   [MainActivity] as MA
+  [PanelController] as PC
+  [ToolbarController] as TC
+  [MediaListPresenter] as MLP
+  [PermissionOrchestrator] as PO
+  [IntentHandler] as IH
   [HistoryActivity] as HA
   [DownloadsActivity] as DA
   [ActionBar/TabsView/BookmarksPanelView] as AB
@@ -69,6 +74,11 @@ package "Service" {
 [ActiveModelsRepository] as AMR
 
 ' UI -> models
+MA --> PC
+MA --> TC
+MA --> MLP
+MA --> PO
+MA --> IH
 MA --> AMR
 HA --> AMR
 DA --> AMR

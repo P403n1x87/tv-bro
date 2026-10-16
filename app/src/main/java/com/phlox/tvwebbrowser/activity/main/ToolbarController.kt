@@ -1,0 +1,91 @@
+package com.phlox.tvwebbrowser.activity.main
+
+import android.app.Activity
+import android.view.View
+import android.view.WindowManager
+import androidx.core.content.ContextCompat
+import androidx.core.view.isInvisible
+import com.phlox.tvwebbrowser.R
+import com.phlox.tvwebbrowser.databinding.ActivityMainBinding
+
+/**
+ * Owns the state of the top bar and its overlay: showing/hiding the toolbar over the live page,
+ * the overlay style, the menu toggle and the in-page fullscreen window flags.
+ *
+ * [MainActivity] keeps the [com.phlox.tvwebbrowser.activity.main.view.ActionBar] wiring (address
+ * box, buttons) and only forwards the lifecycle/fullscreen events here.
+ */
+class ToolbarController(
+    private val activity: Activity,
+    private val vb: ActivityMainBinding,
+    /** Reads the "keep screen on" setting, used when leaving fullscreen. */
+    private val keepScreenOn: () -> Boolean,
+    /** Puts the focus back on the page, called when the overlay is dismissed. */
+    private val focusEngine: () -> Unit,
+) {
+    var isFullscreen: Boolean = false
+        private set
+
+    fun applyOverlayStyle() {
+        vb.rlActionBar.setBackgroundColor(ContextCompat.getColor(activity, R.color.top_bar_background))
+        vb.rlActionBar.elevation = 5f * activity.resources.displayMetrics.density
+        vb.vActionBar.setOverlayTransparency(false)
+        vb.vTabs.setOverlayTransparency(false)
+    }
+
+    fun toggleMenu() {
+        if (vb.rlActionBar.isInvisible) {
+            showMenuOverlay()
+        } else {
+            hideMenuOverlay()
+        }
+    }
+
+    fun showMenuOverlay() {
+        if (isFullscreen) return
+        applyOverlayStyle()
+        vb.flWebViewContainer.visibility = View.VISIBLE
+        vb.ivMiniatures.visibility = View.INVISIBLE
+        vb.rlActionBar.visibility = View.VISIBLE
+        vb.vActionBar.dismissExtendedAddressBarMode()
+        vb.vActionBar.catchFocus()
+    }
+
+    /**
+     * Kept for the auto-hide call sites (tab switch, URL done, history, voice search, …). With the
+     * "keep toolbar open" behaviour the overlay stays up, so this is intentionally a no-op.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    fun autoHideMenuOverlay(hideBottomButtons: Boolean = true) {
+    }
+
+    fun hideMenuOverlay(hideBottomButtons: Boolean = true) {
+        vb.llTabPanel.visibility = View.GONE
+        if (hideBottomButtons) {
+            focusEngine()
+        }
+    }
+
+    fun enterFullscreen() {
+        isFullscreen = true
+        vb.rlActionBar.visibility = View.GONE
+        vb.llTabPanel.visibility = View.GONE
+        activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        activity.window.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_FULLSCREEN
+                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY)
+    }
+
+    fun exitFullscreen() {
+        if (!keepScreenOn()) {
+            activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        activity.window.decorView.systemUiVisibility =
+            View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+        isFullscreen = false
+        vb.rlActionBar.visibility = View.VISIBLE
+    }
+}
