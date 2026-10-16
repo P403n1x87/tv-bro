@@ -23,7 +23,6 @@ import android.os.Handler
 import android.os.Process
 import android.util.Log
 import android.util.Patterns
-import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
@@ -36,8 +35,6 @@ import android.view.animation.AnimationUtils
 import android.view.animation.DecelerateInterpolator
 import android.webkit.CookieManager
 import android.webkit.WebStorage
-import android.widget.FrameLayout
-import android.widget.PopupMenu
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
@@ -55,17 +52,13 @@ import com.phlox.tvwebbrowser.TVBro
 import com.phlox.tvwebbrowser.activity.IncognitoModeMainActivity
 import com.phlox.tvwebbrowser.activity.downloads.DownloadsActivity
 import com.phlox.tvwebbrowser.activity.history.HistoryActivity
-import com.phlox.tvwebbrowser.activity.main.dialogs.favorites.FavoriteEditorDialog
 import com.phlox.tvwebbrowser.activity.main.dialogs.settings.SettingsDialog
 import com.phlox.tvwebbrowser.activity.main.dialogs.settings.SettingsDeps
 import com.phlox.tvwebbrowser.activity.main.view.ActionBar
 import com.phlox.tvwebbrowser.activity.main.view.CursorMenuView
-import com.phlox.tvwebbrowser.activity.main.view.bookmarks.BookmarksPanelView
 import com.phlox.tvwebbrowser.activity.main.view.tabs.TabsAdapter.Listener
 import com.phlox.tvwebbrowser.databinding.ActivityMainBinding
 import com.phlox.tvwebbrowser.domain.AddressInputPolicy
-import com.phlox.tvwebbrowser.domain.LinkActionPolicy
-import com.phlox.tvwebbrowser.model.FavoriteItem
 import com.phlox.tvwebbrowser.model.HostConfig
 import com.phlox.tvwebbrowser.model.WebTabState
 import com.phlox.tvwebbrowser.service.downloads.DownloadService
@@ -122,6 +115,9 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     private lateinit var mediaListPresenter: MediaListPresenter
     private lateinit var permissionOrchestrator: PermissionOrchestrator
     private lateinit var intentHandler: IntentHandler
+    private lateinit var bookmarksController: BookmarksController
+    private lateinit var cursorMenuController: CursorMenuController
+    private lateinit var thumbnailPresenter: TabThumbnailPresenter
     private val mediaDiscoveryListener: () -> Unit = { uiHandler.post { updateMediaCounter() } }
     private lateinit var prefs: SharedPreferences
     protected val config = AppContext.provideConfig()
@@ -130,8 +126,6 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     private val downloadCoordinator by lazy {
         DownloadCoordinator(this) { onDownloadStarted(it) }
     }
-    var openUrlInExternalAppDialog: AlertDialog? = null
-    private var linkActionsMenu: PopupMenu? = null
 
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -191,13 +185,26 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
             changeTab = { changeTab(it) },
             autoHideMenuOverlay = { toolbarController.autoHideMenuOverlay() },
         )
+        bookmarksController = BookmarksController(
+            this, lifecycleScope, vb, viewModel, panelController,
+            currentTab = { tabsModel.currentTab.value },
+            navigate = { navigate(it) },
+        )
+        cursorMenuController = CursorMenuController(
+            this, vb, uiHandler, toolbarController, backNavigationEventsAdapter
+        )
+        thumbnailPresenter = TabThumbnailPresenter(
+            vb, uiHandler, lifecycleScope,
+            keepToolbarOpen = { settingsModel.keepToolbarOpen.value },
+            isCurrentTab = { tabByTitleIndex(vb.vTabs.current) == it },
+        )
 
         vb.ivMiniatures.visibility = View.INVISIBLE
         vb.rlActionBar.visibility = View.VISIBLE
         vb.progressBar.visibility = View.GONE
 
         vb.vTabs.listener = tabsListener
-        vb.vBookmarks.listener = bookmarksListener
+        vb.vBookmarks.listener = bookmarksController.listener
         // The composition root hands the models to the views; the views never locate them.
         vb.vTabs.bind(tabsModel)
 
@@ -261,11 +268,10 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         }
 
         // Bookmark state is owned by the view model; the view only renders it.
-        viewModel.bookmarks.subscribe(this, false) { vb.vBookmarks.setBookmarks(it) }
+        viewModel.bookmarks.subscribe(this, false) { bookmarksController.renderBookmarks(it) }
 
-        viewModel.currentPageBookmarked.subscribe(this, false) { bookmarked ->
-            vb.vBookmarks.setCurrentPage(tabsModel.currentTab.value?.url, bookmarked)
-            vb.vActionBar.setBookmarked(bookmarked)
+        viewModel.currentPageBookmarked.subscribe(this, false) {
+            bookmarksController.renderCurrentPageBookmarked(it)
         }
 
         tabsModel.currentTab.subscribe(this) {
@@ -309,25 +315,12 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         }
     }
 
-    private val displayThumbnailRunnable = object : Runnable {
-        var tabState: WebTabState? = null
-        override fun run() {
-            tabState?.let {
-                lifecycleScope.launch(Dispatchers.Main) {
-                    displayThumbnail(it)
-                }
-            }
-        }
-    }
-
     private val tabsListener = object : Listener {
         override fun onTitleChanged(index: Int) {
             Log.d(TAG, "onTitleChanged: $index")
             val tab = tabByTitleIndex(index)
             vb.vActionBar.setAddressBoxText(tab?.url ?: "")
-            uiHandler.removeCallbacks(displayThumbnailRunnable)
-            displayThumbnailRunnable.tabState = tab
-            uiHandler.postDelayed(displayThumbnailRunnable, 200)
+            thumbnailPresenter.schedule(tab)
         }
 
         override fun onTitleSelected(index: Int) {
@@ -355,40 +348,6 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         }
     }
 
-    private val bookmarksListener = object : BookmarksPanelView.Listener {
-        override fun onToggleThisPageBookmark() {
-            toggleCurrentPageBookmark()
-        }
-
-        override fun onBookmarkSelected(item: FavoriteItem) {
-            item.url?.let { navigate(it) }
-            hideBookmarksPanel()
-        }
-
-        override fun onEditBookmark(item: FavoriteItem) {
-            FavoriteEditorDialog(
-                this@MainActivity,
-                initialTitle = item.title,
-                initialUrl = item.url,
-                newBookmark = item.id == 0L,
-            ) { title, url ->
-                lifecycleScope.launch(Dispatchers.Main) {
-                    viewModel.onHomePageLinkEdited(item, title, url).join()
-                    loadBookmarks()
-                    updateBookmarkState()
-                }
-            }.show()
-        }
-
-        override fun onDeleteBookmark(item: FavoriteItem) {
-            lifecycleScope.launch(Dispatchers.Main) {
-                viewModel.deleteBookmark(item.id).join()
-                loadBookmarks()
-                updateBookmarkState()
-            }
-        }
-    }
-
     override fun closeWindow() {
         Log.d(TAG, "closeWindow")
         lifecycleScope.launch {
@@ -411,79 +370,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     }
 
     override fun showFavorites() {
-        if (panelController.isBookmarksPanelVisible) {
-            hideBookmarksPanel()
-        } else {
-            showBookmarksPanel()
-        }
-    }
-
-    private fun showBookmarksPanel() {
-        // Read the content first and hand the focus to a row only afterwards: the rows, and the
-        // "Add this page" entry (which is hidden again for the home page), are final by then, so the
-        // hand-off needs at most the one layout pass that creates them.
-        panelController.showBookmarksPanel(lifecycleScope) {
-            loadBookmarks()
-            updateBookmarkState()
-        }
-    }
-
-    private fun hideBookmarksPanel() {
-        panelController.hideBookmarksPanel()
-    }
-
-    private suspend fun loadBookmarks() {
-        viewModel.loadBookmarks()
-    }
-
-    /**
-     * Asks the view model to recompute whether the current page is bookmarked. The toolbar star and
-     * the panel's "Add this page" / "Remove from list" row follow [MainActivityViewModel.currentPageBookmarked].
-     */
-    private fun updateBookmarkState() {
-        val url = tabsModel.currentTab.value?.url
-        lifecycleScope.launch(Dispatchers.Main) {
-            viewModel.refreshBookmarkState(url)
-        }
-    }
-
-    private fun addCurrentPageAsBookmark() {
-        val currentTab = tabsModel.currentTab.value ?: return
-        val url = currentTab.url
-        if (url.isNullOrBlank() || Config.isHomePageUrl(url)) return
-        val newItem = FavoriteItem()
-        FavoriteEditorDialog(
-            this,
-            initialTitle = currentTab.title ?: url,
-            initialUrl = url,
-            newBookmark = true,
-        ) { title, editedUrl ->
-            lifecycleScope.launch(Dispatchers.Main) {
-                viewModel.onHomePageLinkEdited(newItem, title, editedUrl).join()
-                loadBookmarks()
-                updateBookmarkState()
-            }
-        }.show()
-    }
-
-    /**
-     * The bookmarks panel's first row: adds the current page if it is not bookmarked, or removes
-     * the existing bookmark when it already is.
-     */
-    private fun toggleCurrentPageBookmark() {
-        val currentTab = tabsModel.currentTab.value ?: return
-        val url = currentTab.url
-        if (url.isNullOrBlank() || Config.isHomePageUrl(url)) return
-        lifecycleScope.launch(Dispatchers.Main) {
-            val existing = viewModel.getBookmarkByUrl(url)
-            if (existing != null) {
-                viewModel.deleteBookmark(existing.id).join()
-                loadBookmarks()
-                updateBookmarkState()
-            } else {
-                addCurrentPageAsBookmark()
-            }
-        }
+        bookmarksController.togglePanel()
     }
 
     private fun tabByTitleIndex(index: Int) =
@@ -559,7 +446,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
                 when (which) {
                     0 -> navigate(settingsModel.homePage)
                     1 -> openInNewTab(settingsModel.homePage, tabsModel.tabsStates.size, needToHideMenuOverlay = false, navigateImmediately = true)
-                    2 -> addCurrentPageAsBookmark()
+                    2 -> bookmarksController.addCurrentPage()
                     3 -> toggleAdBlockForTab()
                     4 -> lifecycleScope.launch(Dispatchers.Main) { showPopupBlockOptions() }
                     5 -> showHistory()
@@ -823,7 +710,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         vb.vActionBar.setForwardEnabled(tab.webEngine.canGoForward() == true)
 
         updateMediaCounter()
-        updateBookmarkState()
+        bookmarksController.updateState()
     }
 
     private fun updateMediaCounter() {
@@ -1067,7 +954,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         } else if (toolbarController.isFullscreen) {
             tabsModel.currentTab.value?.webEngine?.hideFullscreenView()
         } else if (panelController.isBookmarksPanelVisible) {
-            hideBookmarksPanel()
+            bookmarksController.hide()
         } else if (panelController.isTabsPanelVisible) {
             panelController.hideTabsPanel()
         } else if (vb.flWebViewContainer.hasFocus()) {
@@ -1076,35 +963,6 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
             toolbarController.showMenuOverlay()
         } else {
             toolbarController.toggleMenu()
-        }
-    }
-
-    private suspend fun displayThumbnail(currentTab: WebTabState?) {
-        if (settingsModel.keepToolbarOpen.value) return
-        if (currentTab != null) {
-            if (tabByTitleIndex(vb.vTabs.current) != currentTab) return
-            vb.llMiniaturePlaceholder.visibility = View.INVISIBLE
-            vb.ivMiniatures.visibility = View.VISIBLE
-            if (currentTab.thumbnail != null) {
-                vb.ivMiniatures.setImageBitmap(currentTab.thumbnail)
-            } else if (currentTab.thumbnailHash != null) {
-                withContext(Dispatchers.IO) {
-                    val thumbnail = currentTab.loadThumbnail()
-                    withContext(Dispatchers.Main) {
-                        if (thumbnail != null) {
-                            vb.ivMiniatures.setImageBitmap(currentTab.thumbnail)
-                        } else {
-                            vb.ivMiniatures.setImageResource(0)
-                        }
-                    }
-                }
-            } else {
-                vb.ivMiniatures.setImageResource(0)
-            }
-        } else {
-            vb.llMiniaturePlaceholder.visibility = View.VISIBLE
-            vb.ivMiniatures.setImageResource(0)
-            vb.ivMiniatures.visibility = View.INVISIBLE
         }
     }
 
@@ -1138,17 +996,6 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
                 toolbarController.autoHideMenuOverlay()
             }
         })
-    }
-
-    private fun onEditHomePageBookmark(favoriteItem: FavoriteItem) {
-        FavoriteEditorDialog(
-            this,
-            initialTitle = favoriteItem.title,
-            initialUrl = favoriteItem.url,
-            newBookmark = favoriteItem.id == 0L,
-        ) { title, url ->
-            viewModel.onHomePageLinkEdited(favoriteItem, title, url)
-        }.show()
     }
 
     // ---- WebEngineCallbackHost: the view side of the per-tab engine callback -----------------
@@ -1191,7 +1038,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
             if (newThumbnail != null) {
                 tab.updateThumbnail(this@MainActivity, newThumbnail)
                 if (vb.rlActionBar.visibility == View.VISIBLE && tab == tabsModel.currentTab.value) {
-                    displayThumbnail(tab)
+                    thumbnailPresenter.display(tab)
                 }
             }
         }
@@ -1277,33 +1124,15 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     }
 
     override fun onEditHomePageBookmarkSelected(favoriteId: Long) {
-        lifecycleScope.launch {
-            val favoriteItem = viewModel.getBookmarkById(favoriteId) ?: return@launch
-            AlertDialog.Builder(this@MainActivity)
-                .setTitle(R.string.bookmarks)
-                .setItems(arrayOf(getString(R.string.edit), getString(R.string.delete))) { _, which ->
-                    when (which) {
-                        0 -> onEditHomePageBookmark(favoriteItem)
-                        1 -> {
-                            val bookmark = viewModel.homePageLinks.firstOrNull { it.favoriteId == favoriteId }
-                            if (bookmark != null) {
-                                viewModel.removeHomePageLink(bookmark)
-                            } else {
-                                viewModel.deleteBookmark(favoriteId)
-                            }
-                        }
-                    }
-                }
-                .show()
-        }
+        bookmarksController.editBookmarkById(favoriteId)
     }
 
     override fun onPrepareForFullscreen() {
-        toolbarController.enterFullscreen()
+        cursorMenuController.onPrepareForFullscreen()
     }
 
     override fun onExitFullscreen() {
-        toolbarController.exitFullscreen()
+        cursorMenuController.onExitFullscreen()
     }
 
     override fun showCursorMenu(
@@ -1311,73 +1140,22 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         baseUri: String?, linkUri: String?, srcUri: String?, title: String?, altText: String?,
         textContent: String?, x: Int, y: Int
     ) {
-        uiHandler.post {
-            vb.vCursorMenu.show(
-                tab, callback, cursorDrawer,
-                baseUri, linkUri, srcUri,
-                title, altText, textContent,
-                x, y,
-                backNavigationEventsAdapter
-            )
-        }
+        cursorMenuController.showCursorMenu(
+            tab, callback, cursorDrawer,
+            baseUri, linkUri, srcUri, title, altText, textContent, x, y
+        )
     }
 
     override fun suggestActionsForLink(
         tab: WebTabState, callback: WebEngineWindowProviderCallback, baseUri: String?, linkUri: String?,
         srcUri: String?, title: String?, altText: String?, textContent: String?, x: Int, y: Int
     ) {
-        val url = LinkActionPolicy.targetUrl(linkUri, srcUri)
-        val isHTTPUrl = LinkActionPolicy.isHttpUrl(url)
-        val anchor = View(this@MainActivity)
-        val lp = FrameLayout.LayoutParams(1, 1)
-        lp.setMargins(x, y, 0, 0)
-        vb.flWebViewContainer.addView(anchor, lp)
-        linkActionsMenu = PopupMenu(this@MainActivity, anchor, Gravity.BOTTOM).also {
-            it.inflate(R.menu.menu_link)
-            it.menu.findItem(R.id.miOpenInNewTab).isVisible = isHTTPUrl
-            it.menu.findItem(R.id.miOpenInExternalApp).isVisible = isHTTPUrl
-            it.menu.findItem(R.id.miDownload).isVisible = isHTTPUrl
-            it.menu.findItem(R.id.miCopyToClipboard).isVisible = url != null
-            it.menu.findItem(R.id.miShare).isVisible = url != null
-            it.setOnMenuItemClickListener { menuItem ->
-                when (menuItem.itemId) {
-                    R.id.miRefreshPage -> tab.webEngine.reload()
-                    R.id.miOpenInNewTab -> callback.onOpenInNewTabRequested(url!!, true)
-                    R.id.miOpenInExternalApp -> callback.onOpenInExternalAppRequested(url!!)
-                    R.id.miDownload -> callback.onDownloadRequested(url!!)
-                    R.id.miCopyToClipboard -> callback.onCopyTextToClipboardRequested(url!!)
-                    R.id.miShare -> callback.onShareUrlRequested(url!!)
-                }
-                true
-            }
-
-            it.setOnDismissListener {
-                vb.flWebViewContainer.removeView(anchor)
-                linkActionsMenu = null
-            }
-            it.show()
-        }
+        cursorMenuController.suggestActionsForLink(
+            tab, callback, baseUri, linkUri, srcUri, title, altText, textContent, x, y
+        )
     }
 
     override fun askUserAndOpenInExternalApp(url: String, intent: Intent) {
-        if (openUrlInExternalAppDialog != null) {
-            return
-        }
-        openUrlInExternalAppDialog = AlertDialog.Builder(this)
-            .setTitle(R.string.site_asks_to_open_unknown_url)
-            .setMessage(getString(R.string.site_asks_to_open_unknown_url_message) + "\n\n" + url)
-            .setPositiveButton(R.string.yes) { _, _ ->
-                try {
-                    startActivity(intent)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                    Toast.makeText(this@MainActivity, R.string.external_app_open_error, Toast.LENGTH_SHORT).show()
-                }
-            }
-            .setNegativeButton(R.string.no, null)
-            .setOnDismissListener {
-                openUrlInExternalAppDialog = null
-            }
-            .show()
+        cursorMenuController.askUserAndOpenInExternalApp(url, intent)
     }
 }
