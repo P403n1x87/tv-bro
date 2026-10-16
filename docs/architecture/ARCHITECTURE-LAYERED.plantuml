@@ -31,6 +31,14 @@ package "2. Presentation Models (ActiveModel)" {
   [ActiveDownloadsModel\n(active tasks + listeners)] as ADAM
 }
 
+package "2b. Host Seams (view interfaces)" {
+  [WebEngineCallbackHost] as WECH
+  [TabViewHost] as TVH
+  [AutoUpdateHost] as AUH
+  [WebViewDataDirManager] as WVDM
+  [DefaultWebViewDataDirManager] as DWVDM
+}
+
 package "3. Domain (pure, framework-free)" {
   [NavigationPolicy\n(scheme routing + redirect blocking)] as NP
   [PopupPolicy\n(popup blocking rules)] as PP
@@ -96,7 +104,25 @@ AMR --> ABM
 AMR --> AUM
 AMR --> HM
 AMR --> ADHM
+AMR --> TVM
+AMR --> MVM
+AMR --> SM
+AMR --> ABM
+AMR --> AUM
+AMR --> HM
+AMR --> ADHM
 AMR --> ADAM
+
+' Host seams (models never touch Activity/dialog classes)
+MA ..|> WECH
+MA ..|> TVH
+MA ..|> AUH
+WECB ..> WECH : host calls
+TVM --> TVH : changeTab(host)
+AUM --> AUH : showUpdateDialogIfNeeded(host)
+MVM --> WVDM : incognito dirs
+DWVDM ..|> WVDM
+MVM ..> DWVDM : default
 
 TVM --> R
 MVM --> R
@@ -150,6 +176,7 @@ MVM ..> MA : observable state
 SM ..> MA : observable
 SM ..> SD : observable
 ABM ..> SD : observable
+ABM ..> MA : loadError
 AUM ..> SD : observable
 HM ..> HA : observable
 ADHM ..> DA : observable

@@ -29,6 +29,14 @@ package "Presentation Models (ActiveModel)" {
   [ActiveDownloadsModel] as ADAM
 }
 
+package "Host Seams (view interfaces)" {
+  [WebEngineCallbackHost] as WECH
+  [TabViewHost] as TVH
+  [AutoUpdateHost] as AUH
+  [WebViewDataDirManager] as WVDM
+  [DefaultWebViewDataDirManager] as DWVDM
+}
+
 package "Domain (pure)" {
   [NavigationPolicy] as NP
   [PopupPolicy] as PP
@@ -114,6 +122,17 @@ GV ..|> WIF
 WV --> WEH
 GV --> WEH
 
+' Host seams (models stay free of Activity/dialog classes)
+MA ..|> WECH
+MA ..|> TVH
+MA ..|> AUH
+WECB ..> WECH : host calls
+TVM --> TVH : changeTab(host)
+AUM --> AUH : showUpdateDialogIfNeeded(host)
+MVM --> WVDM : incognito dirs
+DWVDM ..|> WVDM
+MVM ..> DWVDM : default
+
 ' Data
 TVM --> TR
 TVM --> HstR
@@ -148,6 +167,7 @@ DT --> DR
 MA <.. MVM : observes
 MA <.. TVM : observes
 MA <.. SM : observes
+MA <.. ABM : observes loadError
 HA <.. HM : observes
 DA <.. ADHM : observes
 DA <.. ADAM : observes
