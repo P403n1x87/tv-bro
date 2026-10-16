@@ -60,6 +60,10 @@ the model/host seam polish. Work on a feature branch; **open a PR only when aske
 ## Known issues / gotchas
 - History is keyed by URL (`HistoryDao.deleteByUrl` before insert → visits collapse to one row,
   latest time wins).
+- Home page: `pages/home/*` is served from bundled assets by **request URL** in
+  `WebViewEx.shouldInterceptRequest`; never gate it on the current tab URL — on Back/Forward the
+  document request lands before `onPageStarted` updates the tab, and the stale remote copy loads
+  (its markup differs, so the injected `renderSections` call fails).
 - Panels: claim focus with `requestFocusFromTouch()`, then hand to a row via
   `RowFocusPanel.requestRowFocus()` once content is settled (row lookup uses
   `findViewHolderForAdapterPosition`).

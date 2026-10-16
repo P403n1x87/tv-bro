@@ -432,14 +432,20 @@ open class WebViewEx(context: Context, val callback: Callback, val jsInterface: 
                     }
                 }
                 val currentPageUrl = currentOriginalUrl
+                val requestUrl = request.url.toString()
 
-                if (currentPageUrl != null && currentPageUrl.toString().startsWith(Config.HOME_PAGE_URL,
-                        ignoreCase = true)) {
+                // The built-in home page and its `favicon://` quick-link icons are always served from
+                // the bundled assets. Do not gate this on [currentOriginalUrl]: on a Back/Forward
+                // history navigation the document request arrives before onPageStarted commits the
+                // new URL, so a stale gate lets the outdated remote copy of the home page load
+                // instead - its markup differs and the injected renderSections call then fails.
+                if (request.url.scheme == "favicon" ||
+                    requestUrl.startsWith(Config.HOME_PAGE_URL, ignoreCase = true)) {
                     HomePageHelper.shouldInterceptRequest(view, request)?.let {
                         return it
                     }
-                    if (request.url.toString().startsWith(Config.HOME_PAGE_URL)) {
-                        var relativePath = request.url.toString().substring(Config.HOME_PAGE_URL.length)
+                    if (requestUrl.startsWith(Config.HOME_PAGE_URL, ignoreCase = true)) {
+                        var relativePath = requestUrl.substring(Config.HOME_PAGE_URL.length)
                         if (relativePath.isEmpty() || relativePath == "/") {
                             relativePath = "index.html"
                         }

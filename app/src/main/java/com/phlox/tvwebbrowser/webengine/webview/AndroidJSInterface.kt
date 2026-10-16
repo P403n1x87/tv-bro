@@ -68,9 +68,13 @@ class AndroidJSInterface(private val webEngine: WebViewWebEngine) {
 
     @JavascriptInterface
     fun onHomePageLoaded() {
-        if (!isHomePage()) return
         val callback = webEngine.callback ?: return
         callback.getActivity().runOnUiThread {
+            // Resolve the live WebView URL on the UI thread: WebView methods must not be called from
+            // the JavascriptInterface thread, and on a cache-restored history load the page scripts
+            // can run before tab.url has been updated to the new page.
+            val webView = webEngine.getView() as? WebViewEx ?: return@runOnUiThread
+            if (!HomePagePolicy.isHomePageUrl(webView.url, Config.localHomePageUrl)) return@runOnUiThread
             val cfg = AppContext.provideConfig()
             fun linksToJson(links: List<com.phlox.tvwebbrowser.model.HomePageLink>): String {
                 val jsArr = JSONArray()
