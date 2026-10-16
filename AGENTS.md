@@ -1,7 +1,7 @@
 # tv-bro — agent notes
 
-Android TV browser. `master` already carries the MVVM refactor and the `MainActivity` decomposition
-(PRs #4/#5). Work on a feature branch; **open a PR only when asked**.
+Android TV browser. `master` already carries the MVVM refactor, the `MainActivity` decomposition and
+the model/host seam polish. Work on a feature branch; **open a PR only when asked**.
 
 ## Layout / flavors
 - Flavors: `p403n1x87` (this fork, self-updates from `P403n1x87/tv-bro`), `generic`/`google`
@@ -23,6 +23,10 @@ Android TV browser. `master` already carries the MVVM refactor and the `MainActi
 - `MainActivity` is the composition root/host; its UI work is delegated to `PanelController`,
   `ToolbarController`, `MediaListPresenter`, `PermissionOrchestrator` and `IntentHandler`, wired in
   `onCreate`. Collaborators must not read `MainActivity` privates — take deps/callbacks via ctor.
+- Models must not touch Activity/dialog classes: UI side effects go through a host seam or an
+  observable the host renders — `TabViewHost` (`TabsModel.changeTab`), `AutoUpdateHost`
+  (`AutoUpdateModel.showUpdateDialogIfNeeded`), `AdblockModel.loadError` (host resets it).
+  `MainActivity` implements both hosts.
 - Models own state; a view assigning a model property is the accepted "intent" pattern. In tests,
   pass repository fakes (existing tests build in-memory Room instances).
 - Deliberate exception to view purity: `MainActivity` reads `config` for pre-model engine checks
@@ -46,11 +50,8 @@ Android TV browser. `master` already carries the MVVM refactor and the `MainActi
   (fallback `signing.keystore`); **never regenerate** (it is what upgrades installs in place).
 
 ## Known issues / gotchas
-- **History search bug (open):** `HistoryRepository.search` passes the query verbatim, so it matches
-  only complete titles/urls. Fix (also update the test that pins today):
-  `dao.search("%$query%", "%$query%")`.
-- `HistoryDao.deleteByUrl` before insert → history keyed by URL (visits collapse). `frequentlyUsedUrls()`
-  is therefore redundant.
+- History is keyed by URL (`HistoryDao.deleteByUrl` before insert → visits collapse to one row,
+  latest time wins).
 - Panels: claim focus with `requestFocusFromTouch()`, then hand to a row via
   `RowFocusPanel.requestRowFocus()` once content is settled (row lookup uses
   `findViewHolderForAdapterPosition`).

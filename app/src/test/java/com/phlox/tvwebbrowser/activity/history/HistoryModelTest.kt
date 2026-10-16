@@ -98,10 +98,8 @@ class HistoryModelTest {
         insert("Kotlin tips", "https://blog.example/one", time = 1)
         insert("Something else", "https://other.example/two", time = 2)
 
-        // NOTE: the DAO's `LIKE :q` has no wildcards, so today only an exact title/url matches.
-        // The `%...%` wrapping the old Java model used was lost in the Kotlin conversion — a
-        // pre-existing bug, deliberately left alone here (see AGENTS.md, Known issues).
-        model.searchQuery = "https://blog.example/one"
+        // A partial query is enough: the repository wraps it in wildcards for the DAO's LIKE.
+        model.searchQuery = "blog.example"
         model.loadItems()
         advance(1)
 

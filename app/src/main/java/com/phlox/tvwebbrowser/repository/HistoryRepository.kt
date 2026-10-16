@@ -14,7 +14,8 @@ class HistoryRepository(private val dao: HistoryDao) {
 
     suspend fun page(offset: Long): List<HistoryItem> = dao.allByLimitOffset(offset)
 
-    suspend fun search(query: String): List<HistoryItem> = dao.search(query, query)
+    /** Partial matches on the title or the url, newest first. */
+    suspend fun search(query: String): List<HistoryItem> = dao.search("%$query%", "%$query%")
 
     suspend fun all(): List<HistoryItem> = dao.getAll()
 

@@ -84,13 +84,13 @@ class HistoryRepositoryTest {
 
         assertEquals(
             listOf("News", "Docs"),
-            repository.search("%android%").map { it.title }
+            repository.search("android").map { it.title }
         )
         assertEquals(
             listOf("Cooking recipes"),
-            repository.search("%recipes.example%").map { it.title }
+            repository.search("recipes.example").map { it.title }
         )
-        assertEquals(emptyList<String>(), repository.search("%nothing%"))
+        assertEquals(emptyList<String>(), repository.search("nothing"))
     }
 
     @Test

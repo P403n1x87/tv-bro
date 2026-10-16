@@ -5,7 +5,7 @@ This document gives a more layered visualisation with brief descriptions of each
 ## Layer 1 - UI (Presentation Layer)
 | Component | Purpose | Key Notes |
 |---|---|---|
-| **MainActivity** | Root activity; implements `WebEngineCallbackHost`. Composition root for the screen: builds the models and the view collaborators, wires the engine seam and the toolbar, and forwards. | Reads config only for pre-model engine checks (deliberate). Observes presentation models; delegates its UI work to the controllers below. |
+| **MainActivity** | Root activity; implements `WebEngineCallbackHost`, `TabViewHost`, `AutoUpdateHost`. Composition root for the screen: builds the models and the view collaborators, wires the engine seam and the toolbar, and forwards. | Reads config only for pre-model engine checks (deliberate). Observes presentation models; renders model events (adblock `loadError`); delegates its UI work to the controllers below. |
 | **PanelController** | Tabs/bookmarks panel visibility and the focus hand-off to a row. | Claims the container focus with `requestFocusFromTouch()`, then `RowFocusPanel.requestRowFocus()` once the content is settled. |
 | **ToolbarController** | Toolbar overlay show/hide/style, the menu toggle, and the in-page fullscreen window flags. | Owns the `isFullscreen` state; `autoHideMenuOverlay()` is a no-op under the keep-toolbar-open behaviour. |
 | **MediaListPresenter** | The "streams on this page" list dialog and its background metadata prefetch. | Wraps `MediaListAdapter`; releases it on dismiss. |
@@ -19,11 +19,11 @@ This document gives a more layered visualisation with brief descriptions of each
 ## Layer 2 - Presentation Models (ActiveModel)
 | Component | Purpose | Key Notes |
 |---|---|---|
-| **TabsModel** | Manages open tabs, current selection, persistence, lifecycle (pause/save/detach). | Exposes `tabsStates` (ObservableList), `currentTab` (ObservableValue). Provides intents: `onOpenTab`, `onCloseTab`, `onToggleAdBlock`, `moveTab`, `changeTab`. |
-| **MainActivityViewModel** | Home page links/bookmarks, history logging (debounced), incognito mode cleanup/switch orchestration. | Owns `bookmarks` and `currentPageBookmarked`. Handles WebView data dir isolation across API levels. |
+| **TabsModel** | Manages open tabs, current selection, persistence, lifecycle (pause/save/detach). | Exposes `tabsStates` (ObservableList), `currentTab` (ObservableValue). Provides intents: `onOpenTab`, `onCloseTab`, `onToggleAdBlock`, `moveTab`, `changeTab`. `changeTab` materialises/attaches through an injected `TabViewHost` (no `ViewGroup` in the model). |
+| **MainActivityViewModel** | Home page links/bookmarks, history logging (debounced), incognito mode cleanup/switch orchestration. | Owns `bookmarks` and `currentPageBookmarked`. WebView data-dir isolation is delegated to the injected `WebViewDataDirManager`. |
 | **SettingsModel** | App settings as observables backed by `Config`. | Exposes observable prefs (theme, keepToolbarOpen, userAgentString). View assigns = intent. |
-| **AdblockModel** | Brave adblock client lifecycle, loading/filter matching. | Loads/updates EasyList; maps request types to filter options. Emits state via observables; UI side effects handled via host/events. |
-| **AutoUpdateModel** | Update checking, state, dialog/action orchestration. | Checks GitHub Releases (semver-aware), manages auto-check cadence; exposes `isUpdateAvailable()`. |
+| **AdblockModel** | Brave adblock client lifecycle, loading/filter matching. | Loads/updates EasyList; maps request types to filter options. Emits state via observables (incl. `loadError`); the host renders it. |
+| **AutoUpdateModel** | Update checking + state; the dialog/action flow runs through `AutoUpdateHost`. | Checks GitHub Releases (semver-aware), manages auto-check cadence; exposes `isUpdateAvailable()`. |
 | **HistoryModel** | Paginated history list/search. | `loadItems(offset)` or search; owns `lastLoadedItems`. Repository injected with default. |
 | **DownloadsHistoryModel** | Paginated completed downloads. | Tracks all loaded items + last page. |
 | **ActiveDownloadsModel** | Active download tasks + listener registry. | Coordinates cancel/update/error/all-complete notifications. |
@@ -43,7 +43,7 @@ This document gives a more layered visualisation with brief descriptions of each
 | Component | Purpose | Key Notes |
 |---|---|---|
 | **Repositories** | Manual DI container (lazy singletons). Wires DAOs → Repos. | Single construction point; models use ctor defaults. |
-| **HistoryRepository** | History CRUD + search + pagination + deleteByUrl (dedup). | All suspend. `search(q,q)` with DAO LIKE (exact substring; behavior pinned). |
+| **HistoryRepository** | History CRUD + search + pagination + deleteByUrl (dedup). | All suspend. `search(q)` wraps `%q%` for a partial match on title/url. |
 | **FavoritesRepository** | Bookmarks CRUD + lookup by URL/id + useful marker. | Indexed by URL (favorites_url_idx). |
 | **TabsRepository** | Tabs CRUD, positions, unselect-all, bulk delete. | Persists tab state metadata. |
 | **DownloadsRepository** | Downloads CRUD + pagination. | Persists download entries. |

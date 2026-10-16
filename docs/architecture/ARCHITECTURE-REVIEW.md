@@ -27,19 +27,22 @@ This review analyzes the new architecture against core software design principle
 | Testability | Excellent | Domain/repo/model/adapter testable. |
 
 ## Concrete Improvements (actionable)
-| Area | Issue | Suggestion | Priority |
+| Area | Issue | Suggestion | Status |
 |---|---|---|---|
-| MainActivity size | Was 1413 LOC (host + lifecycle + panels + permissions + intents) | **Done**: extracted `PanelController`, `ToolbarController`, `MediaListPresenter`, `PermissionOrchestrator`, `IntentHandler`; `MainActivity` keeps the host seam/composition-root role (now ~1310 LOC). | Done |
-| AdblockModel | Toast on failure uses TVBro.instance | Emit ObservableValue/ErrorEvent from model, let host show UI | Low |
-| AutoUpdateModel | Shows dialogs/toasts and takes MainActivity (platform side effects) | Expose state+events (sealed UpdateAction/DialogEvent), host renders/executs | Medium |
-| TabsModel | Takes ViewGroup + lambda for view provider | Consider ViewHost interface (view-agnostic) | Low |
-| MainActivityViewModel | WebView file-dir incognito logic | Extract WebViewDataDirManager behind injected interface | Low |
-| History search | LIKE with no wildcards (deferred behavior, pinned by test) | When changing: dao.search("%$q%","%$q%") + update test (explicit behavior change) | Deferred |
-| History dedup + frequentlyUsedUrls | counts always 1 due to uniqueness | Either drop redundant grouping or add visits counter | Low |
+| MainActivity size | Was 1413 LOC (host + lifecycle + panels + permissions + intents) | **Done**: extracted `PanelController`, `ToolbarController`, `MediaListPresenter`, `PermissionOrchestrator`, `IntentHandler`; `MainActivity` keeps the host seam/composition-root role. | Done |
+| AdblockModel | Toast on failure used `TVBro.instance` | **Done**: the model only sets `loadError`; `MainActivity` renders the toast and acknowledges the flag. | Done |
+| AutoUpdateModel | Showed dialogs/took `MainActivity` (platform side effects) | **Done**: `AutoUpdateHost` (`canInstallPackages`/`showUpdateDialog`/`showUnknownSourcesDialog`/`openInstallPermissionSettings`/`downloadUpdate`); the model keeps only the decision. | Done |
+| TabsModel | Took `ViewGroup` + a view-provider lambda | **Done**: `TabViewHost` (`createView`/`attachEngineToWindow`); `TabsModel` no longer sees a `ViewGroup`. | Done |
+| MainActivityViewModel | WebView file-dir incognito logic inline | **Done**: extracted `DefaultWebViewDataDirManager` behind the `WebViewDataDirManager` interface. | Done |
+| History search | `LIKE` without wildcards | **Done**: `HistoryRepository.search` wraps the query in `%…%`; the pinning tests were updated (explicit behavior change). | Done |
+| History dedup + `frequentlyUsedUrls` | `frequentlyUsedUrls()` was redundant under URL-keyed history | **Done**: the method was dropped; history stays keyed by URL. | Done |
 
 ## Known Deferred
-- History search wildcard wrapping (old Java "%$q%" lost) — behavior-preserving rule; pinned by `HistoryModelTest`.
+- None. The last behavior-affecting item — the history search wildcard fix — landed together with the test updates.
 
 ## Recommendation
-Proceed as-is. The main-screen controller extraction is done; the remaining items (AutoUpdateModel/AdblockModel side-effect seams, a `ViewHost` interface for `TabsModel`, `WebViewDataDirManager`, the deferred history search) are polish and can be picked up independently.
+The refactor and its follow-up polish pass are complete: the main screen is decomposed, the models own
+their state without touching Activity/dialog classes, and the remaining seams (`TabViewHost`,
+`AutoUpdateHost`, `WebViewDataDirManager`) are constructor-injected. Keep new UI side effects behind
+such a host interface rather than in a model.
 

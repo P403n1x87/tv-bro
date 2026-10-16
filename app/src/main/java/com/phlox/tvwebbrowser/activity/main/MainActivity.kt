@@ -19,6 +19,7 @@ import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
 import android.os.Process
+import android.provider.Settings
 import android.util.Log
 import android.util.Patterns
 import android.view.Gravity
@@ -47,6 +48,7 @@ import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.phlox.tvwebbrowser.AppContext
+import com.phlox.tvwebbrowser.BuildConfig
 import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.TVBro
@@ -70,6 +72,7 @@ import com.phlox.tvwebbrowser.singleton.shortcuts.ShortcutMgr
 import com.phlox.tvwebbrowser.utils.BackNavigationEventsAdapter
 import com.phlox.tvwebbrowser.utils.BaseAnimationListener
 import com.phlox.tvwebbrowser.utils.Utils
+import com.phlox.tvwebbrowser.utils.UpdateChecker
 import com.phlox.tvwebbrowser.utils.VoiceSearchHelper
 import com.phlox.tvwebbrowser.utils.activemodel.ActiveModelsRepository
 import com.phlox.tvwebbrowser.utils.childs
@@ -92,7 +95,7 @@ import java.util.Calendar
 import kotlin.system.exitProcess
 
 
-open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCallbackHost {
+open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCallbackHost, TabViewHost, AutoUpdateHost {
     companion object {
         private val TAG = MainActivity::class.java.simpleName
         const val VOICE_SEARCH_REQUEST_CODE = 10001
@@ -234,6 +237,14 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         // activity to restyle it.
         settingsModel.keepToolbarOpen.subscribe(this.lifecycle) {
             toolbarController.applyOverlayStyle()
+        }
+
+        // The ad-blocker list load flags its own failure; the host only renders (and acknowledges) it.
+        adblockModel.loadError.subscribe(this.lifecycle) { failed ->
+            if (failed) {
+                Utils.showToast(this, R.string.adblock_load_error)
+                adblockModel.loadError.value = false
+            }
         }
 
         viewModel.homePageLinks.subscribe(this) {
@@ -664,6 +675,60 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         vb.vActionBar.setUpdateAvailable(autoUpdateModel.isUpdateAvailable())
     }
 
+    // ---- AutoUpdateHost: the view side of the auto-update flow ------------------------------
+
+    override val isScreenFinishing: Boolean get() = isFinishing
+
+    override fun canInstallPackages(): Boolean =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            packageManager.canRequestPackageInstalls()
+        } else {
+            Settings.Secure.getInt(contentResolver, Settings.Secure.INSTALL_NON_MARKET_APPS) == 1
+        }
+
+    override fun showUpdateDialog(onDownload: () -> Unit, onSettings: () -> Unit) {
+        autoUpdateModel.updateChecker.showUpdateDialog(this, object : UpdateChecker.DialogCallback {
+            override fun download() = onDownload()
+            override fun later() {}
+            override fun settings() = onSettings()
+        })
+    }
+
+    override fun showUnknownSourcesDialog(onConfirm: () -> Unit) {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.app_name)
+            .setMessage(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                R.string.turn_on_unknown_sources_for_app else R.string.turn_on_unknown_sources)
+            .setPositiveButton(android.R.string.ok) { _, _ -> onConfirm() }
+            .setNegativeButton(android.R.string.cancel) { _, _ -> }
+            .show()
+    }
+
+    override fun openInstallPermissionSettings(): Boolean {
+        val intent = Intent()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            intent.action = Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES
+            intent.data = Uri.parse("package:${BuildConfig.APPLICATION_ID}")
+        } else {
+            intent.action = Settings.ACTION_SECURITY_SETTINGS
+        }
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK)
+        return try {
+            startActivityForResult(intent, REQUEST_CODE_UNKNOWN_APP_SOURCES)
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Toast.makeText(this, R.string.error, Toast.LENGTH_SHORT).show()
+            false
+        }
+    }
+
+    override fun downloadUpdate() {
+        autoUpdateModel.modelScope.launch(Dispatchers.Main) {
+            autoUpdateModel.updateChecker.downloadUpdate(this@MainActivity, autoUpdateModel.modelScope)
+        }
+    }
+
     private fun handleIntent(intent: Intent) {
         intentHandler.handleIntent(intent)
     }
@@ -697,8 +762,19 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     }
 
     override fun changeTab(newTab: WebTabState) {
-        tabsModel.changeTab(newTab, { tab: WebTabState -> createWebView(tab) }, vb.flWebViewContainer,
-            WebEngineCallback(this, newTab, tabsModel, adblockModel, settingsModel, viewModel))
+        tabsModel.changeTab(
+            newTab,
+            this,
+            WebEngineCallback(this, newTab, tabsModel, adblockModel, settingsModel, viewModel),
+        )
+    }
+
+    // ---- TabViewHost: the view side of tab switching ----------------------------------------
+
+    override fun createView(tab: WebTabState): Boolean = createWebView(tab) != null
+
+    override fun attachEngineToWindow(tab: WebTabState, callback: WebEngineWindowProviderCallback) {
+        tab.webEngine.onAttachToWindow(callback, vb.flWebViewContainer)
     }
 
     @SuppressLint("SetJavaScriptEnabled")

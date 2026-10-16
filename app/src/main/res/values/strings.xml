@@ -2,6 +2,7 @@
     <string name="app_name">TV Bro: TV Web Browser</string>
     <string name="app_name_short" translatable="false">TV Bro</string>
     <string name="error">Error</string>
+    <string name="adblock_load_error">Error loading ad-blocker list</string>
     <string name="ok">OK</string>
     <string name="loading">Loading&#8230;</string>
     <string name="url_prompt">Input query text or URL</string>

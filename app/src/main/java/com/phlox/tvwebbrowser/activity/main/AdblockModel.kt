@@ -1,7 +1,6 @@
 package com.phlox.tvwebbrowser.activity.main
 
 import android.net.Uri
-import android.widget.Toast
 import com.brave.adblock.AdBlockClient
 import com.brave.adblock.AdBlockClient.FilterOption
 import com.brave.adblock.Utils
@@ -27,6 +26,11 @@ class AdblockModel : ActiveModel() {
 
     private var client: AdBlockClient? = null
     val clientLoading = ObservableValue(false)
+    /**
+     * Set when a list load fails, so the host can surface it (the model shows no UI itself); the
+     * host resets it once it has shown the message.
+     */
+    val loadError = ObservableValue(false)
     val config = AppContext.provideConfig()
 
     init {
@@ -62,7 +66,7 @@ class AdblockModel : ActiveModel() {
         this@AdblockModel.client = client
         config.adBlockListLastUpdate = now.timeInMillis
         if (!success) {
-            Toast.makeText(TVBro.instance, "Error loading ad-blocker list", Toast.LENGTH_SHORT).show()
+            loadError.value = true
         }
         clientLoading.value = false
     }

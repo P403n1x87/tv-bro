@@ -1,7 +1,8 @@
 # Architecture (post-MVVM refactor)
 
-This document describes the current architecture on `master`: the view-purity pass, plus the
-follow-up split of the main screen's UI work into view collaborators. It includes a high-level
+This document describes the current architecture: the view-purity pass, the split of the main
+screen's UI work into view collaborators, and the follow-up pass that moved the remaining model-side
+UI side effects behind injected host interfaces. It includes a high-level
 diagram (Mermaid) and notes on contracts, dependency direction, and data flow.
 
 ## Key Contracts
@@ -10,6 +11,9 @@ diagram (Mermaid) and notes on contracts, dependency direction, and data flow.
 - **Observables**: `ObservableValue<T>`, `ObservableList<T>` extend custom `Subscribable` with lifecycle-aware subscribe. Views observe; models mutate state.
 - **WebEngineCallback**: Plain class (per-tab adapter), not an inner Activity. Injected with models; UI access only via `WebEngineCallbackHost`. Pure policy delegated to `domain/`. `DownloadRequest` bundles download params.
 - **WebEngineCallbackHost**: View seam implemented by `MainActivity` (activity operations, UI updates, panels, menus, permissions, fullscreen).
+- **TabViewHost**: View seam implemented by `MainActivity` (`createView`/`attachEngineToWindow`), injected into `TabsModel.changeTab` so the model never handles a `ViewGroup`.
+- **AutoUpdateHost**: View seam implemented by `MainActivity` (dialogs, install-permission handling, download), injected into `AutoUpdateModel.showUpdateDialogIfNeeded` so the model owns only the decision.
+- **WebViewDataDirManager**: The isolated WebView data/cache directories an incognito session runs on; `DefaultWebViewDataDirManager` is the WebView-engine implementation, injected into `MainActivityViewModel`.
 - **Domain**: Framework-free decision objects (`NavigationPolicy`, `PopupPolicy`, `SiteDomains`, `AddressInputPolicy`, `UrlNormalizer`, `LinkActionPolicy`, `NewTabPositionPolicy`).
 - **Repositories**: One per DAO, all `suspend`. `Repositories` is manual DI container (lazy singletons). Models have ctor params with production defaults for testability.
 
@@ -29,6 +33,11 @@ callbacks it needs — they never reach into the activity's private members:
 
 These are view collaborators, not models: they hold no domain state and only render/forward to the
 binding, the models and the callbacks handed to them.
+
+The same rule applies where a model would otherwise need the screen directly: `TabsModel.changeTab`
+takes a `TabViewHost`, `AutoUpdateModel.showUpdateDialogIfNeeded` takes an `AutoUpdateHost`, and
+`AdblockModel` publishes a `loadError` flag the host renders. All three are implemented by
+`MainActivity`.
 
 ## High-Level Diagram
 
@@ -113,5 +122,5 @@ graph TD
 
 - MainActivity reads `config` directly only for engine-construction checks (before models exist) — deliberate.
 - Popup decisions use `runBlocking` in the synchronous engine callback (documented).
-- History search uses exact substring match in current behavior (pinned by test; fix is behavior change).
+- History search does a partial (`%query%`) match on the title or the url, newest first.
 - Rendered diagrams live next to this file: `ARCHITECTURE.plantuml`/`.png`/`.svg`/`.pdf` (overview) and `ARCHITECTURE-LAYERED.*` (layered view with component descriptions). PDFs are produced from the SVG (PlantUML's `-tpdf` needs Batik, which is not available here).
