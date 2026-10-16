@@ -11,6 +11,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
+import android.content.ServiceConnection
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.ConnectivityManager
 import android.net.Uri
@@ -66,6 +68,7 @@ import com.phlox.tvwebbrowser.domain.LinkActionPolicy
 import com.phlox.tvwebbrowser.model.FavoriteItem
 import com.phlox.tvwebbrowser.model.HostConfig
 import com.phlox.tvwebbrowser.model.WebTabState
+import com.phlox.tvwebbrowser.service.downloads.DownloadService
 import com.phlox.tvwebbrowser.singleton.shortcuts.ShortcutMgr
 import com.phlox.tvwebbrowser.utils.BackNavigationEventsAdapter
 import com.phlox.tvwebbrowser.utils.BaseAnimationListener
@@ -94,7 +97,7 @@ import java.util.Calendar
 import kotlin.system.exitProcess
 
 
-open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCallbackHost, TabViewHost, AutoUpdateHost {
+open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCallbackHost, TabViewHost, AutoUpdateHost, DownloadHost {
     companion object {
         private val TAG = MainActivity::class.java.simpleName
         const val VOICE_SEARCH_REQUEST_CODE = 10001
@@ -172,7 +175,11 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
             focusEngine = { tabsModel.currentTab.value?.webEngine?.getView()?.requestFocus() },
         )
         mediaListPresenter = MediaListPresenter(this, tabsModel)
-        permissionOrchestrator = PermissionOrchestrator(voiceSearchHelper, downloadCoordinator) { requestCode, permissions, grantResults ->
+        permissionOrchestrator = PermissionOrchestrator(
+            downloadCoordinator,
+            voiceSearchPermissionsResult = voiceSearchHelper::processPermissionsResult,
+            voiceSearchActivityResult = voiceSearchHelper::processActivityResult,
+        ) { requestCode, permissions, grantResults ->
             tabsModel.currentTab.value?.webEngine?.onPermissionsResult(requestCode, permissions, grantResults) == true
         }
         intentHandler = IntentHandler(
@@ -698,6 +705,23 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         autoUpdateModel.modelScope.launch(Dispatchers.Main) {
             autoUpdateModel.updateChecker.downloadUpdate(this@MainActivity, autoUpdateModel.modelScope)
         }
+    }
+
+    // ---- DownloadHost: the platform side of DownloadCoordinator ------------------------------
+
+    override fun bindDownloadService(connection: ServiceConnection) {
+        bindService(Intent(this, DownloadService::class.java), connection, Context.BIND_AUTO_CREATE)
+    }
+
+    override fun unbindDownloadService(connection: ServiceConnection) {
+        unbindService(connection)
+    }
+
+    override fun hasPermission(permission: String): Boolean =
+        checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+
+    override fun requestPermission(permission: String, requestCode: Int) {
+        requestPermissions(arrayOf(permission), requestCode)
     }
 
     private fun handleIntent(intent: Intent) {

@@ -2,8 +2,6 @@ package com.phlox.tvwebbrowser.activity.main
 
 import android.Manifest
 import android.content.ComponentName
-import android.content.Context
-import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.Build
@@ -16,13 +14,28 @@ import com.phlox.tvwebbrowser.service.downloads.DownloadService
 import java.io.InputStream
 
 /**
+ * The platform side of [DownloadCoordinator]: the screen owns the service binding and the runtime
+ * permission calls. Behind an interface so the coordinator's orchestration can be exercised without
+ * an Activity. Implemented by the main screen.
+ */
+interface DownloadHost {
+    fun bindDownloadService(connection: ServiceConnection)
+
+    fun unbindDownloadService(connection: ServiceConnection)
+
+    fun hasPermission(permission: String): Boolean
+
+    fun requestPermission(permission: String, requestCode: Int)
+}
+
+/**
  * Owns the download use case for the main screen: it keeps the pending request, walks the runtime
  * permissions it needs and hands the request to [DownloadService]. [MainActivity] only forwards the
  * engine's download callbacks and the permission results, so the orchestration does not live in the
  * activity anymore.
  */
 class DownloadCoordinator(
-    private val activity: MainActivity,
+    private val host: DownloadHost,
     private val callbacks: Callbacks
 ) {
     fun interface Callbacks {
@@ -42,13 +55,11 @@ class DownloadCoordinator(
 
     /** Binds the service; call from `onStart`/`onStop` so it is bound exactly while the screen is up. */
     fun bind() {
-        activity.bindService(
-            Intent(activity, DownloadService::class.java), connection, Context.BIND_AUTO_CREATE
-        )
+        host.bindDownloadService(connection)
     }
 
     fun unbind() {
-        activity.unbindService(connection)
+        host.unbindDownloadService(connection)
         service = null
     }
 
@@ -63,19 +74,17 @@ class DownloadCoordinator(
             mimeType, referer, userAgent, base64BlobData, stream, size
         )
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R &&
-            activity.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
-            PackageManager.PERMISSION_GRANTED
+            !host.hasPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         ) {
-            activity.requestPermissions(
-                arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
+            host.requestPermission(
+                Manifest.permission.WRITE_EXTERNAL_STORAGE,
                 MY_PERMISSIONS_REQUEST_EXTERNAL_STORAGE_ACCESS
             )
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            activity.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
-            PackageManager.PERMISSION_GRANTED
+            !host.hasPermission(Manifest.permission.POST_NOTIFICATIONS)
         ) {
-            activity.requestPermissions(
-                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+            host.requestPermission(
+                Manifest.permission.POST_NOTIFICATIONS,
                 MY_PERMISSIONS_REQUEST_POST_NOTIFICATIONS_ACCESS
             )
         } else {
@@ -83,14 +92,11 @@ class DownloadCoordinator(
         }
     }
 
-    /** @return true when the result answers a permission request this coordinator made. */
     fun onPermissionsResult(requestCode: Int, grantResults: IntArray): Boolean {
         return when (requestCode) {
             MY_PERMISSIONS_REQUEST_EXTERNAL_STORAGE_ACCESS,
             MY_PERMISSIONS_REQUEST_POST_NOTIFICATIONS_ACCESS -> {
-                if (grantResults.isNotEmpty() &&
-                    grantResults[0] == PackageManager.PERMISSION_GRANTED
-                ) {
+                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     start()
                 }
                 true
@@ -115,16 +121,14 @@ class DownloadCoordinator(
                 //probably service still in another process due to incognito mode process switch
                 //so we will try to reconnect in a few seconds
                 uiHandler.postDelayed({
-                    activity.bindService(
-                        Intent(activity, DownloadService::class.java), this, Context.BIND_AUTO_CREATE
-                    )
+                    host.bindDownloadService(this)
                 }, 1000)
                 return
             }
             service = downloadBinder.service
         }
 
-        override fun onServiceDisconnected(name: ComponentName?) {
+        override fun onServiceDisconnected(name: ComponentName) {
             service = null
         }
     }

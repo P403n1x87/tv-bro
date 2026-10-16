@@ -88,7 +88,34 @@ class AdblockModel : ActiveModel() {
         return result
     }
 
-    private fun mapRequestToFilterOption(url: Uri?, type: String?): FilterOption? {
+    private fun mapRequestToFilterOption(url: Uri?, type: String?): FilterOption? =
+        AdblockRequestType.filterOptionFor(url, type)
+
+    //Protection settings (the Ads & privacy settings page renders and writes these)
+    var adBlockEnabled: Boolean
+        get() = config.adBlockEnabled
+        set(value) { config.adBlockEnabled = value }
+
+    val adBlockListUrl: String get() = config.adBlockListURL.value
+
+    fun setAdBlockListUrl(url: String) {
+        config.adBlockListURL.value = url.trim().ifEmpty { Config.DEFAULT_ADBLOCK_LIST_URL }
+    }
+
+    val adBlockListLastUpdate: Long get() = config.adBlockListLastUpdate
+
+    var blockAutomaticRedirects: Boolean
+        get() = config.blockAutomaticRedirects
+        set(value) { config.blockAutomaticRedirects = value }
+}
+
+/**
+ * Maps a request to the ad-block filter option it belongs to. Pure policy (no engine): the content
+ * type wins, then the URL extension. Kept out of [AdblockModel] so it can be tested without the
+ * native client.
+ */
+internal object AdblockRequestType {
+    fun filterOptionFor(url: Uri?, type: String?): FilterOption {
         if (type != null) {
             if (type == "image" || type.contains("image/")) {
                 return FilterOption.IMAGE
@@ -110,18 +137,7 @@ class AdblockModel : ActiveModel() {
             if (Utils.uriHasExtension(url, "js")) {
                 return FilterOption.SCRIPT
             }
-            if (Utils.uriHasExtension(
-                    url,
-                    "png",
-                    "jpg",
-                    "jpeg",
-                    "webp",
-                    "svg",
-                    "gif",
-                    "bmp",
-                    "tiff"
-                )
-            ) {
+            if (Utils.uriHasExtension(url, "png", "jpg", "jpeg", "webp", "svg", "gif", "bmp", "tiff")) {
                 return FilterOption.IMAGE
             }
             if (Utils.uriHasExtension(url, "mp4", "mov", "avi")) {
@@ -130,21 +146,4 @@ class AdblockModel : ActiveModel() {
         }
         return FilterOption.UNKNOWN
     }
-
-    //Protection settings (the Ads & privacy settings page renders and writes these)
-    var adBlockEnabled: Boolean
-        get() = config.adBlockEnabled
-        set(value) { config.adBlockEnabled = value }
-
-    val adBlockListUrl: String get() = config.adBlockListURL.value
-
-    fun setAdBlockListUrl(url: String) {
-        config.adBlockListURL.value = url.trim().ifEmpty { Config.DEFAULT_ADBLOCK_LIST_URL }
-    }
-
-    val adBlockListLastUpdate: Long get() = config.adBlockListLastUpdate
-
-    var blockAutomaticRedirects: Boolean
-        get() = config.blockAutomaticRedirects
-        set(value) { config.blockAutomaticRedirects = value }
 }
