@@ -54,12 +54,10 @@ import com.phlox.tvwebbrowser.activity.IncognitoModeMainActivity
 import com.phlox.tvwebbrowser.activity.downloads.DownloadsActivity
 import com.phlox.tvwebbrowser.activity.history.HistoryActivity
 import com.phlox.tvwebbrowser.activity.main.dialogs.favorites.FavoriteEditorDialog
-import com.phlox.tvwebbrowser.activity.main.dialogs.media.MediaListAdapter
 import com.phlox.tvwebbrowser.activity.main.dialogs.settings.SettingsDialog
 import com.phlox.tvwebbrowser.activity.main.dialogs.settings.SettingsDeps
 import com.phlox.tvwebbrowser.activity.main.view.ActionBar
 import com.phlox.tvwebbrowser.activity.main.view.CursorMenuView
-import com.phlox.tvwebbrowser.activity.main.view.RowFocusPanel
 import com.phlox.tvwebbrowser.activity.main.view.bookmarks.BookmarksPanelView
 import com.phlox.tvwebbrowser.activity.main.view.tabs.TabsAdapter.Listener
 import com.phlox.tvwebbrowser.databinding.ActivityMainBinding
@@ -99,12 +97,9 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         private val TAG = MainActivity::class.java.simpleName
         const val VOICE_SEARCH_REQUEST_CODE = 10001
         const val PICK_FILE_REQUEST_CODE = 10005
-        private const val REQUEST_CODE_HISTORY_ACTIVITY = 10006
         const val REQUEST_CODE_UNKNOWN_APP_SOURCES = 10007
         const val KEY_PROCESS_ID_TO_KILL = "proc_id_to_kill"
         private const val MY_PERMISSIONS_REQUEST_VOICE_SEARCH_PERMISSIONS = 10008
-        private const val COMMON_REQUESTS_START_CODE = 10100
-        private const val MAX_MEDIA_LIST_ITEMS = 20
     }
 
     /** [WebEngineCallbackHost]: the activity is the host's view. */
@@ -118,13 +113,16 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     private lateinit var adblockModel: AdblockModel
     private lateinit var autoUpdateModel: AutoUpdateModel
     private lateinit var uiHandler: Handler
+    private lateinit var panelController: PanelController
+    private lateinit var toolbarController: ToolbarController
+    private lateinit var mediaListPresenter: MediaListPresenter
+    private lateinit var permissionOrchestrator: PermissionOrchestrator
+    private lateinit var intentHandler: IntentHandler
     private val mediaDiscoveryListener: () -> Unit = { uiHandler.post { updateMediaCounter() } }
-    private var isFullscreen: Boolean = false
     private lateinit var prefs: SharedPreferences
     protected val config = AppContext.provideConfig()
     private val voiceSearchHelper = VoiceSearchHelper(this, VOICE_SEARCH_REQUEST_CODE,
         MY_PERMISSIONS_REQUEST_VOICE_SEARCH_PERMISSIONS)
-    private var lastCommonRequestsCode = COMMON_REQUESTS_START_CODE
     private val downloadCoordinator by lazy {
         DownloadCoordinator(this) { onDownloadStarted(it) }
     }
@@ -161,6 +159,30 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         prefs = getSharedPreferences(TVBro.MAIN_PREFS_NAME, Context.MODE_PRIVATE)
         vb = ActivityMainBinding.inflate(layoutInflater)
         setContentView(vb.root)
+
+        // The view-layer collaborators: each owns one slice of the activity's UI work and reaches it
+        // only through the binding and the models/callbacks handed to it here.
+        panelController = PanelController(vb) {
+            tabsModel.currentTab.value?.webEngine?.getView()?.requestFocus()
+        }
+        toolbarController = ToolbarController(
+            this, vb,
+            keepScreenOn = { settingsModel.keepScreenOn.value },
+            focusEngine = { tabsModel.currentTab.value?.webEngine?.getView()?.requestFocus() },
+        )
+        mediaListPresenter = MediaListPresenter(this, tabsModel)
+        permissionOrchestrator = PermissionOrchestrator(voiceSearchHelper, downloadCoordinator) { requestCode, permissions, grantResults ->
+            tabsModel.currentTab.value?.webEngine?.onPermissionsResult(requestCode, permissions, grantResults) == true
+        }
+        intentHandler = IntentHandler(
+            tabsModel = tabsModel,
+            openInNewTab = { url, index, navigateImmediately ->
+                openInNewTab(url, index, needToHideMenuOverlay = true, navigateImmediately = navigateImmediately)
+            },
+            navigate = { navigate(it) },
+            changeTab = { changeTab(it) },
+            autoHideMenuOverlay = { toolbarController.autoHideMenuOverlay() },
+        )
 
         vb.ivMiniatures.visibility = View.INVISIBLE
         vb.rlActionBar.visibility = View.VISIBLE
@@ -211,7 +233,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         // The toolbar overlay style follows the setting live, so the settings page never touches the
         // activity to restyle it.
         settingsModel.keepToolbarOpen.subscribe(this.lifecycle) {
-            applyToolbarOverlayStyle()
+            toolbarController.applyOverlayStyle()
         }
 
         viewModel.homePageLinks.subscribe(this) {
@@ -299,8 +321,8 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
             } else if (!tab.selected) {
                 changeTab(tab)
             }
-            vb.llTabPanel.visibility = View.GONE
-            autoHideMenuOverlay()
+            panelController.hideTabsPanel()
+            toolbarController.autoHideMenuOverlay()
         }
 
         override fun onAddNewTabSelected() {
@@ -368,12 +390,12 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     override fun showHistory() {
         startActivityForResult(
                 Intent(this@MainActivity, HistoryActivity::class.java),
-                REQUEST_CODE_HISTORY_ACTIVITY)
-        autoHideMenuOverlay()
+                IntentHandler.REQUEST_CODE_HISTORY_ACTIVITY)
+        toolbarController.autoHideMenuOverlay()
     }
 
     override fun showFavorites() {
-        if (vb.rlBookmarksPanel.isVisible) {
+        if (panelController.isBookmarksPanelVisible) {
             hideBookmarksPanel()
         } else {
             showBookmarksPanel()
@@ -381,23 +403,17 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     }
 
     private fun showBookmarksPanel() {
-        vb.llTabPanel.visibility = View.GONE
-        vb.rlBookmarksPanel.visibility = View.VISIBLE
-        // Give the panel the focus straight away; the remote then cannot escape to the top bar while
-        // the bookmarks are being read.
-        focusPanel(vb.vBookmarks)
-        lifecycleScope.launch(Dispatchers.Main) {
-            // Read the content first and hand the focus to a row only afterwards: the rows, and the
-            // "Add this page" entry (which is hidden again for the home page), are final by then, so
-            // the hand-off needs at most the one layout pass that creates them.
+        // Read the content first and hand the focus to a row only afterwards: the rows, and the
+        // "Add this page" entry (which is hidden again for the home page), are final by then, so the
+        // hand-off needs at most the one layout pass that creates them.
+        panelController.showBookmarksPanel(lifecycleScope) {
             loadBookmarks()
             updateBookmarkState()
-            vb.vBookmarks.requestRowFocus()
         }
     }
 
     private fun hideBookmarksPanel() {
-        vb.rlBookmarksPanel.visibility = View.GONE
+        panelController.hideBookmarksPanel()
     }
 
     private suspend fun loadBookmarks() {
@@ -472,12 +488,11 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     }
 
     override fun onExtendedAddressBarMode() {
-        vb.llTabPanel.visibility = View.GONE
-        vb.rlBookmarksPanel.visibility = View.GONE
+        panelController.hideAllPanels()
     }
 
     override fun onUrlInputDone() {
-        autoHideMenuOverlay()
+        toolbarController.autoHideMenuOverlay()
     }
 
     fun navigateBack(goHomeIfNoHistory: Boolean = false) {
@@ -500,36 +515,10 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
 
     override fun onReload() = refresh()
 
-    override fun onShowStreams() = showMediaListDialog()
+    override fun onShowStreams() = mediaListPresenter.showMediaListDialog()
 
     override fun onToggleTabPanel() {
-        if (vb.llTabPanel.isVisible) {
-            vb.llTabPanel.visibility = View.GONE
-            tabsModel.currentTab.value?.webEngine?.getView()?.requestFocus()
-        } else {
-            vb.rlBookmarksPanel.visibility = View.GONE
-            vb.llTabPanel.visibility = View.VISIBLE
-            focusPanel(vb.vTabs)
-            // The tabs are already in the adapter, so the only thing missing is the layout pass that
-            // creates the rows; ask for the current row straight away.
-            vb.vTabs.requestRowFocus()
-        }
-    }
-
-    /**
-     * Gives a panel that has just been made visible the focus. A plain requestFocus() is not
-     * enough: the panel was GONE, so the views inside it are not laid out yet, and when the device
-     * is in touch mode (a tap anywhere puts it there) a view that is not focusable in touch mode
-     * cannot take focus at all - the panel then stayed unfocused and the D-pad went straight back to
-     * the top bar. requestFocusFromTouch() leaves touch mode first, so the container takes the focus
-     * synchronously and a D-pad press can never escape that way.
-     *
-     * The container is only a fallback though: the focus then moves down to a real row via
-     * [RowFocusPanel.requestRowFocus], which the caller triggers once the panel's content is settled
-     * - the bookmarks panel only asks for it after the list has been read from the database.
-     */
-    private fun focusPanel(panel: View) {
-        panel.requestFocusFromTouch()
+        panelController.toggleTabsPanel()
     }
 
     override fun onShowMenu() {
@@ -655,7 +644,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
 
         val currentTab = tabsModel.currentTab.value
         if (currentTab == null || currentTab.url == settingsModel.homePage) {
-            showMenuOverlay()
+            toolbarController.showMenuOverlay()
         }
         if (autoUpdateModel.needAutoCheckUpdates &&
             autoUpdateModel.updateChecker.versionCheckResult == null &&
@@ -676,20 +665,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     }
 
     private fun handleIntent(intent: Intent) {
-        Log.d(TAG, "handleIntent: " + intent.data)
-        if (intent.getBooleanExtra("com.phlox.tvwebbrowser.EXTRA_OPEN_IN_SAME_TAB", false) &&
-            tabsModel.tabsStates.isNotEmpty()) {
-            if (tabsModel.currentTab.value == null) {
-                changeTab(tabsModel.tabsStates[0])
-            }
-            navigate(intent.data.toString())
-            return
-        }
-
-        openInNewTab(
-            intent.data.toString(), tabsModel.tabsStates.size, needToHideMenuOverlay = true,
-            navigateImmediately = true
-        )
+        intentHandler.handleIntent(intent)
     }
 
     private fun openInNewTab(url: String?, index: Int = 0, needToHideMenuOverlay: Boolean = true, navigateImmediately: Boolean): WebEngine? {
@@ -705,7 +681,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
             navigate(url)
         }
         if (needToHideMenuOverlay) {
-            autoHideMenuOverlay(true)
+            toolbarController.autoHideMenuOverlay(true)
         }
         return tab.webEngine
     }
@@ -717,7 +693,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
             switchTo = { changeTab(it) },
             openNewTab = { openInNewTab(settingsModel.homePage, 0, needToHideMenuOverlay = true, navigateImmediately = true) },
         )
-        autoHideMenuOverlay(true)
+        toolbarController.autoHideMenuOverlay(true)
     }
 
     override fun changeTab(newTab: WebTabState) {
@@ -784,27 +760,6 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         vb.vActionBar.setMediaCounter(count)
     }
 
-    private fun showMediaListDialog() {
-        val tab = tabsModel.currentTab.value
-        val candidates = tab?.webEngine?.mediaCandidates().orEmpty()
-        if (candidates.isEmpty()) {
-            Toast.makeText(this, R.string.media_list_empty, Toast.LENGTH_SHORT).show()
-            return
-        }
-        val listed = candidates.take(MAX_MEDIA_LIST_ITEMS)
-        val adapter = MediaListAdapter(this, listed)
-        val dialog = AlertDialog.Builder(this)
-            .setTitle(R.string.media_list_title)
-            .setAdapter(adapter) { _, which ->
-                if (tab != null) tab.webEngine.playMediaCandidate(listed[which])
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .create()
-        dialog.setOnDismissListener { adapter.release() }
-        dialog.show()
-        tab?.webEngine?.prefetchMediaMetadata()
-    }
-
     override fun onTrimMemory(level: Int) {
         for (tab in tabsModel.tabsStates) {
             if (!tab.selected) {
@@ -816,30 +771,23 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
 
     override fun onRequestPermissionsResult(requestCode: Int,
                                             permissions: Array<String>, grantResults: IntArray) {
-        if (voiceSearchHelper.processPermissionsResult(requestCode, permissions, grantResults)) {
+        if (permissionOrchestrator.onRequestPermissionsResult(requestCode, permissions, grantResults)) {
             return
         }
-        if (tabsModel.currentTab.value?.webEngine?.onPermissionsResult(requestCode, permissions, grantResults) == true) return
-        if (downloadCoordinator.onPermissionsResult(requestCode, grantResults)) return
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
 
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        if (voiceSearchHelper.processActivityResult(requestCode, resultCode, data)) {
+        if (permissionOrchestrator.onActivityResult(requestCode, resultCode, data)) {
             return
         }
         when (requestCode) {
             PICK_FILE_REQUEST_CODE -> {
                 tabsModel.currentTab.value?.webEngine?.onFilePicked(resultCode, data)
             }
-            REQUEST_CODE_HISTORY_ACTIVITY -> if (resultCode == Activity.RESULT_OK) {
-                val url = data?.getStringExtra(HistoryActivity.KEY_URL)
-                if (url != null) {
-                    navigate(url)
-                }
-                autoHideMenuOverlay()
-            }
+            IntentHandler.REQUEST_CODE_HISTORY_ACTIVITY ->
+                intentHandler.handleHistoryResult(resultCode, data)
             REQUEST_CODE_UNKNOWN_APP_SOURCES -> if (autoUpdateModel.needToShowUpdateDlgAgain) {
                 autoUpdateModel.showUpdateDialogIfNeeded(this)
             }
@@ -967,11 +915,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     }
 
     fun toggleMenu() {
-        if (vb.rlActionBar.isInvisible) {
-            showMenuOverlay()
-        } else {
-            hideMenuOverlay()
-        }
+        toolbarController.toggleMenu()
     }
 
     val onBackPressedCallback = object : OnBackPressedCallback(true) {
@@ -1049,36 +993,19 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
             vb.vCursorMenu.close(CursorMenuView.CloseAnimation.ROTATE_OUT)
         } else if (vb.flWebViewContainer.cursorDrawerDelegate.canHandleBackNavigation()) {
             vb.flWebViewContainer.cursorDrawerDelegate.handleBackNavigation()
-        } else if (isFullscreen) {
+        } else if (toolbarController.isFullscreen) {
             tabsModel.currentTab.value?.webEngine?.hideFullscreenView()
-        } else if (vb.rlBookmarksPanel.isVisible) {
+        } else if (panelController.isBookmarksPanelVisible) {
             hideBookmarksPanel()
-        } else if (vb.llTabPanel.isVisible) {
-            vb.llTabPanel.visibility = View.GONE
+        } else if (panelController.isTabsPanelVisible) {
+            panelController.hideTabsPanel()
         } else if (vb.flWebViewContainer.hasFocus()) {
             //Focus is on the page: BACK must give the remote a way back to the UI,
             //otherwise the user is stuck in the WebView with no focused control.
-            showMenuOverlay()
+            toolbarController.showMenuOverlay()
         } else {
-            toggleMenu()
+            toolbarController.toggleMenu()
         }
-    }
-
-    fun applyToolbarOverlayStyle() {
-        vb.rlActionBar.setBackgroundColor(ContextCompat.getColor(this, R.color.top_bar_background))
-        vb.rlActionBar.elevation = 5f * resources.displayMetrics.density
-        vb.vActionBar.setOverlayTransparency(false)
-        vb.vTabs.setOverlayTransparency(false)
-    }
-
-    private fun showMenuOverlay() {
-        if (isFullscreen) return
-        applyToolbarOverlayStyle()
-        vb.flWebViewContainer.visibility = View.VISIBLE
-        vb.ivMiniatures.visibility = View.INVISIBLE
-        vb.rlActionBar.visibility = View.VISIBLE
-        vb.vActionBar.dismissExtendedAddressBarMode()
-        vb.vActionBar.catchFocus()
     }
 
     private suspend fun displayThumbnail(currentTab: WebTabState?) {
@@ -1110,16 +1037,6 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         }
     }
 
-    private fun autoHideMenuOverlay(hideBottomButtons: Boolean = true) {
-    }
-
-    private fun hideMenuOverlay(hideBottomButtons: Boolean = true) {
-        vb.llTabPanel.visibility = View.GONE
-        if (hideBottomButtons) {
-            tabsModel.currentTab.value?.webEngine?.getView()?.requestFocus()
-        }
-    }
-
     private fun syncTabWithTitles() {
         val tab = tabByTitleIndex(vb.vTabs.current)
         if (tab == null) {
@@ -1135,11 +1052,11 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     private fun onDownloadStarted(fileName: String) {
         Utils.showToast(this, getString(R.string.download_started,
                 Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).toString() + File.separator + fileName))
-        showMenuOverlay()
+        toolbarController.showMenuOverlay()
     }
 
     override fun initiateVoiceSearch() {
-        autoHideMenuOverlay()
+        toolbarController.autoHideMenuOverlay()
         voiceSearchHelper.initiateVoiceSearch(object : VoiceSearchHelper.Callback {
             override fun onResult(text: String?) {
                 if (text == null) {
@@ -1147,7 +1064,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
                     return
                 }
                 search(text)
-                autoHideMenuOverlay()
+                toolbarController.autoHideMenuOverlay()
             }
         })
     }
@@ -1214,7 +1131,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     }
 
     override fun requestPermissionsOnHost(permissions: Array<String>): Int {
-        val requestCode = lastCommonRequestsCode++
+        val requestCode = permissionOrchestrator.nextRequestCode()
         requestPermissions(permissions, requestCode)
         return requestCode
     }
@@ -1311,29 +1228,11 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     }
 
     override fun onPrepareForFullscreen() {
-        //window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
-        //        WindowManager.LayoutParams.FLAG_FULLSCREEN)
-        isFullscreen = true
-        vb.rlActionBar.visibility = View.GONE
-        vb.llTabPanel.visibility = View.GONE
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        window.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                or View.SYSTEM_UI_FLAG_FULLSCREEN
-                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY)
+        toolbarController.enterFullscreen()
     }
 
     override fun onExitFullscreen() {
-        //window.setFlags(0, WindowManager.LayoutParams.FLAG_FULLSCREEN)
-        if (!settingsModel.keepScreenOn.value) {
-            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        }
-        window.decorView.systemUiVisibility =
-            View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-        isFullscreen = false
-        vb.rlActionBar.visibility = View.VISIBLE
+        toolbarController.exitFullscreen()
     }
 
     override fun showCursorMenu(
