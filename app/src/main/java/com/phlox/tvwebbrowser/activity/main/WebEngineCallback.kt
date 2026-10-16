@@ -10,7 +10,6 @@ import android.webkit.MimeTypeMap
 import android.webkit.URLUtil
 import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.R
-import com.phlox.tvwebbrowser.TVBro
 import com.phlox.tvwebbrowser.domain.HomePagePolicy
 import com.phlox.tvwebbrowser.domain.NavigationPolicy
 import com.phlox.tvwebbrowser.domain.NewTabPositionPolicy
@@ -143,7 +142,7 @@ class WebEngineCallback(
             Log.d(TAG, "shouldOverrideUrlLoading: non-network url: $url")
             val intent = Intent(Intent.ACTION_VIEW, uri)
             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            if (intent.resolveActivity(TVBro.instance.packageManager) != null) {
+            if (intent.resolveActivity(host.activity.packageManager) != null) {
                 host.activity.runOnUiThread {
                     host.askUserAndOpenInExternalApp(url, intent)
                 }

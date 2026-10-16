@@ -3,13 +3,12 @@ package com.phlox.tvwebbrowser.webengine
 import android.content.Context
 import android.util.Log
 import androidx.annotation.UiThread
-import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.model.WebTabState
 import com.phlox.tvwebbrowser.widgets.cursor.CursorLayout
 
 interface WebEngineProviderCallback {
-    suspend fun initialize(context: Context, webViewContainer: CursorLayout)
+    suspend fun initialize(context: Context, config: Config, webViewContainer: CursorLayout)
     fun createWebEngine(tab: WebTabState): WebEngine
     suspend fun clearCache(ctx: Context)
     fun onThemeSettingUpdated(value: Config.Theme)
@@ -37,8 +36,7 @@ object WebEngineFactory {
     }
 
     @UiThread
-    suspend fun initialize(context: Context, webViewContainer: CursorLayout) {
-        val config = AppContext.provideConfig()
+    suspend fun initialize(context: Context, config: Config, webViewContainer: CursorLayout) {
         var webEngineProvider = engineProviders.find { it.name == config.webEngine }
         if (webEngineProvider == null && engineProviders.isNotEmpty()) {
             webEngineProvider = engineProviders[0]
@@ -46,7 +44,7 @@ object WebEngineFactory {
             config.webEngine = webEngineProvider.name
         }
         if (webEngineProvider != null) {
-            webEngineProvider.callback.initialize(context, webViewContainer)
+            webEngineProvider.callback.initialize(context, config, webViewContainer)
             initializedProvider = webEngineProvider
         } else {
             throw IllegalArgumentException("WebEngineProvider with name ${config.webEngine} not found")

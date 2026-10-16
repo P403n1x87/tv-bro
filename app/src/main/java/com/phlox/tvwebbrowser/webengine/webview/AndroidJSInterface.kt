@@ -1,18 +1,21 @@
 package com.phlox.tvwebbrowser.webengine.webview
 
+import android.content.Context
 import android.net.http.SslError
 import android.webkit.JavascriptInterface
-import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.domain.HomePagePolicy
 import com.phlox.tvwebbrowser.R
-import com.phlox.tvwebbrowser.TVBro
 import com.phlox.tvwebbrowser.model.Download
 import com.phlox.tvwebbrowser.utils.DownloadUtils
 import org.json.JSONArray
 
 
-class AndroidJSInterface(private val webEngine: WebViewWebEngine) {
+class AndroidJSInterface(
+    private val webEngine: WebViewWebEngine,
+    private val context: Context,
+    private val config: Config,
+) {
     @JavascriptInterface
     fun currentUrl(): String {
         if (!webEngine.tab.url.startsWith(WebViewEx.INTERNAL_SCHEME)) return ""
@@ -32,7 +35,7 @@ class AndroidJSInterface(private val webEngine: WebViewWebEngine) {
 
     @JavascriptInterface
     fun getStringByName(name: String): String {
-        val ctx = TVBro.instance
+        val ctx = context
         //val resId = ctx.resources.getIdentifier(name, "string", ctx.packageName)
         //return ctx.getString(resId)
         when (name) {
@@ -56,7 +59,7 @@ class AndroidJSInterface(private val webEngine: WebViewWebEngine) {
     @JavascriptInterface
     fun setSearchEngine(engine: String, customSearchEngineURL: String) {
         if (!isHomePage()) return
-        AppContext.provideConfig().searchEngineURL.value = customSearchEngineURL
+        config.searchEngineURL.value = customSearchEngineURL
     }
 
     @JavascriptInterface
@@ -75,7 +78,6 @@ class AndroidJSInterface(private val webEngine: WebViewWebEngine) {
             // can run before tab.url has been updated to the new page.
             val webView = webEngine.getView() as? WebViewEx ?: return@runOnUiThread
             if (!HomePagePolicy.isHomePageUrl(webView.url, Config.localHomePageUrl)) return@runOnUiThread
-            val cfg = AppContext.provideConfig()
             fun linksToJson(links: List<com.phlox.tvwebbrowser.model.HomePageLink>): String {
                 val jsArr = JSONArray()
                 for (item in links) {
@@ -87,7 +89,7 @@ class AndroidJSInterface(private val webEngine: WebViewWebEngine) {
             val history = linksToJson(callback.getHomePageHistoryLinks())
             webEngine.evaluateJavascript("renderSections($bookmarks, $history)")
             webEngine.evaluateJavascript(
-                "applySearchEngine(\"${cfg.guessSearchEngineName()}\", \"${cfg.searchEngineURL.value}\")")
+                "applySearchEngine(\"${config.guessSearchEngineName()}\", \"${config.searchEngineURL.value}\")")
         }
     }
 
@@ -98,10 +100,10 @@ class AndroidJSInterface(private val webEngine: WebViewWebEngine) {
             lastSSLError.toString()
         } else {
             when (lastSSLError.primaryError) {
-                SslError.SSL_EXPIRED -> TVBro.instance.getString(R.string.ssl_expired)
-                SslError.SSL_IDMISMATCH -> TVBro.instance.getString(R.string.ssl_idmismatch)
-                SslError.SSL_DATE_INVALID -> TVBro.instance.getString(R.string.ssl_date_invalid)
-                SslError.SSL_INVALID -> TVBro.instance.getString(R.string.ssl_invalid)
+                SslError.SSL_EXPIRED -> context.getString(R.string.ssl_expired)
+                SslError.SSL_IDMISMATCH -> context.getString(R.string.ssl_idmismatch)
+                SslError.SSL_DATE_INVALID -> context.getString(R.string.ssl_date_invalid)
+                SslError.SSL_INVALID -> context.getString(R.string.ssl_invalid)
                 else -> "unknown"
             }
         }

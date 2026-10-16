@@ -502,7 +502,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
 
     private fun loadState() = lifecycleScope.launch(Dispatchers.Main) {
         Log.d(TAG, "loadState")
-        WebEngineFactory.initialize(this@MainActivity, vb.flWebViewContainer)
+        WebEngineFactory.initialize(this@MainActivity, config, vb.flWebViewContainer)
 
         vb.progressBarGeneric.visibility = View.VISIBLE
         vb.progressBarGeneric.requestFocus()

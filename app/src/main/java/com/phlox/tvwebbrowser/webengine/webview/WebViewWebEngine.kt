@@ -11,7 +11,6 @@ import android.view.ViewGroup
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import androidx.webkit.WebViewCompat
-import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.model.WebTabState
 import com.phlox.tvwebbrowser.utils.Utils
@@ -25,13 +24,17 @@ import com.phlox.tvwebbrowser.widgets.cursor.CursorDrawerDelegate
 import com.phlox.tvwebbrowser.widgets.cursor.CursorLayout
 
 
-class WebViewWebEngine(val tab: WebTabState) : WebEngine, CursorDrawerDelegate.Callback {
+class WebViewWebEngine(
+    val tab: WebTabState,
+    private val appContext: Context,
+    private val config: Config,
+) : WebEngine, CursorDrawerDelegate.Callback {
     private var webView: WebViewEx? = null
     internal var callback: WebEngineWindowProviderCallback? = null
     private var viewParent: CursorLayout? = null
     private var fullScreenView: View? = null
     private val permissionsRequests = HashMap<Int, Boolean>()//request code, isGeolocationPermissionRequest
-    private val jsInterface = AndroidJSInterface(this)
+    private val jsInterface = AndroidJSInterface(this, appContext, config)
 
     override fun getWebEngineName(): String = "WebView"
 
@@ -394,12 +397,16 @@ class WebViewWebEngine(val tab: WebTabState) : WebEngine, CursorDrawerDelegate.C
     companion object {
         init {
             WebEngineFactory.registerProvider(WebEngineProvider("WebView", object : WebEngineProviderCallback {
-                override suspend fun initialize(context: Context, webViewContainer: CursorLayout) {
+                private var appContext: Context? = null
+                private var config: Config? = null
 
+                override suspend fun initialize(context: Context, config: Config, webViewContainer: CursorLayout) {
+                    appContext = context.applicationContext ?: context
+                    this.config = config
                 }
 
                 override fun createWebEngine(tab: WebTabState): WebEngine {
-                    return WebViewWebEngine(tab)
+                    return WebViewWebEngine(tab, appContext!!, config!!)
                 }
 
                 override suspend fun clearCache(ctx: Context) {
@@ -411,7 +418,7 @@ class WebViewWebEngine(val tab: WebTabState) : WebEngine, CursorDrawerDelegate.C
                 }
 
                 override fun getWebEngineVersionString(): String {
-                    val webViewPackage = WebViewCompat.getCurrentWebViewPackage(AppContext.get())
+                    val webViewPackage = appContext?.let { WebViewCompat.getCurrentWebViewPackage(it) }
                     return (webViewPackage?.packageName ?: "unknown") + ":" + (webViewPackage?.versionName ?: "unknown")
                 }
             }))
