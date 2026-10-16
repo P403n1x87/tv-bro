@@ -12,6 +12,11 @@ package "UI (Activities/Views)" {
   [MediaListPresenter] as MLP
   [PermissionOrchestrator] as PO
   [IntentHandler] as IH
+  [BookmarksController] as BC
+  [CursorMenuController] as CMC
+  [TabThumbnailPresenter] as TTP
+  [DownloadCoordinator] as DC
+  [InstallPermissionHelper] as IPH
   [HistoryActivity] as HA
   [DownloadsActivity] as DA
   [ActionBar/TabsView/BookmarksPanelView] as AB
@@ -35,6 +40,7 @@ package "Host Seams (view interfaces)" {
   [AutoUpdateHost] as AUH
   [WebViewDataDirManager] as WVDM
   [DefaultWebViewDataDirManager] as DWVDM
+  [DownloadHost] as DH
 }
 
 package "Domain (pure)" {
@@ -87,9 +93,17 @@ MA --> TC
 MA --> MLP
 MA --> PO
 MA --> IH
+MA --> BC
+MA --> CMC
+MA --> TTP
+MA --> DC
+BC --> MVM
+BC --> PC
+CMC --> TC
 MA --> AMR
 HA --> AMR
 DA --> AMR
+DA --> IPH
 SD --> MVM
 SD --> SM
 SD --> ABM
@@ -126,12 +140,15 @@ GV --> WEH
 MA ..|> WECH
 MA ..|> TVH
 MA ..|> AUH
+MA ..|> DH
 WECB ..> WECH : host calls
 TVM --> TVH : changeTab(host)
 AUM --> AUH : showUpdateDialogIfNeeded(host)
 MVM --> WVDM : incognito dirs
 DWVDM ..|> WVDM
 MVM ..> DWVDM : default
+PO --> DC : download permission walk
+DC ..> DH : bind/permissions(host)
 
 ' Data
 TVM --> TR
@@ -161,6 +178,7 @@ DB --> HostDao
 TVB --> R
 TVB --> AMR
 DS --> DR
+DS --> IPH
 DT --> DR
 
 ' Observables

@@ -21,12 +21,14 @@ the model/host seam polish. Work on a feature branch; **open a PR only when aske
   (`NavigationPolicy`, `PopupPolicy`, `SiteDomains`, `AddressInputPolicy`, `UrlNormalizer`,
   `LinkActionPolicy`, `NewTabPositionPolicy`).
 - `MainActivity` is the composition root/host; its UI work is delegated to `PanelController`,
-  `ToolbarController`, `MediaListPresenter`, `PermissionOrchestrator` and `IntentHandler`, wired in
-  `onCreate`. Collaborators must not read `MainActivity` privates — take deps/callbacks via ctor.
+  `ToolbarController`, `MediaListPresenter`, `PermissionOrchestrator`, `IntentHandler`,
+  `BookmarksController`, `CursorMenuController`, `TabThumbnailPresenter` and `DownloadCoordinator`,
+  wired in `onCreate`. Collaborators must not read `MainActivity` privates — take deps/callbacks via
+  ctor (e.g. `DownloadCoordinator` takes a `DownloadHost`).
 - Models must not touch Activity/dialog classes: UI side effects go through a host seam or an
   observable the host renders — `TabViewHost` (`TabsModel.changeTab`), `AutoUpdateHost`
-  (`AutoUpdateModel.showUpdateDialogIfNeeded`), `AdblockModel.loadError` (host resets it).
-  `MainActivity` implements both hosts.
+  (`AutoUpdateModel.showUpdateDialogIfNeeded`), `DownloadHost` (`DownloadCoordinator`),
+  `AdblockModel.loadError` (host resets it). `MainActivity` implements all of them.
 - Models own state; a view assigning a model property is the accepted "intent" pattern. In tests,
   pass repository fakes (existing tests build in-memory Room instances).
 - Deliberate exception to view purity: `MainActivity` reads `config` for pre-model engine checks

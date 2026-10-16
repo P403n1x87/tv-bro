@@ -30,14 +30,18 @@ callbacks it needs — they never reach into the activity's private members:
 | `MediaListPresenter` | The "streams on this page" list dialog and its background metadata prefetch. | activity + `TabsModel` |
 | `PermissionOrchestrator` | Routing of permission/activity-result callbacks (voice search → engine → downloads) and the shared request-code counter. | `VoiceSearchHelper`, `DownloadCoordinator`, engine-permission callback |
 | `IntentHandler` | Deep links, the "open in same tab" extra, and the History activity result. | `TabsModel` + navigate/open-tab/change-tab/auto-hide callbacks |
+| `BookmarksController` | Bookmark panel toggle, bookmark CRUD and favorite editing. | activity, lifecycle scope, binding, `MainActivityViewModel`, `PanelController` + current-tab/navigate callbacks |
+| `CursorMenuController` | Fullscreen enter/exit, the cursor menu, the link-actions popup and the external-app dialog. | activity, binding, `Handler`, `ToolbarController`, `BackNavigationEventsAdapter` |
+| `TabThumbnailPresenter` | The debounced thumbnail repaint and its bitmap/placeholder rendering. | binding, `Handler`, lifecycle scope + keep-toolbar-open/current-tab predicates |
+| `DownloadCoordinator` | The download permission walk and the download-service binding, through `DownloadHost`. | `DownloadHost` + on-download-started callback |
 
 These are view collaborators, not models: they hold no domain state and only render/forward to the
 binding, the models and the callbacks handed to them.
 
 The same rule applies where a model would otherwise need the screen directly: `TabsModel.changeTab`
-takes a `TabViewHost`, `AutoUpdateModel.showUpdateDialogIfNeeded` takes an `AutoUpdateHost`, and
-`AdblockModel` publishes a `loadError` flag the host renders. All three are implemented by
-`MainActivity`.
+takes a `TabViewHost`, `AutoUpdateModel.showUpdateDialogIfNeeded` takes an `AutoUpdateHost`,
+`DownloadCoordinator` talks to a `DownloadHost`, and `AdblockModel` publishes a `loadError` flag the
+host renders. All are implemented by `MainActivity`.
 
 ## High-Level Diagram
 
@@ -50,6 +54,10 @@ graph TD
         MLP["MediaListPresenter"]
         PO["PermissionOrchestrator"]
         IH["IntentHandler"]
+        BC["BookmarksController"]
+        CMC["CursorMenuController"]
+        TTP["TabThumbnailPresenter"]
+        DC["DownloadCoordinator"]
         HA["HistoryActivity"]
         DA["DownloadsActivity"]
         AB["ActionBar/TabsView/BookmarksPanelView"]
@@ -94,6 +102,8 @@ graph TD
     SD --> PM; AB --> TVM
 
     MA --> PC & TC & MLP & PO & IH
+    MA --> BC & CMC & TTP & DC
+    BC --> MVM; CMC --> TC
     MA --> WECB; WECB --> MA; WECB --> PM; WECB --> DOM
     ENG --> WIF; ENG --> WEH
 
@@ -123,4 +133,6 @@ graph TD
 - MainActivity reads `config` directly only for engine-construction checks (before models exist) — deliberate.
 - Popup decisions use `runBlocking` in the synchronous engine callback (documented).
 - History search does a partial (`%query%`) match on the title or the url, newest first.
+- APK installs (DownloadsActivity and DownloadService) both go through `InstallPermissionHelper.launchInstaller`, which is MediaStore-aware (a `content://` Uri from API 30, an absolute path below).
+- The `ActiveModelsRepository` no-arg-constructor contract is pinned by a reflection test over the known models (`ActiveModelsContractTest`).
 - Rendered diagrams live next to this file: `ARCHITECTURE.plantuml`/`.png`/`.svg`/`.pdf` (overview) and `ARCHITECTURE-LAYERED.*` (layered view with component descriptions). PDFs are produced from the SVG (PlantUML's `-tpdf` needs Batik, which is not available here).

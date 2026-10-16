@@ -11,6 +11,12 @@ This document gives a more layered visualisation with brief descriptions of each
 | **MediaListPresenter** | The "streams on this page" list dialog and its background metadata prefetch. | Wraps `MediaListAdapter`; releases it on dismiss. |
 | **PermissionOrchestrator** | Routes permission/activity-result callbacks (voice search → engine → downloads) and owns the shared request-code counter. | Consults the handlers in the same order as before. |
 | **IntentHandler** | Deep links, the "open in same tab" extra and the History activity result. | Talks to the activity through navigate/open-tab/change-tab/auto-hide callbacks. |
+| **IntentHandler** | Deep links, the "open in same tab" extra and the History activity result. | Talks to the activity through navigate/open-tab/change-tab/auto-hide callbacks. |
+| **BookmarksController** | Bookmark panel toggle, bookmark CRUD (add/remove/edit) and favorite editing. | Renders into `vb.vBookmarks`; reads/writes through `MainActivityViewModel`; delegates the panel to `PanelController`. |
+| **CursorMenuController** | Fullscreen enter/exit, the cursor menu, the link-actions popup and the "site wants to open an unknown URL" dialog. | Owns the two popup lifetimes; takes the `BackNavigationEventsAdapter` and `ToolbarController`. |
+| **TabThumbnailPresenter** | The debounced thumbnail repaint and its bitmap/placeholder rendering. | Given keep-toolbar-open and "is current tab" predicates; owns the repaint `Runnable`. |
+| **DownloadCoordinator** | The download permission walk and the download-service binding. | Talks to `DownloadHost` (bind/unbind + `hasPermission`/`requestPermission`), implemented by `MainActivity`. |
+| **InstallPermissionHelper** | Launches the system APK installer for a downloaded file. | Shared by `DownloadsActivity` and `DownloadService`; MediaStore-aware Uri (content Uri from API 30, path below). |
 | **HistoryActivity** | History list with search (voice), multi-select delete, infinite scroll. | Binds to `HistoryModel`; forwards selection to caller via result. |
 | **DownloadsActivity** | Active + completed downloads, open/install APK, open folder, cancel/delete. | Binds to `ActiveDownloadsModel` + `DownloadsHistoryModel`. |
 | **ActionBar/View Layer** (ActionBar, TabsView, BookmarksPanelView) | Toolbar, tabs panel (RecyclerView), bookmarks panel (RecyclerView + "Add this page"). | Observes models; uses `PanelRowFocusDelegate`/`RowFocusPanel` for deterministic D-pad row focus. Never touches repositories. |
@@ -22,7 +28,7 @@ This document gives a more layered visualisation with brief descriptions of each
 | **TabsModel** | Manages open tabs, current selection, persistence, lifecycle (pause/save/detach). | Exposes `tabsStates` (ObservableList), `currentTab` (ObservableValue). Provides intents: `onOpenTab`, `onCloseTab`, `onToggleAdBlock`, `moveTab`, `changeTab`. `changeTab` materialises/attaches through an injected `TabViewHost` (no `ViewGroup` in the model). |
 | **MainActivityViewModel** | Home page links/bookmarks, history logging (debounced), incognito mode cleanup/switch orchestration. | Owns `bookmarks` and `currentPageBookmarked`. WebView data-dir isolation is delegated to the injected `WebViewDataDirManager`. |
 | **SettingsModel** | App settings as observables backed by `Config`. | Exposes observable prefs (theme, keepToolbarOpen, userAgentString). View assigns = intent. |
-| **AdblockModel** | Brave adblock client lifecycle, loading/filter matching. | Loads/updates EasyList; maps request types to filter options. Emits state via observables (incl. `loadError`); the host renders it. |
+| **AdblockModel** | Brave adblock client lifecycle, loading/filter matching. | Loads/updates EasyList; maps request types to filter options via the pure `AdblockRequestType` (unit-tested without the native engine). Emits state via observables (incl. `loadError`); the host renders it. |
 | **AutoUpdateModel** | Update checking + state; the dialog/action flow runs through `AutoUpdateHost`. | Checks GitHub Releases (semver-aware), manages auto-check cadence; exposes `isUpdateAvailable()`. |
 | **HistoryModel** | Paginated history list/search. | `loadItems(offset)` or search; owns `lastLoadedItems`. Repository injected with default. |
 | **DownloadsHistoryModel** | Paginated completed downloads. | Tracks all loaded items + last page. |
