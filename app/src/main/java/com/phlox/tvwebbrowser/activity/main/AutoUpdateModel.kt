@@ -42,8 +42,9 @@ interface AutoUpdateHost {
     fun downloadUpdate()
 }
 
-class AutoUpdateModel: ActiveModel() {
-    val config = AppContext.provideConfig()
+class AutoUpdateModel(
+    val config: Config = AppContext.provideConfig(),
+): ActiveModel() {
     var needToShowUpdateDlgAgain: Boolean = false
     val updateChecker = UpdateChecker(BuildConfig.VERSION_NAME)
     var lastUpdateNotificationTime: Calendar

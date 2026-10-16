@@ -52,9 +52,9 @@ mostly large, invasive or test-shape changes rather than small extractions. Orde
 | # | Area | Evidence | Effort / value |
 |---|---|---|---|
 | 1 | `MainActivity.onCreate` is the last big function | 166 LOC; the activity is 1163 LOC / 75 `override fun` / 16 `lateinit`, implementing 5 host interfaces. A `StartupCoordinator`/`SessionComposer` (activity as host) would shrink it. | Medium / medium — composition root, so returns diminish and wiring legibility must not regress. |
-| 2 | Global service-locator coupling | 38 sites across 24 non-test files (`TVBro.instance`, `AppContext.get()`), including models that otherwise take ctor deps (`TabsModel`, `MainActivityViewModel`, `ActiveDownloadsModel`, `WebViewDataDirManager`). "Default + override" DI still reaches a global. | High / high — the deepest coupling; threading a `Services`/`AppContext` through ctors touches the reflection DI contract. |
+| 2 | Global service-locator coupling | 38 sites across 24 non-test files (`TVBro.instance`, `AppContext.get()`), including models. | **Started**: every presentation model now takes its settings (`Config`) and the app services it needs (files dir, connectivity, content resolver, application context) as constructor parameters with production defaults — no model reads a global; `TabsModelTest` builds the model without ever initialising `AppContext`. The remaining sites are engine/adapters/services. High / high — the deepest coupling; the rest is still invasive. |
 | 3 | `Config` grab-bag | 14 KB, ~60 members, 65 `Config.` call sites under `activity/`; still mixes SharedPreferences storage with decisions (item 7 moved only two pure predicates). | High / medium |
-| 4 | `runBlocking` on the UI path | `MainActivity:782` (`saveTab`), `WebEngineCallback:222` (`findHostConfig`); plus the download service/task. Bridges suspend repos into sync engine callbacks — correct today, jank/ANR risk surface. | Low–medium / medium |
+| 4 | `runBlocking` on the UI path | `MainActivity.onPause` blocked the main thread on Room + the tab-state file; `WebEngineCallback.shouldBlockNewWindow` is a synchronous engine callback. | **Mostly done**: `onPause` persists through `TabsModel.saveTabInBackground`; `TabsModel.onPageStarted` warms the tab's host config off the main thread so the popup bridge resolves from memory, keeping `runBlocking` as the documented fallback for a popup that beats the warm-up. Low–medium / medium. |
 | 5 | `WebEngineCallbackHost` is wide | 335-LOC adapter with a many-member host interface (ISP smell) | Medium / low–medium |
 | 6 | Test shape, not count | 160 tests, all unit (`app/src/test`); there is **no `androidTest`/Robolectric** for panel focus, D-pad, toolbar URL box or back handling. | Medium / high for regression safety |
 | 7 | Packaging | `:app:common` is 4092 LOC (Config + singletons + utils + cursor widgets); `WebTabState` carries global refs. Gecko only sees `:app:common` (correct), but `common` is a grab-bag. | High / low–medium |
@@ -65,7 +65,8 @@ models own their state without touching Activity/dialog classes, the host seams 
 `AutoUpdateHost`, `DownloadHost`, `WebViewDataDirManager`) are the only UI escape hatches, and the
 pure decisions live in `domain/`. Keep new UI side effects behind such a seam rather than in a model.
 
-The next margin is (in order) the `MainActivity` composition/lifecycle body, the global
-service-locator coupling, and integration-test coverage — not more unit tests or more small
-extractions.
+The next margin is (in order) the `MainActivity` composition/lifecycle body, the rest of the global
+service-locator coupling (engine/adapters/services), and integration-test coverage — not more unit
+tests or more small extractions. The presentation layer is now fully constructor-injected; keep it
+that way rather than reaching for `AppContext`/`TVBro` inside a model.
 

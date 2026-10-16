@@ -1,12 +1,12 @@
 package com.phlox.tvwebbrowser.activity.main
 
+import android.content.Context
 import android.util.Log
 import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.BuildConfig
 import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.domain.HomePagePolicy
 import com.phlox.tvwebbrowser.domain.WebEnginePolicy
-import com.phlox.tvwebbrowser.TVBro
 import com.phlox.tvwebbrowser.model.FavoriteItem
 import com.phlox.tvwebbrowser.model.HistoryItem
 import com.phlox.tvwebbrowser.model.HomePageLink
@@ -29,14 +29,18 @@ import java.util.Calendar
 /**
  * Presentation model of the main screen.
  *
- * The data-layer gateways are constructor parameters with production defaults, so a test can hand
- * it repositories over an in-memory database; [com.phlox.tvwebbrowser.utils.activemodel.ActiveModelsRepository]
- * builds the no-argument constructor it synthesises.
+ * Every dependency — the data-layer gateways, the settings, the WebView data-dir seam and the
+ * application context the update-APK cleanup runs on — is a constructor parameter with a production
+ * default, so a test can hand it in-memory repositories and its own configuration;
+ * [com.phlox.tvwebbrowser.utils.activemodel.ActiveModelsRepository] builds the no-argument
+ * constructor it synthesises.
  */
 class MainActivityViewModel(
     private val favorites: FavoritesRepository = Repositories.favorites,
     private val history: HistoryRepository = Repositories.history,
     private val webViewDataDirs: WebViewDataDirManager = DefaultWebViewDataDirManager(),
+    val config: Config = AppContext.provideConfig(),
+    private val appContext: () -> Context = { AppContext.get() },
 ): ActiveModel() {
     companion object {
         var TAG: String = MainActivityViewModel::class.java.simpleName
@@ -47,7 +51,6 @@ class MainActivityViewModel(
     private var lastHistoryItemSaveJob: Job? = null
     val homePageLinks = ObservableList<HomePageLink>()
     val homePageHistoryLinks = ObservableList<HomePageLink>()
-    val config = AppContext.provideConfig()
 
     /** Stored bookmarks, owned here so the view only renders them. */
     val bookmarks = ObservableList<FavoriteItem>()
@@ -60,7 +63,7 @@ class MainActivityViewModel(
         // Purge any update APK left in the cache by a previous session (after a download, the file
         // has to linger until the installer has read it, so we clean up on the next launch).
         withContext(Dispatchers.IO) {
-            UpdateChecker.clearTempFilesIfAny(TVBro.instance)
+            UpdateChecker.clearTempFilesIfAny(appContext())
         }
         checkVersionCodeAndRunMigrations()
         initHistory()
@@ -74,7 +77,7 @@ class MainActivityViewModel(
             Log.i(TAG, "App version code changed from ${config.appVersionCodeMark} to ${BuildConfig.VERSION_CODE}")
             config.appVersionCodeMark = BuildConfig.VERSION_CODE
             withContext(Dispatchers.IO) {
-                UpdateChecker.clearTempFilesIfAny(TVBro.instance)
+                UpdateChecker.clearTempFilesIfAny(appContext())
             }
         }
     }
@@ -99,7 +102,6 @@ class MainActivityViewModel(
 
     private suspend fun loadHomePageLinks() {
         Log.d(TAG, "loadHomePageLinks")
-        val config = AppContext.provideConfig()
         if (config.homePageMode == Config.HomePageMode.HOME_PAGE) {
             homePageLinks.replaceAll(
                 favorites.allBookmarks()
@@ -145,7 +147,7 @@ class MainActivityViewModel(
 
     fun onTabTitleUpdated(tab: WebTabState) {
         Log.d(TAG, "onTabTitleUpdated: ${tab.url} ${tab.title}")
-        if (AppContext.provideConfig().incognitoMode) return
+        if (config.incognitoMode) return
         val lastHistoryItem = lastHistoryItem ?: return
         if (tab.url == lastHistoryItem.url) {
             lastHistoryItem.title = tab.title

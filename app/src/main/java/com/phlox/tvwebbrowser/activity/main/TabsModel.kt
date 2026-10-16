@@ -2,6 +2,7 @@ package com.phlox.tvwebbrowser.activity.main
 
 import android.util.Log
 import com.phlox.tvwebbrowser.AppContext
+import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.TVBro
 import com.phlox.tvwebbrowser.model.HostConfig
 import com.phlox.tvwebbrowser.model.WebTabState
@@ -34,13 +35,18 @@ interface TabViewHost {
 /**
  * The open tabs of the current browsing mode.
  *
- * The data-layer gateways are constructor parameters with production defaults, so a test can hand
- * it repositories over an in-memory database; [com.phlox.tvwebbrowser.utils.activemodel.ActiveModelsRepository]
- * builds the no-argument constructor it synthesises.
+ * Every dependency — the data-layer gateways, the settings and the two application services it
+ * needs (the private files directory, the connectivity check) — is a constructor parameter with a
+ * production default, so a test can hand it in-memory repositories and its own configuration;
+ * [com.phlox.tvwebbrowser.utils.activemodel.ActiveModelsRepository] builds the no-argument
+ * constructor Kotlin synthesises.
  */
 class TabsModel(
     private val tabsRepository: TabsRepository = Repositories.tabs,
     private val hostsRepository: HostsRepository = Repositories.hosts,
+    private val config: Config = AppContext.provideConfig(),
+    private val filesDir: () -> File? = { AppContext.get().filesDir },
+    private val networkAvailable: () -> Boolean = { Utils.isNetworkConnected(TVBro.instance) },
 ) : ActiveModel() {
     companion object {
         var TAG: String = TabsModel::class.java.simpleName
@@ -49,7 +55,6 @@ class TabsModel(
     var loaded = false
     val currentTab = ObservableValue<WebTabState?>(null)
     val tabsStates = ObservableList<WebTabState>()
-    private val config = AppContext.provideConfig()
     private var incognitoMode = config.incognitoMode
 
     init {
@@ -94,7 +99,7 @@ class TabsModel(
     }
 
     private fun tabWvStatesDir() =
-        AppContext.get().filesDir?.let { File(it, WebTabState.TAB_WVSTATES_DIR) }
+        filesDir()?.let { File(it, WebTabState.TAB_WVSTATES_DIR) }
 
     suspend fun saveTab(tab: WebTabState) {
         if (tab.selected) {
@@ -108,6 +113,15 @@ class TabsModel(
         } else {
             tab.id = tabsRepository.insert(tab)
         }
+    }
+
+    /**
+     * Persists [tab] without blocking the caller. The write is durable once the coroutine completes,
+     * so the screen pause path uses this instead of blocking the main thread on Room and the tab
+     * state file.
+     */
+    fun saveTabInBackground(tab: WebTabState) {
+        modelScope.launch { saveTab(tab) }
     }
 
     /**
@@ -211,7 +225,7 @@ class TabsModel(
         if (needReloadUrl) {
             newTab.webEngine.loadUrl(newTab.url)
         }
-        newTab.webEngine.setNetworkAvailable(Utils.isNetworkConnected(TVBro.instance))
+        newTab.webEngine.setNetworkAvailable(networkAvailable())
     }
 
     /**
@@ -240,6 +254,10 @@ class TabsModel(
         onPageUrlUpdated(tab, engineUrl, callbackUrl)
         tab.blockedAds = 0
         tab.blockedPopups = 0
+        // Warm the per-tab host config off the main thread, so the synchronous popup callback
+        // (WebEngineCallback.shouldBlockNewWindow) resolves it from memory instead of blocking the
+        // UI thread on a database read. findHostConfig only reads (createIfNotFound is false).
+        modelScope.launch { findHostConfig(tab, false) }
     }
 
     fun onPageFinished(tab: WebTabState, engineUrl: String?, callbackUrl: String?) {

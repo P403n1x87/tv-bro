@@ -27,12 +27,16 @@ class AutoUpdateModelTest {
 
     private lateinit var model: AutoUpdateModel
     private lateinit var host: FakeHost
+    private lateinit var config: Config
 
     @Before
     fun setUp() {
         val app = RuntimeEnvironment.getApplication()
-        AppContext.init(app, Config(app.getSharedPreferences("autoupdate_test", Context.MODE_PRIVATE)))
-        model = AutoUpdateModel()
+        config = Config(app.getSharedPreferences("autoupdate_test", Context.MODE_PRIVATE))
+        // A different instance than the model's, so a test that flips [config] proves the model
+        // follows the Config it was handed rather than a global.
+        AppContext.init(app, Config(app.getSharedPreferences("autoupdate_global_test", Context.MODE_PRIVATE)))
+        model = AutoUpdateModel(config)
         host = FakeHost()
     }
 
@@ -139,7 +143,6 @@ class AutoUpdateModelTest {
 
     @Test
     fun theUpdateBadgeFollowsTheCheckResult() {
-        val config = AppContext.provideConfig()
         config.autoCheckUpdates = true
         assertFalse(model.isUpdateAvailable())
 
