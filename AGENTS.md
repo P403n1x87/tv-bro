@@ -1,13 +1,14 @@
 # tv-bro — agent notes
 
 ## Branch / context
-- Work in progress on branch `feat/stream-player`: native video playback handoff for WebView + GeckoView (shared `:app:player` module).
+- `master` now carries the MVVM refactor *and* the follow-up main-screen decomposition (both merged:
+  PR #4 `refactor/mvvm`, PR #5 `refactor/mainactivity-split`). The `feat/stream-player` work is merged too.
 - Branch `refactor/mvvm`: the phased, behaviour-preserving move of the app to MVVM (repository
   layer, presentation models, `domain/` decisions, tests) — see the Architecture section below.
-  Committed step by step, **not pushed**. The view-purity pass is done; the last item was lifting
-  `WebEngineCallback` out of `MainActivity`.
+  The view-purity pass is done; the last item was lifting `WebEngineCallback` out of `MainActivity`.
+  Follow-up: `MainActivity`'s UI work is split into view collaborators (PR #5, see below).
 
-## Architecture: the MVVM refactor (branch `refactor/mvvm`)
+## Architecture: the MVVM refactor (merged to `master`)
 - Conventions: models stay `ActiveModel`s (the custom `ActiveModelsRepository`/observables are kept —
   no Hilt, no androidx `ViewModel`/`StateFlow`). Views render observable state and forward input;
   they never open Room, never locate a model, never write state that a model owns. Decisions that
@@ -40,6 +41,12 @@
   `LinkActionPolicy`, `NewTabPositionPolicy` — extracted out of `MainActivity`/`WebEngineCallback`,
   each with a unit test. Prefer extracting a decision here over testing a framework-heavy model
   directly.
+- Main-screen view collaborators (PR #5): `MainActivity` keeps the host-seam/composition-root role and
+  delegates its UI work to `PanelController` (side-panel visibility + the row focus hand-off),
+  `ToolbarController` (toolbar overlay + in-page fullscreen flags), `MediaListPresenter` (stream
+  list), `PermissionOrchestrator` (permission/activity-result routing), `IntentHandler` (deep links +
+  the History result). Each takes the binding/models/callbacks it needs through its constructor and
+  never reads `MainActivity`'s private members; `MainActivity` builds them in `onCreate`.
 - Test setup (Robolectric + Room): `@Config(sdk = [26], application = Application::class)`,
   `AppContext.init(app, Config(app.getSharedPreferences(...)))` in `@Before`, and
   `Room.inMemoryDatabaseBuilder(...).allowMainThreadQueries()` with **direct** executors

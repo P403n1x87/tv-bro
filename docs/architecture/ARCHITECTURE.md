@@ -1,6 +1,8 @@
 # Architecture (post-MVVM refactor)
 
-This document summarizes the current architecture after the view-purity pass on branch `refactor/mvvm`. It includes a high-level diagram (Mermaid) and notes on contracts, dependency direction, and data flow.
+This document describes the current architecture on `master`: the view-purity pass, plus the
+follow-up split of the main screen's UI work into view collaborators. It includes a high-level
+diagram (Mermaid) and notes on contracts, dependency direction, and data flow.
 
 ## Key Contracts
 
@@ -11,12 +13,34 @@ This document summarizes the current architecture after the view-purity pass on 
 - **Domain**: Framework-free decision objects (`NavigationPolicy`, `PopupPolicy`, `SiteDomains`, `AddressInputPolicy`, `UrlNormalizer`, `LinkActionPolicy`, `NewTabPositionPolicy`).
 - **Repositories**: One per DAO, all `suspend`. `Repositories` is manual DI container (lazy singletons). Models have ctor params with production defaults for testability.
 
+## Main-screen view collaborators
+
+`MainActivity` is the host (`WebEngineCallbackHost`) and the composition root for the screen. Its UI
+work is split into cohesive collaborators, each constructed in `onCreate` with the binding, models and
+callbacks it needs — they never reach into the activity's private members:
+
+| Collaborator | Owns | Wired with |
+|---|---|---|
+| `PanelController` | Tabs/bookmarks panel visibility and the focus hand-off (claims the container focus synchronously via `requestFocusFromTouch()`, then hands the focus to a row once the content is settled). | binding + focus-engine callback |
+| `ToolbarController` | Toolbar overlay show/hide/style, the menu toggle, the auto-hide call sites (currently a no-op under keep-toolbar-open), and the in-page fullscreen window flags. | activity, binding, keep-screen-on reader, focus-engine callback |
+| `MediaListPresenter` | The "streams on this page" list dialog and its background metadata prefetch. | activity + `TabsModel` |
+| `PermissionOrchestrator` | Routing of permission/activity-result callbacks (voice search → engine → downloads) and the shared request-code counter. | `VoiceSearchHelper`, `DownloadCoordinator`, engine-permission callback |
+| `IntentHandler` | Deep links, the "open in same tab" extra, and the History activity result. | `TabsModel` + navigate/open-tab/change-tab/auto-hide callbacks |
+
+These are view collaborators, not models: they hold no domain state and only render/forward to the
+binding, the models and the callbacks handed to them.
+
 ## High-Level Diagram
 
 ```mermaid
 graph TD
     subgraph UI["Presentation (Activities/Views)"]
         MA["MainActivity : WebEngineCallbackHost"]
+        PC["PanelController"]
+        TC["ToolbarController"]
+        MLP["MediaListPresenter"]
+        PO["PermissionOrchestrator"]
+        IH["IntentHandler"]
         HA["HistoryActivity"]
         DA["DownloadsActivity"]
         AB["ActionBar/TabsView/BookmarksPanelView"]
@@ -60,6 +84,7 @@ graph TD
     UI -->|gets models| AMR --> PM
     SD --> PM; AB --> TVM
 
+    MA --> PC & TC & MLP & PO & IH
     MA --> WECB; WECB --> MA; WECB --> PM; WECB --> DOM
     ENG --> WIF; ENG --> WEH
 
@@ -77,7 +102,7 @@ graph TD
 - Repository: depends on Room/DAOs/entities.
 - Presentation Models: depend on Repositories and domain; avoid View references (small controlled seams).
 - Engine Adapter: depends on models, domain, host interface.
-- View/Activity: depends on models (observables) and host interface; never on Repositories/DAOs/AppDatabase.
+- View/Activity: depends on models (observables) and host interface; never on Repositories/DAOs/AppDatabase. The view collaborators depend on the binding/models/callbacks they are wired with.
 - Service layer: may depend on Repositories (allowed).
 
 ## Data Flow (example: engine page load)
@@ -89,3 +114,4 @@ graph TD
 - MainActivity reads `config` directly only for engine-construction checks (before models exist) — deliberate.
 - Popup decisions use `runBlocking` in the synchronous engine callback (documented).
 - History search uses exact substring match in current behavior (pinned by test; fix is behavior change).
+- Rendered diagrams live next to this file: `ARCHITECTURE.plantuml`/`.png`/`.svg`/`.pdf` (overview) and `ARCHITECTURE-LAYERED.*` (layered view with component descriptions). PDFs are produced from the SVG (PlantUML's `-tpdf` needs Batik, which is not available here).

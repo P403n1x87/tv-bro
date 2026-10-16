@@ -5,7 +5,12 @@ This document gives a more layered visualisation with brief descriptions of each
 ## Layer 1 - UI (Presentation Layer)
 | Component | Purpose | Key Notes |
 |---|---|---|
-| **MainActivity** | Root activity; implements `WebEngineCallbackHost`. Orchestrates UI state, panels, toolbar, permissions, fullscreen, intents. | Largest component (host seam). Reads config only for pre-model engine checks (deliberate). Observes presentation models. |
+| **MainActivity** | Root activity; implements `WebEngineCallbackHost`. Composition root for the screen: builds the models and the view collaborators, wires the engine seam and the toolbar, and forwards. | Reads config only for pre-model engine checks (deliberate). Observes presentation models; delegates its UI work to the controllers below. |
+| **PanelController** | Tabs/bookmarks panel visibility and the focus hand-off to a row. | Claims the container focus with `requestFocusFromTouch()`, then `RowFocusPanel.requestRowFocus()` once the content is settled. |
+| **ToolbarController** | Toolbar overlay show/hide/style, the menu toggle, and the in-page fullscreen window flags. | Owns the `isFullscreen` state; `autoHideMenuOverlay()` is a no-op under the keep-toolbar-open behaviour. |
+| **MediaListPresenter** | The "streams on this page" list dialog and its background metadata prefetch. | Wraps `MediaListAdapter`; releases it on dismiss. |
+| **PermissionOrchestrator** | Routes permission/activity-result callbacks (voice search → engine → downloads) and owns the shared request-code counter. | Consults the handlers in the same order as before. |
+| **IntentHandler** | Deep links, the "open in same tab" extra and the History activity result. | Talks to the activity through navigate/open-tab/change-tab/auto-hide callbacks. |
 | **HistoryActivity** | History list with search (voice), multi-select delete, infinite scroll. | Binds to `HistoryModel`; forwards selection to caller via result. |
 | **DownloadsActivity** | Active + completed downloads, open/install APK, open folder, cancel/delete. | Binds to `ActiveDownloadsModel` + `DownloadsHistoryModel`. |
 | **ActionBar/View Layer** (ActionBar, TabsView, BookmarksPanelView) | Toolbar, tabs panel (RecyclerView), bookmarks panel (RecyclerView + "Add this page"). | Observes models; uses `PanelRowFocusDelegate`/`RowFocusPanel` for deterministic D-pad row focus. Never touches repositories. |
