@@ -2,9 +2,10 @@
 
 ## Branch / context
 - Work in progress on branch `feat/stream-player`: native video playback handoff for WebView + GeckoView (shared `:app:player` module).
-- Work in progress on branch `refactor/mvvm`: phased, behaviour-preserving move of the app to MVVM
-  (repository layer, presentation models, `domain/` decisions, tests) — see the Architecture
-  section below. Committed step by step, **not pushed**.
+- Branch `refactor/mvvm`: the phased, behaviour-preserving move of the app to MVVM (repository
+  layer, presentation models, `domain/` decisions, tests) — see the Architecture section below.
+  Committed step by step, **not pushed**. The view-purity pass is done; the last item was lifting
+  `WebEngineCallback` out of `MainActivity`.
 
 ## Architecture: the MVVM refactor (branch `refactor/mvvm`)
 - Conventions: models stay `ActiveModel`s (the custom `ActiveModelsRepository`/observables are kept —
@@ -16,6 +17,13 @@
   `HistoryModel`, `DownloadsHistoryModel`, `ActiveDownloadsModel`) → activities/views. No activity
   or view references `AppDatabase`/`Repositories` any more; the only remaining direct users are the
   service layer (`TVBro`, `DownloadService`, `DownloadTask`).
+- `WebEngineCallback` (the per-tab engine adapter) is a plain class in
+  `activity/main/WebEngineCallback.kt`, not an inner class of `MainActivity`: the models it needs are
+  constructor-injected and the view work goes through the `WebEngineCallbackHost` interface
+  (implemented by `MainActivity`, its only host), whose members are the repaints, the window flags,
+  the cursor/link menus and the activity launches. The engine-facing policy that stays in the
+  adapter (url routing, popup/redirect blocking, the new-tab position, the download filename) is
+  delegated to `domain/` wherever it is pure, and a download crosses the seam as a `DownloadRequest`.
 - Models take their repositories as **constructor parameters with production defaults**
   (`private val history: HistoryRepository = Repositories.history`), so a test injects a repository
   over an in-memory database. `ActiveModelsRepository.get` builds the *declared* no-arg constructor
@@ -29,8 +37,9 @@
 - Settings pages (and other views) assigning a model property (`settingsModel.restoreTabsOnStartup = it`)
   is the accepted "view assigns = intent" pattern; the model owns the write and the persistence.
 - `domain/`: `NavigationPolicy`, `PopupPolicy`, `SiteDomains`, `AddressInputPolicy`, `UrlNormalizer`,
-  `LinkActionPolicy` — extracted out of `MainActivity`/`WebEngineCallback`, each with a unit test.
-  Prefer extracting a decision here over testing a framework-heavy model directly.
+  `LinkActionPolicy`, `NewTabPositionPolicy` — extracted out of `MainActivity`/`WebEngineCallback`,
+  each with a unit test. Prefer extracting a decision here over testing a framework-heavy model
+  directly.
 - Test setup (Robolectric + Room): `@Config(sdk = [26], application = Application::class)`,
   `AppContext.init(app, Config(app.getSharedPreferences(...)))` in `@Before`, and
   `Room.inMemoryDatabaseBuilder(...).allowMainThreadQueries()` with **direct** executors
@@ -38,10 +47,10 @@
   the main-looper clock with `shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(n))` to
   let `delay`s (the 5s history debounce) elapse. `org.robolectric.annotation.Config` clashes with
   the app's `Config`, so import the Robolectric one as an alias.
-- Not done yet: `WebEngineCallback` is still a ~420-line `inner class` of `MainActivity` (engine
-  adapter holding the new-tab index policy, permissions/intents, fullscreen window flags); lifting it
-  out needs a host interface. `SearchEngineConfigDialogFactory` (the old `SettingsActivity` path)
-  still reads `config` directly.
+- No known view-purity gaps left: the `WebEngineCallback` lift-out and the dead
+  `SearchEngineConfigDialogFactory` deletion were the last two. `MainActivity` still reads `config`
+  directly for the engine-construction checks (`incognitoMode` before the models exist,
+  `isWebEngineGecko()`), which is deliberate — those are not model-owned settings.
 
 ## Known issues / TODO
 - **History search only matches exact titles/urls (open, not fixed).**
@@ -110,7 +119,7 @@
   constructed before `WebViewWebEngine.onAttachToWindow()` assigns `callback`, so the internal
   `webViewCallback` returned `false` and the document-start script was never added (page reported
   `NOINJ`). Re-apply in `onAttachToWindow` via `webView?.onUpdateAdblockSetting(callback.isAdBlockingEnabled())`.
-  Also fixed `MainActivity.WebEngineCallback.isAdBlockingEnabled()` to read its own `tab.adblock ?: config.adBlockEnabled`
+  Also fixed `WebEngineCallback.isAdBlockingEnabled()` to read its own `tab.adblock ?: config.adBlockEnabled`
   (it read `tabsModel.currentTab.value?.adblock`, which is wrong while a tab isn't selected yet), and
   re-sync every open tab when the global toggle is dismissed (`SettingsDialog.onDismissed` →
   `MainActivity.showSettings()`), since the zapper is registration-based while the network blocker
