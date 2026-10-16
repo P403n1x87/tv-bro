@@ -24,9 +24,16 @@ interface WebViewDataDirManager {
     fun clearIncognitoData()
 }
 
+/**
+ * The default [WebViewDataDirManager]: the app's real private data/cache directories.
+ *
+ * The directory providers are lazy on purpose: the manager may be built (e.g. as a default
+ * constructor argument) before `AppContext` is initialised, so the real directories are only read
+ * when the session methods run.
+ */
 class DefaultWebViewDataDirManager(
-    private val appFilesDir: File = AppContext.get().filesDir,
-    private val appCacheDir: File = AppContext.get().cacheDir,
+    private val appFilesDir: () -> File = { AppContext.get().filesDir },
+    private val appCacheDir: () -> File = { AppContext.get().cacheDir },
 ) : WebViewDataDirManager {
     companion object {
         private val TAG = DefaultWebViewDataDirManager::class.java.simpleName
@@ -36,8 +43,8 @@ class DefaultWebViewDataDirManager(
         const val INCOGNITO_SUFFIX = "incognito"
     }
 
-    private fun dataDir(name: String) = File(appFilesDir.parentFile, name)
-    private fun cacheDir(name: String) = File(appCacheDir, name)
+    private fun dataDir(name: String) = File(appFilesDir().parentFile, name)
+    private fun cacheDir(name: String) = File(appCacheDir(), name)
 
     override fun prepareIncognitoSession() {
         Log.d(TAG, "prepareIncognitoSession")
