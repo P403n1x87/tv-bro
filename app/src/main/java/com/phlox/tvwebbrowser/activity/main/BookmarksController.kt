@@ -3,6 +3,7 @@ package com.phlox.tvwebbrowser.activity.main
 import android.app.Activity
 import android.app.AlertDialog
 import com.phlox.tvwebbrowser.Config
+import com.phlox.tvwebbrowser.domain.HomePagePolicy
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.activity.main.dialogs.favorites.FavoriteEditorDialog
 import com.phlox.tvwebbrowser.activity.main.view.bookmarks.BookmarksPanelView
@@ -93,7 +94,7 @@ class BookmarksController(
     fun addCurrentPage() {
         val tab = currentTab() ?: return
         val url = tab.url
-        if (url.isNullOrBlank() || Config.isHomePageUrl(url)) return
+        if (url.isNullOrBlank() || HomePagePolicy.isHomePageUrl(url, Config.localHomePageUrl)) return
         val newItem = FavoriteItem()
         FavoriteEditorDialog(
             activity,
@@ -164,7 +165,7 @@ class BookmarksController(
     private fun toggleCurrentPage() {
         val tab = currentTab() ?: return
         val url = tab.url
-        if (url.isNullOrBlank() || Config.isHomePageUrl(url)) return
+        if (url.isNullOrBlank() || HomePagePolicy.isHomePageUrl(url, Config.localHomePageUrl)) return
         scope.launch(Dispatchers.Main) {
             val existing = viewModel.getBookmarkByUrl(url)
             if (existing != null) {

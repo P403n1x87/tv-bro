@@ -7,6 +7,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
 import com.phlox.tvwebbrowser.Config
+import com.phlox.tvwebbrowser.domain.HomePagePolicy
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.databinding.ViewBookmarkItemBinding
 import com.phlox.tvwebbrowser.model.FavoriteItem
@@ -51,7 +52,7 @@ class BookmarksAdapter(private val listener: Listener) : RecyclerView.Adapter<Bo
             vb.ivFavicon.setImageResource(R.drawable.ic_not_available)
 
             val url = item.url
-            if (url != null && !Config.isHomePageUrl(url)) {
+            if (url != null && !HomePagePolicy.isHomePageUrl(url, Config.localHomePageUrl)) {
                 val scope = (itemView.activity as AppCompatActivity).lifecycleScope
                 scope.launch(Dispatchers.Main) {
                     val favicon = FaviconsPool.get(url)

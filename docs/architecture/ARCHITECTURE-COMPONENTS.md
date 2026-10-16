@@ -43,7 +43,10 @@ This document gives a more layered visualisation with brief descriptions of each
 | **AddressInputPolicy** | Resolves typed input to URL (search or direct). | Pure. |
 | **UrlNormalizer** | Normalizes URLs. | Pure. |
 | **LinkActionPolicy** | Determines link target/action eligibility (HTTP URL checks). | Pure. |
+| **LinkActionPolicy** | Determines link target/action eligibility (HTTP URL checks). | Pure. |
 | **SiteDomains** | Same-site/domain comparison for cross-site checks. | Pure. |
+| **HomePagePolicy** | Built-in-home-page check (remote URL, `about:home` alias or the loopback URL). | Pure; the loopback URL is passed in because the asset server sets it at runtime. |
+| **WebEnginePolicy** | Web-engine identity check (Gecko or not). | Pure; the engine string comes from `Config`. |
 
 ## Layer 4 - Repository (suspend-only)
 | Component | Purpose | Key Notes |

@@ -59,6 +59,8 @@ import com.phlox.tvwebbrowser.activity.main.view.CursorMenuView
 import com.phlox.tvwebbrowser.activity.main.view.tabs.TabsAdapter.Listener
 import com.phlox.tvwebbrowser.databinding.ActivityMainBinding
 import com.phlox.tvwebbrowser.domain.AddressInputPolicy
+import com.phlox.tvwebbrowser.domain.HomePagePolicy
+import com.phlox.tvwebbrowser.domain.WebEnginePolicy
 import com.phlox.tvwebbrowser.model.HostConfig
 import com.phlox.tvwebbrowser.model.WebTabState
 import com.phlox.tvwebbrowser.service.downloads.DownloadService
@@ -262,7 +264,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         viewModel.homePageLinks.subscribe(this) {
             Log.i(TAG, "homePageLinks updated")
             val currentUrl = tabsModel.currentTab.value?.url ?: return@subscribe
-            if (Config.isHomePageUrl(currentUrl)) {
+            if (HomePagePolicy.isHomePageUrl(currentUrl, Config.localHomePageUrl)) {
                 tabsModel.currentTab.value?.webEngine?.reload()
             }
         }
@@ -284,7 +286,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         tabsModel.tabsStates.subscribe(this, false) {
             vb.vActionBar.setTabsCounter(it.size)
             if (it.isEmpty()) {
-                if (!config.isWebEngineGecko()) {
+                if (!WebEnginePolicy.isGecko(config.webEngine)) {
                     vb.flWebViewContainer.removeAllViews()
                 }
             }
@@ -667,7 +669,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         } catch (e: Throwable) {
             e.printStackTrace()
 
-            if (!config.isWebEngineGecko()) {
+            if (!WebEnginePolicy.isGecko(config.webEngine)) {
                 val dialogBuilder = AlertDialog.Builder(this)
                     .setTitle(R.string.error)
                     .setCancelable(false)

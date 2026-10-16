@@ -51,6 +51,8 @@ package "Domain (pure)" {
   [UrlNormalizer] as UN
   [LinkActionPolicy] as LAP
   [SiteDomains] as SDom
+  [HomePagePolicy] as HPP
+  [WebEnginePolicy] as WEP
 }
 
 package "Repository (suspend)" {
@@ -130,6 +132,9 @@ WECB --> NP
 WECB --> PP
 WECB --> NTP
 WECB --> SDom
+WECB --> HPP
+MA --> HPP
+MA --> WEP
 WECB ..> WEH
 WV ..|> WIF
 GV ..|> WIF

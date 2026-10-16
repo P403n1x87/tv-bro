@@ -53,6 +53,8 @@ package "3. Domain (pure, framework-free)" {
   [UrlNormalizer\n(URL normalization)] as UN
   [LinkActionPolicy\n(link action decisions)] as LAP
   [SiteDomains\n(same-site/domain checks)] as SDom
+  [HomePagePolicy\n(built-in home page check)] as HPP
+  [WebEnginePolicy\n(engine identity check)] as WEP
 }
 
 package "4. Repository (suspend-only)" {
@@ -175,6 +177,9 @@ WECB --> NP
 WECB --> PP
 WECB --> NTP
 WECB --> SDom
+WECB --> HPP
+MA --> HPP
+MA --> WEP
 WV ..|> WIF
 GV ..|> WIF
 WV --> WEH

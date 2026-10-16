@@ -19,7 +19,7 @@ the model/host seam polish. Work on a feature branch; **open a PR only when aske
 - `WebEngineCallback` is a plain per-tab engine adapter; all UI access goes through the
   `WebEngineCallbackHost` interface (`MainActivity` is the only host). Pure policy in `domain/`
   (`NavigationPolicy`, `PopupPolicy`, `SiteDomains`, `AddressInputPolicy`, `UrlNormalizer`,
-  `LinkActionPolicy`, `NewTabPositionPolicy`).
+  `LinkActionPolicy`, `NewTabPositionPolicy`, `HomePagePolicy`, `WebEnginePolicy`).
 - `MainActivity` is the composition root/host; its UI work is delegated to `PanelController`,
   `ToolbarController`, `MediaListPresenter`, `PermissionOrchestrator`, `IntentHandler`,
   `BookmarksController`, `CursorMenuController`, `TabThumbnailPresenter` and `DownloadCoordinator`,

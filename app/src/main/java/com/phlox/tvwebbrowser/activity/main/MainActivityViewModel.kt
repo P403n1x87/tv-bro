@@ -4,6 +4,8 @@ import android.util.Log
 import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.BuildConfig
 import com.phlox.tvwebbrowser.Config
+import com.phlox.tvwebbrowser.domain.HomePagePolicy
+import com.phlox.tvwebbrowser.domain.WebEnginePolicy
 import com.phlox.tvwebbrowser.TVBro
 import com.phlox.tvwebbrowser.model.FavoriteItem
 import com.phlox.tvwebbrowser.model.HistoryItem
@@ -110,7 +112,7 @@ class MainActivityViewModel(
 
     fun logVisitedHistory(title: String?, url: String, faviconHash: String?) {
         Log.d(TAG, "logVisitedHistory: $url")
-        if ((url == lastHistoryItem?.url) || Config.isHomePageUrl(url) || !url.startsWith("http", true)) {
+        if ((url == lastHistoryItem?.url) || HomePagePolicy.isHomePageUrl(url, Config.localHomePageUrl) || !url.startsWith("http", true)) {
             return
         }
 
@@ -174,11 +176,11 @@ class MainActivityViewModel(
     ): Boolean {
         val becomingIncognitoMode = !config.incognitoMode
         if (!becomingIncognitoMode) {
-            if (!config.isWebEngineGecko()) {
+            if (!WebEnginePolicy.isGecko(config.webEngine)) {
                 clearEngineSession()
             }
             clearOpenTabs()
-            if (!config.isWebEngineGecko()) {
+            if (!WebEnginePolicy.isGecko(config.webEngine)) {
                 withContext(Dispatchers.IO) {
                     webViewDataDirs.clearIncognitoData()
                 }
@@ -195,7 +197,7 @@ class MainActivityViewModel(
      */
     fun prepareSwitchToIncognito() {
         Log.d(TAG, "prepareSwitchToIncognito")
-        if (config.isWebEngineGecko()) return
+        if (WebEnginePolicy.isGecko(config.webEngine)) return
         webViewDataDirs.prepareIncognitoSession()
     }
 

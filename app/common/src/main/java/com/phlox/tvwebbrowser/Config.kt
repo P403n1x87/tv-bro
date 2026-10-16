@@ -71,14 +71,6 @@ class Config(val prefs: SharedPreferences) {
         /** URL an engine should load for the built-in home page (loopback when available). */
         fun currentHomePageUrl(): String = localHomePageUrl ?: HOME_PAGE_URL
 
-        /** True if [url] points at the built-in home page (remote, alias or loopback). */
-        fun isHomePageUrl(url: String?): Boolean {
-            if (url == null) return false
-            if (url == HOME_PAGE_URL || url == HOME_URL_ALIAS) return true
-            val local = localHomePageUrl ?: return false
-            return url.startsWith(local)
-        }
-
         fun canRecommendGeckoView(): Boolean {
             //disable recommendation for now
             //There are plans to keep its support, but user reports and internal testing show
@@ -294,14 +286,7 @@ class Config(val prefs: SharedPreferences) {
             prefs.edit().putInt(APP_VERSION_CODE_MARK_KEY, value).apply()
         }
 
-    fun isWebEngineGecko(): Boolean {
-        return webEngine == SupportedWebEngines[0]
-    }
-
-    fun isWebEngineNotSet(): Boolean {
-        return !prefs.contains(WEB_ENGINE)
-    }
-
+    /** The short name of the configured search engine (its "custom" entry when unknown). */
     fun guessSearchEngineName(): String {
         val url = searchEngineURL.value
         val index = SearchEnginesURLs.indexOf(url)

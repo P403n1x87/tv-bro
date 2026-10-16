@@ -36,13 +36,21 @@ This review analyzes the new architecture against core software design principle
 | MainActivityViewModel | WebView file-dir incognito logic inline | **Done**: extracted `DefaultWebViewDataDirManager` behind the `WebViewDataDirManager` interface. | Done |
 | History search | `LIKE` without wildcards | **Done**: `HistoryRepository.search` wraps the query in `%…%`; the pinning tests were updated (explicit behavior change). | Done |
 | History dedup + `frequentlyUsedUrls` | `frequentlyUsedUrls()` was redundant under URL-keyed history | **Done**: the method was dropped; history stays keyed by URL. | Done |
+| APK install duplication | `DownloadsActivity` and `DownloadService` each had a `launchInstallAPKActivity` (the service copy was buggy: FileProvider on a `content://` Uri, missing `NEW_TASK`) | **Done**: both route through `InstallPermissionHelper.launchInstaller` (MediaStore-aware, `NEW_TASK` only off-activity). | Done |
+| Permission/download/intent tests | The orchestrators had no tests; `PermissionOrchestrator`/`DownloadCoordinator` reached into the activity | **Done**: `DownloadHost` seam + voice-search lambdas; tests cover permission routing, deep links, the download walk, settings and adblock request mapping. | Done |
+| `ActiveModelsRepository` contract | A model missing its no-arg ctor broke at runtime, not build time | **Done**: `ActiveModelsContractTest` reflects over the known models. | Done |
+| `DefaultWebViewDataDirManager` | Read `AppContext.get()` at construction (before init in some paths) | **Done**: directories resolve through providers at use time; test covers the move/restore cycle. | Done |
+| MainActivity clusters | Bookmark, cursor-menu/link and thumbnail concerns still sat in the activity | **Done**: `BookmarksController`, `CursorMenuController`, `TabThumbnailPresenter` (each ctor-injected). | Done |
+| Doc/diagram drift | Diagrams missed the new collaborators/seams | **Done**: PlantUML sources updated and png/svg/pdf re-rendered; docs list the new pieces. | Done |
+| `Config` grab-bag | Mixes preference storage with pure decision logic | **Done**: `isHomePageUrl`/`isWebEngineGecko` moved to `domain/HomePagePolicy`/`WebEnginePolicy`; the unused `isWebEngineNotSet` dropped. | Done |
 
 ## Known Deferred
-- None. The last behavior-affecting item — the history search wildcard fix — landed together with the test updates.
+- None. All behavior-affecting items landed with their tests.
 
 ## Recommendation
-The refactor and its follow-up polish pass are complete: the main screen is decomposed, the models own
-their state without touching Activity/dialog classes, and the remaining seams (`TabViewHost`,
-`AutoUpdateHost`, `WebViewDataDirManager`) are constructor-injected. Keep new UI side effects behind
-such a host interface rather than in a model.
+The refactor, the follow-up polish pass and the deferred improvements are complete: the main screen
+is decomposed into constructor-injected collaborators, models own their state without touching
+Activity/dialog classes, the host seams (`TabViewHost`, `AutoUpdateHost`, `DownloadHost`,
+`WebViewDataDirManager`) are the only UI escape hatches, and the pure decisions live in `domain/`.
+Keep new UI side effects behind such a seam rather than in a model.
 

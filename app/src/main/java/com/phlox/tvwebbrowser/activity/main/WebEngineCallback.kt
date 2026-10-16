@@ -11,6 +11,7 @@ import android.webkit.URLUtil
 import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.TVBro
+import com.phlox.tvwebbrowser.domain.HomePagePolicy
 import com.phlox.tvwebbrowser.domain.NavigationPolicy
 import com.phlox.tvwebbrowser.domain.NewTabPositionPolicy
 import com.phlox.tvwebbrowser.domain.PopupPolicy
@@ -207,7 +208,7 @@ class WebEngineCallback(
     }
 
     override fun isDialogsBlockingEnabled(): Boolean {
-        if (Config.isHomePageUrl(tab.url)) return false
+        if (HomePagePolicy.isHomePageUrl(tab.url, Config.localHomePageUrl)) return false
         return shouldBlockNewWindow(dialog = true, userGesture = false)
     }
 

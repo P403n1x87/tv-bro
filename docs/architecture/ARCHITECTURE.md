@@ -14,7 +14,7 @@ diagram (Mermaid) and notes on contracts, dependency direction, and data flow.
 - **TabViewHost**: View seam implemented by `MainActivity` (`createView`/`attachEngineToWindow`), injected into `TabsModel.changeTab` so the model never handles a `ViewGroup`.
 - **AutoUpdateHost**: View seam implemented by `MainActivity` (dialogs, install-permission handling, download), injected into `AutoUpdateModel.showUpdateDialogIfNeeded` so the model owns only the decision.
 - **WebViewDataDirManager**: The isolated WebView data/cache directories an incognito session runs on; `DefaultWebViewDataDirManager` is the WebView-engine implementation, injected into `MainActivityViewModel`.
-- **Domain**: Framework-free decision objects (`NavigationPolicy`, `PopupPolicy`, `SiteDomains`, `AddressInputPolicy`, `UrlNormalizer`, `LinkActionPolicy`, `NewTabPositionPolicy`).
+- **Domain**: Framework-free decision objects (`NavigationPolicy`, `PopupPolicy`, `SiteDomains`, `AddressInputPolicy`, `UrlNormalizer`, `LinkActionPolicy`, `NewTabPositionPolicy`, `HomePagePolicy`, `WebEnginePolicy`).
 - **Repositories**: One per DAO, all `suspend`. `Repositories` is manual DI container (lazy singletons). Models have ctor params with production defaults for testability.
 
 ## Main-screen view collaborators
@@ -78,6 +78,7 @@ graph TD
     subgraph DOM["Domain (pure)"]
         NP["NavigationPolicy"]; PP["PopupPolicy"]; NTP["NewTabPositionPolicy"]
         AIP["AddressInputPolicy"]; UN["UrlNormalizer"]; LAP["LinkActionPolicy"]; SDom["SiteDomains"]
+        HPP["HomePagePolicy"]; WEP["WebEnginePolicy"]
     end
 
     subgraph REPO["Repository (suspend)"]
