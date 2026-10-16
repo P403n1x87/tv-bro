@@ -19,7 +19,6 @@ import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
 import android.os.Process
-import android.provider.Settings
 import android.util.Log
 import android.util.Patterns
 import android.view.Gravity
@@ -48,7 +47,6 @@ import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.phlox.tvwebbrowser.AppContext
-import com.phlox.tvwebbrowser.BuildConfig
 import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.TVBro
@@ -71,6 +69,7 @@ import com.phlox.tvwebbrowser.model.WebTabState
 import com.phlox.tvwebbrowser.singleton.shortcuts.ShortcutMgr
 import com.phlox.tvwebbrowser.utils.BackNavigationEventsAdapter
 import com.phlox.tvwebbrowser.utils.BaseAnimationListener
+import com.phlox.tvwebbrowser.utils.InstallPermissionHelper
 import com.phlox.tvwebbrowser.utils.Utils
 import com.phlox.tvwebbrowser.utils.UpdateChecker
 import com.phlox.tvwebbrowser.utils.VoiceSearchHelper
@@ -100,7 +99,6 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         private val TAG = MainActivity::class.java.simpleName
         const val VOICE_SEARCH_REQUEST_CODE = 10001
         const val PICK_FILE_REQUEST_CODE = 10005
-        const val REQUEST_CODE_UNKNOWN_APP_SOURCES = 10007
         const val KEY_PROCESS_ID_TO_KILL = "proc_id_to_kill"
         private const val MY_PERMISSIONS_REQUEST_VOICE_SEARCH_PERMISSIONS = 10008
     }
@@ -679,12 +677,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
 
     override val isScreenFinishing: Boolean get() = isFinishing
 
-    override fun canInstallPackages(): Boolean =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            packageManager.canRequestPackageInstalls()
-        } else {
-            Settings.Secure.getInt(contentResolver, Settings.Secure.INSTALL_NON_MARKET_APPS) == 1
-        }
+    override fun canInstallPackages(): Boolean = InstallPermissionHelper.canInstallPackages(this)
 
     override fun showUpdateDialog(onDownload: () -> Unit, onSettings: () -> Unit) {
         autoUpdateModel.updateChecker.showUpdateDialog(this, object : UpdateChecker.DialogCallback {
@@ -695,33 +688,11 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     }
 
     override fun showUnknownSourcesDialog(onConfirm: () -> Unit) {
-        AlertDialog.Builder(this)
-            .setTitle(R.string.app_name)
-            .setMessage(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                R.string.turn_on_unknown_sources_for_app else R.string.turn_on_unknown_sources)
-            .setPositiveButton(android.R.string.ok) { _, _ -> onConfirm() }
-            .setNegativeButton(android.R.string.cancel) { _, _ -> }
-            .show()
+        InstallPermissionHelper.showEnableUnknownSourcesDialog(this, onConfirm)
     }
 
-    override fun openInstallPermissionSettings(): Boolean {
-        val intent = Intent()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            intent.action = Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES
-            intent.data = Uri.parse("package:${BuildConfig.APPLICATION_ID}")
-        } else {
-            intent.action = Settings.ACTION_SECURITY_SETTINGS
-        }
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK)
-        return try {
-            startActivityForResult(intent, REQUEST_CODE_UNKNOWN_APP_SOURCES)
-            true
-        } catch (e: Exception) {
-            e.printStackTrace()
-            Toast.makeText(this, R.string.error, Toast.LENGTH_SHORT).show()
-            false
-        }
-    }
+    override fun openInstallPermissionSettings(): Boolean =
+        InstallPermissionHelper.openUnknownSourcesSettings(this)
 
     override fun downloadUpdate() {
         autoUpdateModel.modelScope.launch(Dispatchers.Main) {
@@ -864,7 +835,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
             }
             IntentHandler.REQUEST_CODE_HISTORY_ACTIVITY ->
                 intentHandler.handleHistoryResult(resultCode, data)
-            REQUEST_CODE_UNKNOWN_APP_SOURCES -> if (autoUpdateModel.needToShowUpdateDlgAgain) {
+            InstallPermissionHelper.REQUEST_CODE_UNKNOWN_APP_SOURCES -> if (autoUpdateModel.needToShowUpdateDlgAgain) {
                 autoUpdateModel.showUpdateDialogIfNeeded(this)
             }
 

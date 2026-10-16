@@ -14,6 +14,7 @@ import com.phlox.tvwebbrowser.singleton.AppDatabase
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -40,14 +41,20 @@ class MainActivityViewModelTest {
     private lateinit var db: AppDatabase
     private lateinit var favorites: FavoritesRepository
     private lateinit var history: HistoryRepository
+    private lateinit var config: Config
     private lateinit var viewModel: MainActivityViewModel
+    private val webViewDataDirs = FakeWebViewDataDirManager()
 
     private val directExecutor = Executor { it.run() }
 
     @Before
     fun setUp() {
         val app = RuntimeEnvironment.getApplication()
-        AppContext.init(app, Config(app.getSharedPreferences("main_test", Context.MODE_PRIVATE)))
+        config = Config(app.getSharedPreferences("main_test", Context.MODE_PRIVATE))
+        AppContext.init(app, config)
+        // The incognito tests only exercise the WebView branch; pin the engine so the outcome does
+        // not depend on what the host recommends.
+        config.webEngine = Config.ENGINE_WEB_VIEW
         db = Room.inMemoryDatabaseBuilder(app, AppDatabase::class.java)
             .allowMainThreadQueries()
             .setQueryExecutor(directExecutor)
@@ -58,6 +65,7 @@ class MainActivityViewModelTest {
         viewModel = MainActivityViewModel(
             favorites = favorites,
             history = history,
+            webViewDataDirs = webViewDataDirs,
         )
     }
 
@@ -176,5 +184,77 @@ class MainActivityViewModelTest {
         assertEquals("After", stored.single().title)
         assertEquals("https://after.example/", stored.single().url)
         assertEquals(listOf("https://after.example/"), viewModel.homePageLinks.map { it.url })
+    }
+
+    // ---- incognito mode: the cleanup order and the WebView data-dir seam ----------------------
+
+    @Test
+    fun leavingIncognitoClearsTheEngineThenTabsThenTheIsolatedData() = runBlocking {
+        config.incognitoMode = true
+        val closed = mutableListOf<String>()
+
+        val becomingIncognitoMode = viewModel.toggleIncognitoMode(
+            clearEngineSession = { closed += "engine" },
+            clearOpenTabs = { closed += "tabs" },
+        )
+
+        assertFalse(becomingIncognitoMode)
+        assertEquals(listOf("engine", "tabs"), closed)
+        assertEquals("the isolated WebView directories are wiped last", 1, webViewDataDirs.cleared)
+        assertFalse(config.incognitoMode)
+    }
+
+    @Test
+    fun enteringIncognitoOnlyFlipsTheMode() = runBlocking {
+        config.incognitoMode = false
+        val closed = mutableListOf<String>()
+
+        val becomingIncognitoMode = viewModel.toggleIncognitoMode(
+            clearEngineSession = { closed += "engine" },
+            clearOpenTabs = { closed += "tabs" },
+        )
+
+        assertTrue(becomingIncognitoMode)
+        assertTrue("entering the mode closes nothing", closed.isEmpty())
+        assertEquals(0, webViewDataDirs.cleared)
+        assertTrue(config.incognitoMode)
+    }
+
+    @Test
+    fun prepareSwitchToIncognitoMovesTheWebViewDataAside() {
+        viewModel.prepareSwitchToIncognito()
+
+        assertEquals(1, webViewDataDirs.prepared)
+    }
+
+    @Test
+    fun geckoNeedsNeitherTheWebViewDataDirsNorAnEngineClear() = runBlocking {
+        config.webEngine = Config.ENGINE_GECKO_VIEW
+        config.incognitoMode = true
+        val closed = mutableListOf<String>()
+
+        viewModel.toggleIncognitoMode(
+            clearEngineSession = { closed += "engine" },
+            clearOpenTabs = { closed += "tabs" },
+        )
+
+        assertEquals("only the open tabs are closed", listOf("tabs"), closed)
+        assertEquals(0, webViewDataDirs.cleared)
+
+        viewModel.prepareSwitchToIncognito()
+        assertEquals(0, webViewDataDirs.prepared)
+    }
+
+    private class FakeWebViewDataDirManager : WebViewDataDirManager {
+        var prepared = 0
+        var cleared = 0
+
+        override fun prepareIncognitoSession() {
+            prepared++
+        }
+
+        override fun clearIncognitoData() {
+            cleared++
+        }
     }
 }

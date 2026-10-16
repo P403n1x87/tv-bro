@@ -7,7 +7,6 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.os.*
-import android.provider.Settings
 import android.text.format.Formatter
 import android.util.Log
 import android.webkit.MimeTypeMap
@@ -19,6 +18,7 @@ import com.phlox.tvwebbrowser.TVBro
 import com.phlox.tvwebbrowser.activity.downloads.ActiveDownloadsModel
 import com.phlox.tvwebbrowser.model.Download
 import com.phlox.tvwebbrowser.repository.Repositories
+import com.phlox.tvwebbrowser.utils.InstallPermissionHelper
 import com.phlox.tvwebbrowser.utils.activemodel.ActiveModelsRepository
 import kotlinx.coroutines.runBlocking
 import java.io.File
@@ -127,12 +127,7 @@ class DownloadService : Service() {
     private fun onTaskEnded(task: DownloadTask) {
         when (task.downloadInfo.operationAfterDownload) {
             Download.OperationAfterDownload.INSTALL -> {
-                val canInstallFromOtherSources = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    packageManager.canRequestPackageInstalls()
-                } else {
-                    Settings.Secure.getInt(this.contentResolver, Settings.Secure.INSTALL_NON_MARKET_APPS) == 1
-                }
-                if (canInstallFromOtherSources) {
+                if (InstallPermissionHelper.canInstallPackages(this)) {
                     launchInstallAPKActivity(this, task.downloadInfo)
                 }
             }
