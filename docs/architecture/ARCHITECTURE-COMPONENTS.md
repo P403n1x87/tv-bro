@@ -1,0 +1,72 @@
+# Architecture - Layered View with Component Descriptions
+
+This document gives a more layered visualisation with brief descriptions of each main component.
+
+## Layer 1 - UI (Presentation Layer)
+| Component | Purpose | Key Notes |
+|---|---|---|
+| **MainActivity** | Root activity; implements `WebEngineCallbackHost`. Orchestrates UI state, panels, toolbar, permissions, fullscreen, intents. | Largest component (host seam). Reads config only for pre-model engine checks (deliberate). Observes presentation models. |
+| **HistoryActivity** | History list with search (voice), multi-select delete, infinite scroll. | Binds to `HistoryModel`; forwards selection to caller via result. |
+| **DownloadsActivity** | Active + completed downloads, open/install APK, open folder, cancel/delete. | Binds to `ActiveDownloadsModel` + `DownloadsHistoryModel`. |
+| **ActionBar/View Layer** (ActionBar, TabsView, BookmarksPanelView) | Toolbar, tabs panel (RecyclerView), bookmarks panel (RecyclerView + "Add this page"). | Observes models; uses `PanelRowFocusDelegate`/`RowFocusPanel` for deterministic D-pad row focus. Never touches repositories. |
+| **SettingsDialog/Pages** | 7-category settings rendered declaratively via `SettingsItem` + `SettingsRowFactory`. | View-only; writes via model properties or model methods. Rebuilds keeping focused row. |
+
+## Layer 2 - Presentation Models (ActiveModel)
+| Component | Purpose | Key Notes |
+|---|---|---|
+| **TabsModel** | Manages open tabs, current selection, persistence, lifecycle (pause/save/detach). | Exposes `tabsStates` (ObservableList), `currentTab` (ObservableValue). Provides intents: `onOpenTab`, `onCloseTab`, `onToggleAdBlock`, `moveTab`, `changeTab`. |
+| **MainActivityViewModel** | Home page links/bookmarks, history logging (debounced), incognito mode cleanup/switch orchestration. | Owns `bookmarks` and `currentPageBookmarked`. Handles WebView data dir isolation across API levels. |
+| **SettingsModel** | App settings as observables backed by `Config`. | Exposes observable prefs (theme, keepToolbarOpen, userAgentString). View assigns = intent. |
+| **AdblockModel** | Brave adblock client lifecycle, loading/filter matching. | Loads/updates EasyList; maps request types to filter options. Emits state via observables; UI side effects handled via host/events. |
+| **AutoUpdateModel** | Update checking, state, dialog/action orchestration. | Checks GitHub Releases (semver-aware), manages auto-check cadence; exposes `isUpdateAvailable()`. |
+| **HistoryModel** | Paginated history list/search. | `loadItems(offset)` or search; owns `lastLoadedItems`. Repository injected with default. |
+| **DownloadsHistoryModel** | Paginated completed downloads. | Tracks all loaded items + last page. |
+| **ActiveDownloadsModel** | Active download tasks + listener registry. | Coordinates cancel/update/error/all-complete notifications. |
+
+## Layer 3 - Domain (pure, framework-free)
+| Component | Purpose | Key Notes |
+|---|---|---|
+| **NavigationPolicy** | Scheme routing (engine-only vs external intent vs network) + automatic-redirect blocking. | Pure decisions; host does Android plumbing (Uri/intent resolution). |
+| **PopupPolicy** | Popup/dialog blocking decision by host config level. | Pure. |
+| **NewTabPositionPolicy** | Computes new tab insertion index (after requesting tab, else append). | Pure; used by adapter and host paths. |
+| **AddressInputPolicy** | Resolves typed input to URL (search or direct). | Pure. |
+| **UrlNormalizer** | Normalizes URLs. | Pure. |
+| **LinkActionPolicy** | Determines link target/action eligibility (HTTP URL checks). | Pure. |
+| **SiteDomains** | Same-site/domain comparison for cross-site checks. | Pure. |
+
+## Layer 4 - Repository (suspend-only)
+| Component | Purpose | Key Notes |
+|---|---|---|
+| **Repositories** | Manual DI container (lazy singletons). Wires DAOs → Repos. | Single construction point; models use ctor defaults. |
+| **HistoryRepository** | History CRUD + search + pagination + deleteByUrl (dedup). | All suspend. `search(q,q)` with DAO LIKE (exact substring; behavior pinned). |
+| **FavoritesRepository** | Bookmarks CRUD + lookup by URL/id + useful marker. | Indexed by URL (favorites_url_idx). |
+| **TabsRepository** | Tabs CRUD, positions, unselect-all, bulk delete. | Persists tab state metadata. |
+| **DownloadsRepository** | Downloads CRUD + pagination. | Persists download entries. |
+| **HostsRepository** | Host configs (per-host settings, favicons). | Upsert/find by hostname (unique). |
+
+## Layer 5 - Data (Room/DAOs)
+| Component | Purpose | Key Notes |
+|---|---|---|
+| **AppDatabase** | Room DB (entities: HistoryItem, FavoriteItem, WebTabState, Download, HostConfig). | Migrations include favorites URL index. |
+| **HistoryDao** | Queries: count, last, allByLimitOffset, search (LIKE), getAll, insert/update/delete variants. | deleteByUrl used for history uniqueness (latest visit wins). |
+| **FavoritesDao** | Bookmarks queries (all, byId/byUrl, insert/update/delete, markAsUseful). | has index on URL. |
+| **TabsDao** | Tabs persistence (all by incognito, update positions, delete/unselect). | |
+| **DownloadDao** | Downloads (all by limit/offset, insert/update/delete). | |
+| **HostsDao** | Host lookup/upsert/update. | Unique host_name. |
+
+## Layer 6 - Engine
+| Component | Purpose | Key Notes |
+|---|---|---|
+| **WebEngine** | Interface abstracting WebView/GeckoView. | View lifecycle, navigation, JS, media, virtual cursor, thumbnails. |
+| **WebViewWebEngine** | WebView implementation. | Document-start overlay zapper (when supported), media candidate detection (incl. query-param manifests), prefetch metadata. |
+| **GeckoWebEngine** | GeckoView implementation. | Delegates-based (Content/Navigation/Media/etc.), media candidate extraction, prefetch metadata. |
+| **WebEngineCallback** | Per-tab adapter: policy + model updates. | Plain class; injected models; talks to UI via host. Delegates to domain where pure. Uses runBlocking only for synchronous popup decision (documented). |
+| **WebEngineWindowProviderCallback** | Engine→app callback interface. | Defines host-facing operations engine needs. |
+
+## Layer 7 - Service/Application
+| Component | Purpose | Key Notes |
+|---|---|---|
+| **TVBro** | Application class. Wires Repositories, initializes ActiveModelsRepository, sets theme, registers lifecycle callbacks. | Initializes engine classes, LocalAssetServer, thread pool. |
+| **ActiveModelsRepository** | Lifecycle-scoped holder of ActiveModel instances (by class). | Reflection-based construction with declared no-arg ctor (defaults). Clears models when last user gone (Activity finishing). |
+| **DownloadService** | Foreground service managing downloads. | Uses Repositories/DownloadTask. |
+| **DownloadTask** | Background download task implementation(s). | Reports progress/state to listeners; updates Download entity. |

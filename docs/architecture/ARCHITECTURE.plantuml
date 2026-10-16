@@ -1,0 +1,156 @@
+@startuml
+!theme plain
+skinparam componentStyle rectangle
+skinparam shadowing false
+
+title TV-Bro Architecture (post-MVVM refactor)
+
+package "UI (Activities/Views)" {
+  [MainActivity] as MA
+  [HistoryActivity] as HA
+  [DownloadsActivity] as DA
+  [ActionBar/TabsView/BookmarksPanelView] as AB
+  [SettingsDialog + SettingsPages] as SD
+}
+
+package "Presentation Models (ActiveModel)" {
+  [TabsModel] as TVM
+  [MainActivityViewModel] as MVM
+  [SettingsModel] as SM
+  [AdblockModel] as ABM
+  [AutoUpdateModel] as AUM
+  [HistoryModel] as HM
+  [DownloadsHistoryModel] as ADHM
+  [ActiveDownloadsModel] as ADAM
+}
+
+package "Domain (pure)" {
+  [NavigationPolicy] as NP
+  [PopupPolicy] as PP
+  [NewTabPositionPolicy] as NTP
+  [AddressInputPolicy] as AIP
+  [UrlNormalizer] as UN
+  [LinkActionPolicy] as LAP
+  [SiteDomains] as SDom
+}
+
+package "Repository (suspend)" {
+  [Repositories] as R
+  [HistoryRepository] as HR
+  [FavoritesRepository] as FR
+  [TabsRepository] as TR
+  [DownloadsRepository] as DR
+  [HostsRepository] as HstR
+}
+
+package "Data (Room/DAOs)" {
+  [AppDatabase] as DB
+  [HistoryDao] as HDao
+  [FavoritesDao] as FDao
+  [TabsDao] as TDao
+  [DownloadDao] as DDao
+  [HostsDao] as HostDao
+}
+
+package "Engine" {
+  [WebEngine] as WIF
+  [WebViewWebEngine] as WV
+  [GeckoWebEngine] as GV
+  [WebEngineCallback] as WECB
+  [WebEngineWindowProviderCallback] as WEH
+}
+
+package "Service" {
+  [TVBro] as TVB
+  [DownloadService] as DS
+  [DownloadTask] as DT
+}
+
+[ActiveModelsRepository] as AMR
+
+' UI -> models
+MA --> AMR
+HA --> AMR
+DA --> AMR
+SD --> MVM
+SD --> SM
+SD --> ABM
+SD --> AUM
+AB --> TVM
+
+AMR --> TVM
+AMR --> MVM
+AMR --> SM
+AMR --> ABM
+AMR --> AUM
+AMR --> HM
+AMR --> ADHM
+AMR --> ADAM
+
+' Engine seam
+MA .right.> WECB : owns
+WECB ..> MA : host calls
+WECB --> TVM
+WECB --> MVM
+WECB --> SM
+WECB --> ABM
+WECB --> NP
+WECB --> PP
+WECB --> NTP
+WECB --> SDom
+WECB ..> WEH
+WV ..|> WIF
+GV ..|> WIF
+WV --> WEH
+GV --> WEH
+
+' Data
+TVM --> TR
+TVM --> HstR
+MVM --> FR
+MVM --> HR
+HM --> HR
+ADHM --> DR
+ADAM --> DR
+R --> HR
+R --> FR
+R --> TR
+R --> DR
+R --> HstR
+HR --> HDao
+FR --> FDao
+TR --> TDao
+DR --> DDao
+HstR --> HostDao
+DB --> HDao
+DB --> FDao
+DB --> TDao
+DB --> DDao
+DB --> HostDao
+
+' Services
+TVB --> R
+TVB --> AMR
+DS --> DR
+DT --> DR
+
+' Observables
+MA <.. MVM : observes
+MA <.. TVM : observes
+MA <.. SM : observes
+HA <.. HM : observes
+DA <.. ADHM : observes
+DA <.. ADAM : observes
+AB <.. TVM : observes
+SD <.. SM : observes
+SD <.. ABM : observes
+SD <.. AUM : observes
+
+MA --> TVM : intents
+MA --> MVM : intents
+HA --> HM : intents
+DA --> ADAM : intents
+SD --> SM : intents
+AB --> TVM : intents
+
+@enduml

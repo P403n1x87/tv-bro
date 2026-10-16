@@ -1,0 +1,148 @@
+@startuml
+!theme plain
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam nodesep 30
+skinparam ranksep 40
+
+title TV-Bro Architecture - Layered View
+
+package "1. UI Layer" {
+  [MainActivity\n(implements WebEngineCallbackHost\n+ lifecycle + panels + permissions)] as MA
+  [HistoryActivity\n(list + search + multi-select)] as HA
+  [DownloadsActivity\n(active + history + actions)] as DA
+  [ActionBar/View Layer\n(TabsView, BookmarksPanelView, ActionBar)] as AB
+  [SettingsDialog/Pages\n(declarative SettingsItem)] as SD
+}
+
+package "2. Presentation Models (ActiveModel)" {
+  [TabsModel\n(tabs state, current tab,\nopen/close/switch)] as TVM
+  [MainActivityViewModel\n(homepage links, bookmarks,\nhistory log, incognito cleanup)] as MVM
+  [SettingsModel\n(config-backed observables,\nuser prefs)] as SM
+  [AdblockModel\n(adblock client, rules)] as ABM
+  [AutoUpdateModel\n(update checks/state)] as AUM
+  [HistoryModel\n(paginated search/list)] as HM
+  [DownloadsHistoryModel\n(paginated history)] as ADHM
+  [ActiveDownloadsModel\n(active tasks + listeners)] as ADAM
+}
+
+package "3. Domain (pure, framework-free)" {
+  [NavigationPolicy\n(scheme routing + redirect blocking)] as NP
+  [PopupPolicy\n(popup blocking rules)] as PP
+  [NewTabPositionPolicy\n(new tab insertion index)] as NTP
+  [AddressInputPolicy\n(URL/search resolution)] as AIP
+  [UrlNormalizer\n(URL normalization)] as UN
+  [LinkActionPolicy\n(link action decisions)] as LAP
+  [SiteDomains\n(same-site/domain checks)] as SDom
+}
+
+package "4. Repository (suspend-only)" {
+  [Repositories\n(manual DI container, lazy)] as R
+  [HistoryRepository] as HR
+  [FavoritesRepository] as FR
+  [TabsRepository] as TR
+  [DownloadsRepository] as DR
+  [HostsRepository] as HstR
+}
+
+package "5. Data (Room)" {
+  [AppDatabase] as DB
+  [HistoryDao] as HDao
+  [FavoritesDao] as FDao
+  [TabsDao] as TDao
+  [DownloadDao] as DDao
+  [HostsDao] as HostDao
+}
+
+package "6. Engine" {
+  [WebEngine\n(interface)] as WIF
+  [WebViewWebEngine] as WV
+  [GeckoWebEngine] as GV
+  [WebEngineCallback\n(per-tab adapter, injected models)] as WECB
+  [WebEngineWindowProviderCallback\n(engine<->app)] as WEH
+}
+
+package "7. Service/Application" {
+  [TVBro\n(Application, wiring)] as TVB
+  [DownloadService] as DS
+  [DownloadTask] as DT
+  [ActiveModelsRepository\n(lifecycle-scoped holders)] as AMR
+}
+
+' Dependencies (top -> down, UI depends on models via AMR/observables)
+MA --> AMR
+HA --> AMR
+DA --> AMR
+AB --> TVM
+SD --> SM
+SD --> ABM
+SD --> AUM
+SD --> MVM
+
+AMR --> TVM
+AMR --> MVM
+AMR --> SM
+AMR --> ABM
+AMR --> AUM
+AMR --> HM
+AMR --> ADHM
+AMR --> ADAM
+
+TVM --> R
+MVM --> R
+HM --> R
+ADHM --> R
+ADAM --> R
+
+R --> HR
+R --> FR
+R --> TR
+R --> DR
+R --> HstR
+
+HR --> HDao
+FR --> FDao
+TR --> TDao
+DR --> DDao
+HstR --> HostDao
+
+DB --> HDao
+DB --> FDao
+DB --> TDao
+DB --> DDao
+DB --> HostDao
+
+' Engine seam
+MA ..> WECB : host (implements WebEngineCallbackHost)
+WECB --> TVM
+WECB --> MVM
+WECB --> SM
+WECB --> ABM
+WECB --> NP
+WECB --> PP
+WECB --> NTP
+WECB --> SDom
+WV ..|> WIF
+GV ..|> WIF
+WV --> WEH
+GV --> WEH
+WECB ..> WEH
+
+' Services
+TVB --> R
+TVB --> AMR
+DS --> DR
+DT --> DR
+
+' Observables (back up)
+TVM ..> AB : observable state
+MVM ..> MA : observable state
+SM ..> MA : observable
+SM ..> SD : observable
+ABM ..> SD : observable
+AUM ..> SD : observable
+HM ..> HA : observable
+ADHM ..> DA : observable
+ADAM ..> DA : observable
+
+@enduml
