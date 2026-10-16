@@ -3,16 +3,13 @@ package com.phlox.tvwebbrowser.service.downloads
 import android.app.Notification
 import android.app.NotificationManager
 import android.app.Service
-import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.os.*
 import android.text.format.Formatter
 import android.util.Log
-import android.webkit.MimeTypeMap
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
-import androidx.core.content.FileProvider
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.TVBro
 import com.phlox.tvwebbrowser.activity.downloads.ActiveDownloadsModel
@@ -128,7 +125,7 @@ class DownloadService : Service() {
         when (task.downloadInfo.operationAfterDownload) {
             Download.OperationAfterDownload.INSTALL -> {
                 if (InstallPermissionHelper.canInstallPackages(this)) {
-                    launchInstallAPKActivity(this, task.downloadInfo)
+                    InstallPermissionHelper.launchInstaller(this, task.downloadInfo.filepath)
                 }
             }
             Download.OperationAfterDownload.NOP -> {
@@ -138,23 +135,6 @@ class DownloadService : Service() {
         if (model.activeDownloads.isEmpty()) {
             stopForeground(true)
             stopSelf()
-        }
-    }
-
-    fun launchInstallAPKActivity(context: Context, download: Download) {
-        val file = File(download.filepath)
-        val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(file.extension)
-        val apkURI = FileProvider.getUriForFile(
-                context,
-                context.applicationContext.packageName + ".provider", file)
-
-        val install = Intent(Intent.ACTION_INSTALL_PACKAGE)
-        install.setDataAndType(apkURI, mimeType)
-        install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        try {
-            context.startActivity(install)
-        } catch (e: ActivityNotFoundException) {
-            Toast.makeText(context, R.string.error, Toast.LENGTH_SHORT).show()
         }
     }
 

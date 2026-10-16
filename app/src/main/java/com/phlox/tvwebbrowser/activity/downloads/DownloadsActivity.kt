@@ -1,6 +1,5 @@
 package com.phlox.tvwebbrowser.activity.downloads
 
-import android.app.Activity
 import android.content.*
 import android.net.Uri
 import android.os.Build
@@ -10,11 +9,9 @@ import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
 import android.view.View
-import android.webkit.MimeTypeMap
 import android.widget.AbsListView
 import android.widget.AdapterView
 import android.widget.PopupMenu
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
@@ -186,7 +183,7 @@ class DownloadsActivity : AppCompatActivity(), AdapterView.OnItemClickListener, 
             Settings.Secure.getInt(contentResolver, Settings.Secure.INSTALL_NON_MARKET_APPS) == 1
 
         if (canInstallFromOtherSources) {
-            launchInstallAPKActivity(this, download)
+            InstallPermissionHelper.launchInstaller(this, download.filepath)
         } else {
             InstallPermissionHelper.showEnableUnknownSourcesDialog(this) {
                 InstallPermissionHelper.openUnknownSourcesSettings(this)
@@ -235,29 +232,6 @@ class DownloadsActivity : AppCompatActivity(), AdapterView.OnItemClickListener, 
     }
 
     companion object {
-        private const val REQUEST_CODE_INSTALL_PACKAGE = 10008
         val TAG: String = DownloadsActivity::class.java.simpleName
-
-        fun launchInstallAPKActivity(activity: Activity, download: Download) {
-            val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension("apk")
-            val apkURI = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                Uri.parse(download.filepath)
-            } else {
-                val file = File(download.filepath)
-                FileProvider.getUriForFile(
-                    activity,
-                    activity.applicationContext.packageName + ".provider", file
-                )
-            }
-
-            val install = Intent(Intent.ACTION_INSTALL_PACKAGE)
-            install.setDataAndType(apkURI, mimeType)
-            install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            try {
-                activity.startActivityForResult(install, REQUEST_CODE_INSTALL_PACKAGE)//we are not using result for now
-            } catch (e: Exception) {
-                Toast.makeText(activity, R.string.error, Toast.LENGTH_SHORT).show()
-            }
-        }
     }
 }

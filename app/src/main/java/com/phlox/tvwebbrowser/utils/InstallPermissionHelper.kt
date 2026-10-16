@@ -7,9 +7,12 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.webkit.MimeTypeMap
 import android.widget.Toast
+import androidx.core.content.FileProvider
 import com.phlox.tvwebbrowser.BuildConfig
 import com.phlox.tvwebbrowser.R
+import java.io.File
 
 /**
  * The "the app is about to install an APK" permission flow, shared by the screens and the download
@@ -63,6 +66,35 @@ object InstallPermissionHelper {
             .setPositiveButton(android.R.string.ok) { _, _ -> onConfirm() }
             .setNegativeButton(android.R.string.cancel) { _, _ -> }
             .show()
+    }
+
+    /**
+     * Hands the downloaded APK at [filePath] to the system installer.
+     *
+     * From API 30 the download goes through MediaStore, so [filePath] is already a `content://` Uri;
+     * below that it is a filesystem path the installer can only read through this app's FileProvider.
+     * A Service cannot start an activity without `NEW_TASK`, so it is added when [context] is not an
+     * Activity. Failures are reported here.
+     */
+    fun launchInstaller(context: Context, filePath: String) {
+        val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Uri.parse(filePath)
+        } else {
+            FileProvider.getUriForFile(context, context.packageName + ".provider", File(filePath))
+        }
+        val install = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
+            setDataAndType(uri, MimeTypeMap.getSingleton().getMimeTypeFromExtension("apk"))
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            if (context !is Activity) {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        }
+        try {
+            context.startActivity(install)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Toast.makeText(context, R.string.error, Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun unknownSourcesIntent(): Intent {
