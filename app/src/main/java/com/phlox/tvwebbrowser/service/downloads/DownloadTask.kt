@@ -10,8 +10,9 @@ import android.util.Log
 import android.webkit.CookieManager
 import com.phlox.tvwebbrowser.TVBro
 import com.phlox.tvwebbrowser.model.Download
-import com.phlox.tvwebbrowser.singleton.AppDatabase
+import com.phlox.tvwebbrowser.repository.Repositories
 import com.phlox.tvwebbrowser.utils.DownloadUtils
+import kotlinx.coroutines.runBlocking
 import java.io.*
 import java.net.HttpURLConnection
 import java.net.URL
@@ -38,7 +39,7 @@ class FileDownloadTask(override var downloadInfo: Download, private val userAgen
     }
 
     override fun run() {
-        downloadInfo.id = AppDatabase.db.downloadDao().insert(downloadInfo)
+        downloadInfo.id = runBlocking { Repositories.downloads.add(downloadInfo) }
 
         var input: InputStream? = null
         var output: OutputStream? = null
@@ -137,7 +138,7 @@ class FileDownloadTask(override var downloadInfo: Download, private val userAgen
 class BlobDownloadTask(override var downloadInfo: Download, val blobBase64Data: String, val callback: DownloadTask.Callback) : Runnable, DownloadTask {
 
     override fun run() {
-        downloadInfo.id = AppDatabase.db.downloadDao().insert(downloadInfo)
+        downloadInfo.id = runBlocking { Repositories.downloads.add(downloadInfo) }
 
         try {
             val blobAsBytes: ByteArray = Base64.decode(blobBase64Data.replaceFirst("data:${downloadInfo.mimeType};base64,", ""), 0)
@@ -158,7 +159,7 @@ class BlobDownloadTask(override var downloadInfo: Download, val blobBase64Data: 
 
 class StreamDownloadTask(override var downloadInfo: Download, val stream: InputStream, val callback: DownloadTask.Callback) : Runnable, DownloadTask {
     override fun run() {
-        downloadInfo.id = AppDatabase.db.downloadDao().insert(downloadInfo)
+        downloadInfo.id = runBlocking { Repositories.downloads.add(downloadInfo) }
 
         var output: OutputStream? = null
         try {
@@ -238,7 +239,7 @@ private fun prepareDownloadOutput(downloadInfo: Download): OutputStream {
         }
         val fd = contentResolver.openFileDescriptor(downloadUri, "w", null)
         downloadInfo.filepath = downloadUri.toString()
-        AppDatabase.db.downloadDao().update(downloadInfo)
+        runBlocking { Repositories.downloads.update(downloadInfo) }
         AutoCloseOutputStream(fd)
     } else {
         FileOutputStream(downloadInfo.filepath)

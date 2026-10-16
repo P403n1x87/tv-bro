@@ -17,7 +17,7 @@ class IncognitoModeMainActivity: MainActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         Log.d(TAG, "onCreate")
         super.onCreate(savedInstanceState)
-        if (!config.incognitoModeHintSuppress) {
+        if (!settingsModel.incognitoModeHintSuppress) {
             showIncognitoModeHintDialog()
         }
     }
@@ -36,7 +36,7 @@ class IncognitoModeMainActivity: MainActivity() {
             .setMessage(R.string.incognito_mode_hint)
             .setPositiveButton(android.R.string.ok) { dialog, _ -> dialog.dismiss() }
             .setNeutralButton(R.string.don_t_show_again) { dialog, _ ->
-                config.incognitoModeHintSuppress = true
+                settingsModel.incognitoModeHintSuppress = true
                 dialog.dismiss()
             }
             .show()

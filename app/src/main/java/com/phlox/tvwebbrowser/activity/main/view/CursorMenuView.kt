@@ -14,7 +14,6 @@ import android.view.animation.AccelerateInterpolator
 import android.view.animation.OvershootInterpolator
 import android.widget.CheckBox
 import android.widget.FrameLayout
-import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.databinding.ViewCursorMenuBinding
 import com.phlox.tvwebbrowser.utils.dip2px
@@ -32,6 +31,12 @@ class CursorMenuView @JvmOverloads constructor(
     private var menuContext: MenuContext? = null
     private var handler = Handler(Looper.getMainLooper())
     private var lastShowTime = 0L
+
+    /** Host-provided: whether the user already dismissed the "direct navigation" hint. */
+    var shouldSuppressDirectNavigationHint: () -> Boolean = { false }
+
+    /** Host-provided: called when the user asks not to see the "direct navigation" hint again. */
+    var onDirectNavigationHintSuppressed: () -> Unit = {}
 
     init {
         vb.btnGrabMode.setOnClickListener {
@@ -64,7 +69,7 @@ class CursorMenuView @JvmOverloads constructor(
             if (hasFocus) {
                 postDelayed({
                     val mc = menuContext ?: return@postDelayed
-                    if (AppContext.provideConfig().directNavigationModeHintSuppress) {
+                    if (shouldSuppressDirectNavigationHint()) {
                         enterDirectNavigationMode(mc)
                         close(CloseAnimation.FADE_OUT)
                     } else {
@@ -221,7 +226,7 @@ class CursorMenuView @JvmOverloads constructor(
             .setView(container)
             .setPositiveButton(android.R.string.ok) { _, _ ->
                 if (checkBox.isChecked) {
-                    AppContext.provideConfig().directNavigationModeHintSuppress = true
+                    onDirectNavigationHintSuppressed()
                 }
                 enterDirectNavigationMode(mc)
             }

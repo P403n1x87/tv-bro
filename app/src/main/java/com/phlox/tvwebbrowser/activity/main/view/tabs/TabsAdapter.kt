@@ -49,7 +49,8 @@ class TabsAdapter(private val tabsView: TabsView) : RecyclerView.Adapter<TabView
         fun onTitleSelected(index: Int)
         fun onAddNewTabSelected()
         fun closeTab(tabState: WebTabState?)
-        fun openInNewTab(url: String, tabIndex: Int)
+        /** A new tab was asked for at [tabIndex]; what it opens with is the owner's business. */
+        fun onNewTabRequested(tabIndex: Int)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): TabViewHolder {

@@ -1,16 +1,14 @@
 package com.phlox.tvwebbrowser.activity.main.dialogs.settings
 
 import android.content.Context
-import android.util.AttributeSet
-import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.Config.PlayerKind
 import com.phlox.tvwebbrowser.R
 
-class PlaybackSettingsView @JvmOverloads constructor(
-    context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
-) : SettingsPageView(context, attrs, defStyleAttr) {
+class PlaybackSettingsView(
+    context: Context, private val deps: SettingsDeps
+) : SettingsPageView(context) {
 
-    private val config = AppContext.provideConfig()
+    private val settingsModel = deps.settings
 
     init {
         setItems(buildItems())
@@ -22,8 +20,8 @@ class PlaybackSettingsView @JvmOverloads constructor(
                 iconRes = R.drawable.ic_settings_play_24dp,
                 titleRes = R.string.allow_autoplay_media,
                 summaryRes = R.string.allow_autoplay_media_summary,
-                isChecked = { config.allowAutoplayMedia },
-                onCheckedChange = { config.allowAutoplayMedia = it }
+                isChecked = { settingsModel.allowAutoplayMedia },
+                onCheckedChange = { settingsModel.allowAutoplayMedia = it }
             )
         )
         add(
@@ -31,11 +29,11 @@ class PlaybackSettingsView @JvmOverloads constructor(
                 iconRes = R.drawable.ic_settings_play_24dp,
                 titleRes = R.string.settings_video_player,
                 summaryRes = R.string.settings_video_player_summary,
-                value = { playerLabels()[config.playerKind.ordinal] },
+                value = { playerLabels()[settingsModel.playerKind.ordinal] },
                 entries = { playerLabels() },
-                selectedIndex = { config.playerKind.ordinal },
+                selectedIndex = { settingsModel.playerKind.ordinal },
                 onSelected = {
-                    config.playerKind = PlayerKind.entries[it]
+                    settingsModel.playerKind = PlayerKind.entries[it]
                     rebuild()
                 }
             )

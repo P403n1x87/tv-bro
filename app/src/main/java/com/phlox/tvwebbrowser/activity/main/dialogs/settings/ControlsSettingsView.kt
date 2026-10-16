@@ -1,18 +1,16 @@
 package com.phlox.tvwebbrowser.activity.main.dialogs.settings
 
 import android.content.Context
-import android.util.AttributeSet
-import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.activity.main.dialogs.ShortcutDialog
 import com.phlox.tvwebbrowser.singleton.shortcuts.Shortcut
 
-class ControlsSettingsView @JvmOverloads constructor(
-    context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
-) : SettingsPageView(context, attrs, defStyleAttr) {
+class ControlsSettingsView(
+    context: Context, private val deps: SettingsDeps
+) : SettingsPageView(context) {
 
-    private val config = AppContext.provideConfig()
+    private val settingsModel = deps.settings
 
     init {
         setItems(buildItems())
@@ -24,8 +22,8 @@ class ControlsSettingsView @JvmOverloads constructor(
             SettingsItem.Toggle(
                 iconRes = R.drawable.ic_settings_gamepad_24dp,
                 titleRes = R.string.navigate_with_joystick_axes,
-                isChecked = { !config.disableMotionAxesDpadNavigation },
-                onCheckedChange = { config.disableMotionAxesDpadNavigation = !it }
+                isChecked = { !settingsModel.disableMotionAxesDpadNavigation },
+                onCheckedChange = { settingsModel.disableMotionAxesDpadNavigation = !it }
             )
         )
         add(SettingsItem.Header(R.string.settings_section_cursor))
@@ -35,9 +33,9 @@ class ControlsSettingsView @JvmOverloads constructor(
                 titleRes = R.string.cursor_max_speed,
                 min = Config.CURSOR_PHYSICS_PERCENT_MIN,
                 max = Config.CURSOR_PHYSICS_PERCENT_MAX,
-                value = { config.cursorMaxSpeedPercent },
+                value = { settingsModel.cursorMaxSpeedPercent },
                 valueText = { context.getString(R.string.cursor_physics_percent, it) },
-                onValueChange = { config.cursorMaxSpeedPercent = it }
+                onValueChange = { settingsModel.cursorMaxSpeedPercent = it }
             )
         )
         add(
@@ -46,9 +44,9 @@ class ControlsSettingsView @JvmOverloads constructor(
                 titleRes = R.string.cursor_acceleration,
                 min = Config.CURSOR_PHYSICS_PERCENT_MIN,
                 max = Config.CURSOR_PHYSICS_PERCENT_MAX,
-                value = { config.cursorAccelerationPercent },
+                value = { settingsModel.cursorAccelerationPercent },
                 valueText = { context.getString(R.string.cursor_physics_percent, it) },
-                onValueChange = { config.cursorAccelerationPercent = it }
+                onValueChange = { settingsModel.cursorAccelerationPercent = it }
             )
         )
         add(SettingsItem.Header(R.string.shortcuts))

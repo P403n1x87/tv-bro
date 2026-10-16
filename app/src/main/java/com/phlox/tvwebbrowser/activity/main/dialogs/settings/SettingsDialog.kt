@@ -1,6 +1,5 @@
 package com.phlox.tvwebbrowser.activity.main.dialogs.settings
 
-import android.app.Activity
 import android.app.Dialog
 import android.content.Context
 import android.content.DialogInterface
@@ -10,18 +9,14 @@ import android.view.WindowManager
 import android.widget.Button
 import com.fedir.segmentedbutton.SegmentedButton
 import com.phlox.tvwebbrowser.R
-import com.phlox.tvwebbrowser.activity.main.AutoUpdateModel
-import com.phlox.tvwebbrowser.activity.main.SettingsModel
-import com.phlox.tvwebbrowser.utils.activemodel.ActiveModelsRepository
 import com.phlox.tvwebbrowser.widgets.SegmentedButtonTabsAdapter
 
-class SettingsDialog(context: Context, val model: SettingsModel) :
+class SettingsDialog(context: Context, val deps: SettingsDeps) :
     Dialog(context, R.style.SettingsDialog),
     DialogInterface.OnDismissListener, VersionSettingsView.Callback {
     private var sbTabs: SegmentedButton
     private val btnVersionTab: Button
-    private val autoUpdateModel: AutoUpdateModel? =
-        (context as? Activity)?.let { ActiveModelsRepository.get(AutoUpdateModel::class, it) }
+    private val autoUpdateModel = deps.autoUpdate
 
     /** Invoked after the dialog's own [onDismiss] work, for callers that need to react to changes. */
     var onDismissed: (() -> Unit)? = null
@@ -36,14 +31,14 @@ class SettingsDialog(context: Context, val model: SettingsModel) :
         val tabContentAdapter = object : SegmentedButtonTabsAdapter(sbTabs, findViewById(R.id.flTabsContent)) {
             override fun createContentViewForSegmentButtonId(id: Int): View {
                 return when (id) {
-                    R.id.btnGeneralTab -> GeneralSettingsView(context)
-                    R.id.btnAdsTab -> AdsSettingsView(context)
-                    R.id.btnAppearanceTab -> AppearanceSettingsView(context)
-                    R.id.btnPlaybackTab -> PlaybackSettingsView(context)
-                    R.id.btnControlsTab -> ControlsSettingsView(context)
-                    R.id.btnAdvancedTab -> AdvancedSettingsView(context)
+                    R.id.btnGeneralTab -> GeneralSettingsView(context, deps)
+                    R.id.btnAdsTab -> AdsSettingsView(context, deps)
+                    R.id.btnAppearanceTab -> AppearanceSettingsView(context, deps)
+                    R.id.btnPlaybackTab -> PlaybackSettingsView(context, deps)
+                    R.id.btnControlsTab -> ControlsSettingsView(context, deps)
+                    R.id.btnAdvancedTab -> AdvancedSettingsView(context, deps)
                     else -> {
-                        val view = VersionSettingsView(context)
+                        val view = VersionSettingsView(context, deps)
                         view.callback = this@SettingsDialog
                         view
                     }
@@ -79,7 +74,7 @@ class SettingsDialog(context: Context, val model: SettingsModel) :
      * toolbar settings badge so the remote user can spot it from the category rail.
      */
     private fun refreshAboutTab() {
-        val available = autoUpdateModel?.isUpdateAvailable() == true
+        val available = autoUpdateModel.isUpdateAvailable()
         btnVersionTab.text = context.getString(R.string.settings_category_about)
         btnVersionTab.setCompoundDrawablesWithIntrinsicBounds(
             0, 0, if (available) R.drawable.ic_update_badge_circle else 0, 0

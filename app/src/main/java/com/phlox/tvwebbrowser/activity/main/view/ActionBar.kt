@@ -12,7 +12,6 @@ import android.view.View.OnKeyListener
 import android.view.inputmethod.InputMethodManager
 import android.widget.LinearLayout
 import androidx.core.content.ContextCompat
-import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.databinding.ViewActionbarBinding
@@ -109,8 +108,6 @@ class ActionBar @JvmOverloads constructor(
         gravity = Gravity.CENTER_VERTICAL
 
         if (isInEditMode) return
-
-        val incognitoMode = AppContext.provideConfig().incognitoMode
 
         vb.ibTabs.setOnClickListener { callback?.onToggleTabPanel() }
         vb.ibBack.setOnClickListener { callback?.onNavigateBack() }

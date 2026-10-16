@@ -2,24 +2,20 @@ package com.phlox.tvwebbrowser.activity.main.dialogs.settings
 
 import android.content.Context
 import android.content.Intent
-import android.util.AttributeSet
 import androidx.core.net.toUri
 import com.phlox.tvwebbrowser.BuildConfig
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.activity.IncognitoModeMainActivity
-import com.phlox.tvwebbrowser.activity.main.AutoUpdateModel
 import com.phlox.tvwebbrowser.activity.main.MainActivity
-import com.phlox.tvwebbrowser.activity.main.SettingsModel
-import com.phlox.tvwebbrowser.utils.activemodel.ActiveModelsRepository
 import com.phlox.tvwebbrowser.utils.activity
 import com.phlox.tvwebbrowser.webengine.WebEngineFactory
 
 /**
  * "About" settings category. Renders app info, links and update controls as native TV-settings rows.
  */
-class VersionSettingsView @JvmOverloads constructor(
-    context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
-) : SettingsPageView(context, attrs, defStyleAttr) {
+class VersionSettingsView(
+    context: Context, private val deps: SettingsDeps
+) : SettingsPageView(context) {
 
     companion object {
         private const val URL_PROJECT = "https://github.com/${BuildConfig.UPDATE_REPO}"
@@ -32,8 +28,8 @@ class VersionSettingsView @JvmOverloads constructor(
         private const val URL_ICON_STORY = "https://tv-bro-3546c.web.app/msg001.html"
     }
 
-    private val settingsModel = ActiveModelsRepository.get(SettingsModel::class, activity!!)
-    private val autoUpdateModel = ActiveModelsRepository.get(AutoUpdateModel::class, activity!!)
+    private val settingsModel = deps.settings
+    private val autoUpdateModel = deps.autoUpdate
     var callback: Callback? = null
 
     interface Callback {
@@ -183,7 +179,7 @@ class VersionSettingsView @JvmOverloads constructor(
 
     private fun loadUrl(url: String) {
         callback?.onNeedToCloseSettings()
-        val activityClass = if (settingsModel.config.incognitoMode)
+        val activityClass = if (settingsModel.incognitoMode)
             IncognitoModeMainActivity::class.java else MainActivity::class.java
         val intent = Intent(activity, activityClass)
         intent.data = url.toUri()

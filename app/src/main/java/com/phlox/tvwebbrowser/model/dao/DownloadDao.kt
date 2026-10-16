@@ -9,10 +9,10 @@ interface DownloadDao {
     suspend fun getAll(): List<Download>
 
     @Insert
-    fun insert(download: Download): Long
+    suspend fun insert(download: Download): Long
 
     @Update
-    fun update(vararg downloads: Download)
+    suspend fun update(vararg downloads: Download)
 
     @Delete
     suspend fun delete(download: Download)
