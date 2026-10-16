@@ -13,6 +13,7 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.LinearLayout
 import androidx.core.content.ContextCompat
 import com.phlox.tvwebbrowser.Config
+import com.phlox.tvwebbrowser.domain.HomePagePolicy
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.databinding.ViewActionbarBinding
 
@@ -128,7 +129,7 @@ class ActionBar @JvmOverloads constructor(
     }
 
     fun setAddressBoxText(text: String) {
-        if (Config.isHomePageUrl(text)) {
+        if (HomePagePolicy.isHomePageUrl(text, Config.localHomePageUrl)) {
             vb.etUrl.setText("")
         } else {
             vb.etUrl.setText(text)

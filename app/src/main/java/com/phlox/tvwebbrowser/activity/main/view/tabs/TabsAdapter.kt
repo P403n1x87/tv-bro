@@ -11,6 +11,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.phlox.tvwebbrowser.Config
+import com.phlox.tvwebbrowser.domain.HomePagePolicy
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.activity.main.TabsModel
 import com.phlox.tvwebbrowser.activity.main.view.tabs.TabsAdapter.TabViewHolder
@@ -93,7 +94,7 @@ class TabsAdapter(private val tabsView: TabsView) : RecyclerView.Adapter<TabView
             vb.ivFavicon.setImageResource(R.drawable.ic_launcher)
 
             val url = tabState.url
-            if (!Config.isHomePageUrl(url)) {
+            if (!HomePagePolicy.isHomePageUrl(url, Config.localHomePageUrl)) {
                 val scope = (itemView.activity as AppCompatActivity).lifecycleScope
                 scope.launch(Dispatchers.Main) {
                     val favicon = FaviconsPool.get(url)

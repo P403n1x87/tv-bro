@@ -12,6 +12,11 @@ package "UI (Activities/Views)" {
   [MediaListPresenter] as MLP
   [PermissionOrchestrator] as PO
   [IntentHandler] as IH
+  [BookmarksController] as BC
+  [CursorMenuController] as CMC
+  [TabThumbnailPresenter] as TTP
+  [DownloadCoordinator] as DC
+  [InstallPermissionHelper] as IPH
   [HistoryActivity] as HA
   [DownloadsActivity] as DA
   [ActionBar/TabsView/BookmarksPanelView] as AB
@@ -29,6 +34,15 @@ package "Presentation Models (ActiveModel)" {
   [ActiveDownloadsModel] as ADAM
 }
 
+package "Host Seams (view interfaces)" {
+  [WebEngineCallbackHost] as WECH
+  [TabViewHost] as TVH
+  [AutoUpdateHost] as AUH
+  [WebViewDataDirManager] as WVDM
+  [DefaultWebViewDataDirManager] as DWVDM
+  [DownloadHost] as DH
+}
+
 package "Domain (pure)" {
   [NavigationPolicy] as NP
   [PopupPolicy] as PP
@@ -37,6 +51,8 @@ package "Domain (pure)" {
   [UrlNormalizer] as UN
   [LinkActionPolicy] as LAP
   [SiteDomains] as SDom
+  [HomePagePolicy] as HPP
+  [WebEnginePolicy] as WEP
 }
 
 package "Repository (suspend)" {
@@ -79,9 +95,17 @@ MA --> TC
 MA --> MLP
 MA --> PO
 MA --> IH
+MA --> BC
+MA --> CMC
+MA --> TTP
+MA --> DC
+BC --> MVM
+BC --> PC
+CMC --> TC
 MA --> AMR
 HA --> AMR
 DA --> AMR
+DA --> IPH
 SD --> MVM
 SD --> SM
 SD --> ABM
@@ -108,11 +132,28 @@ WECB --> NP
 WECB --> PP
 WECB --> NTP
 WECB --> SDom
+WECB --> HPP
+MA --> HPP
+MA --> WEP
 WECB ..> WEH
 WV ..|> WIF
 GV ..|> WIF
 WV --> WEH
 GV --> WEH
+
+' Host seams (models stay free of Activity/dialog classes)
+MA ..|> WECH
+MA ..|> TVH
+MA ..|> AUH
+MA ..|> DH
+WECB ..> WECH : host calls
+TVM --> TVH : changeTab(host)
+AUM --> AUH : showUpdateDialogIfNeeded(host)
+MVM --> WVDM : incognito dirs
+DWVDM ..|> WVDM
+MVM ..> DWVDM : default
+PO --> DC : download permission walk
+DC ..> DH : bind/permissions(host)
 
 ' Data
 TVM --> TR
@@ -142,12 +183,14 @@ DB --> HostDao
 TVB --> R
 TVB --> AMR
 DS --> DR
+DS --> IPH
 DT --> DR
 
 ' Observables
 MA <.. MVM : observes
 MA <.. TVM : observes
 MA <.. SM : observes
+MA <.. ABM : observes loadError
 HA <.. HM : observes
 DA <.. ADHM : observes
 DA <.. ADAM : observes

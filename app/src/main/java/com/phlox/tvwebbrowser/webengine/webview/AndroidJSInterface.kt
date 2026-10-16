@@ -4,6 +4,7 @@ import android.net.http.SslError
 import android.webkit.JavascriptInterface
 import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.Config
+import com.phlox.tvwebbrowser.domain.HomePagePolicy
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.TVBro
 import com.phlox.tvwebbrowser.model.Download
@@ -119,6 +120,6 @@ class AndroidJSInterface(private val webEngine: WebViewWebEngine) {
     }
 
     private fun isHomePage(): Boolean {
-        return Config.isHomePageUrl(webEngine.tab.url)
+        return HomePagePolicy.isHomePageUrl(webEngine.tab.url, Config.localHomePageUrl)
     }
 }

@@ -11,6 +11,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.phlox.tvwebbrowser.activity.main.view.PanelRowFocusDelegate
 import com.phlox.tvwebbrowser.activity.main.view.RowFocusPanel
 import com.phlox.tvwebbrowser.Config
+import com.phlox.tvwebbrowser.domain.HomePagePolicy
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.databinding.ViewBookmarksBinding
 import com.phlox.tvwebbrowser.model.FavoriteItem
@@ -82,7 +83,7 @@ class BookmarksPanelView @JvmOverloads constructor(
     }
 
     private fun canAddThisPage(url: String?): Boolean = url != null && url.isNotBlank() &&
-            !Config.isHomePageUrl(url) && url.startsWith("http", true)
+            !HomePagePolicy.isHomePageUrl(url, Config.localHomePageUrl) && url.startsWith("http", true)
 
     fun setBookmarks(items: List<FavoriteItem>) {
         adapter.setItems(items)

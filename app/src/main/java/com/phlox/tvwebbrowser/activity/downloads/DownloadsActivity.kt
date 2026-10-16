@@ -1,7 +1,5 @@
 package com.phlox.tvwebbrowser.activity.downloads
 
-import android.app.Activity
-import android.app.AlertDialog
 import android.content.*
 import android.net.Uri
 import android.os.Build
@@ -11,11 +9,9 @@ import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
 import android.view.View
-import android.webkit.MimeTypeMap
 import android.widget.AbsListView
 import android.widget.AdapterView
 import android.widget.PopupMenu
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
@@ -23,6 +19,7 @@ import com.phlox.tvwebbrowser.BuildConfig
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.databinding.ActivityDownloadsBinding
 import com.phlox.tvwebbrowser.model.Download
+import com.phlox.tvwebbrowser.utils.InstallPermissionHelper
 import com.phlox.tvwebbrowser.utils.Utils
 import com.phlox.tvwebbrowser.utils.activemodel.ActiveModelsRepository
 import kotlinx.coroutines.Dispatchers
@@ -180,37 +177,17 @@ class DownloadsActivity : AppCompatActivity(), AdapterView.OnItemClickListener, 
     }
 
     private fun installAPK(download: Download) {
-        val canInstallFromOtherSources = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            //packageManager.canRequestPackageInstalls()
-            true
-        } else
-            Settings.Secure.getInt(this.contentResolver, Settings.Secure.INSTALL_NON_MARKET_APPS) == 1
+        // The downloads screen always lets the system installer handle the grant on API 26+ — it
+        // prompts the user itself; only below that does the global setting gate it.
+        val canInstallFromOtherSources = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ||
+            Settings.Secure.getInt(contentResolver, Settings.Secure.INSTALL_NON_MARKET_APPS) == 1
 
-        if(canInstallFromOtherSources) {
-            launchInstallAPKActivity(this, download)
+        if (canInstallFromOtherSources) {
+            InstallPermissionHelper.launchInstaller(this, download.filepath)
         } else {
-            AlertDialog.Builder(this)
-                    .setTitle(R.string.app_name)
-                    .setMessage(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                        R.string.turn_on_unknown_sources_for_app else R.string.turn_on_unknown_sources)
-                    .setPositiveButton(android.R.string.ok, DialogInterface.OnClickListener { dialog, which -> run {
-                        val intentSettings = Intent()
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            intentSettings.action = Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES
-                            intentSettings.data = Uri.parse("package:${BuildConfig.APPLICATION_ID}")
-                        } else {
-                            intentSettings.action = Settings.ACTION_SECURITY_SETTINGS
-                        }
-                        intentSettings.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK)
-                        try {
-                            startActivityForResult(intentSettings, REQUEST_CODE_UNKNOWN_APP_SOURCES)
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                            Toast.makeText(this, R.string.error, Toast.LENGTH_SHORT).show()
-                        }
-                    }})
-                    .show()
-
+            InstallPermissionHelper.showEnableUnknownSourcesDialog(this) {
+                InstallPermissionHelper.openUnknownSourcesSettings(this)
+            }
         }
     }
 
@@ -255,30 +232,6 @@ class DownloadsActivity : AppCompatActivity(), AdapterView.OnItemClickListener, 
     }
 
     companion object {
-        const val REQUEST_CODE_UNKNOWN_APP_SOURCES = 10007
-        private const val REQUEST_CODE_INSTALL_PACKAGE = 10008
         val TAG: String = DownloadsActivity::class.java.simpleName
-
-        fun launchInstallAPKActivity(activity: Activity, download: Download) {
-            val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension("apk")
-            val apkURI = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                Uri.parse(download.filepath)
-            } else {
-                val file = File(download.filepath)
-                FileProvider.getUriForFile(
-                    activity,
-                    activity.applicationContext.packageName + ".provider", file
-                )
-            }
-
-            val install = Intent(Intent.ACTION_INSTALL_PACKAGE)
-            install.setDataAndType(apkURI, mimeType)
-            install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            try {
-                activity.startActivityForResult(install, REQUEST_CODE_INSTALL_PACKAGE)//we are not using result for now
-            } catch (e: Exception) {
-                Toast.makeText(activity, R.string.error, Toast.LENGTH_SHORT).show()
-            }
-        }
     }
 }

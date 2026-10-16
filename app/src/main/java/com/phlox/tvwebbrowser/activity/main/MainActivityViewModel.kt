@@ -1,11 +1,11 @@
 package com.phlox.tvwebbrowser.activity.main
 
-import android.os.Build
 import android.util.Log
-import android.webkit.WebView
 import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.BuildConfig
 import com.phlox.tvwebbrowser.Config
+import com.phlox.tvwebbrowser.domain.HomePagePolicy
+import com.phlox.tvwebbrowser.domain.WebEnginePolicy
 import com.phlox.tvwebbrowser.TVBro
 import com.phlox.tvwebbrowser.model.FavoriteItem
 import com.phlox.tvwebbrowser.model.HistoryItem
@@ -16,7 +16,6 @@ import com.phlox.tvwebbrowser.repository.HistoryRepository
 import com.phlox.tvwebbrowser.repository.Repositories
 import com.phlox.tvwebbrowser.utils.UpdateChecker
 import com.phlox.tvwebbrowser.utils.activemodel.ActiveModel
-import com.phlox.tvwebbrowser.utils.deleteDirectory
 import com.phlox.tvwebbrowser.utils.observable.ObservableList
 import com.phlox.tvwebbrowser.utils.observable.ObservableValue
 import kotlinx.coroutines.Dispatchers
@@ -24,10 +23,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.net.URL
 import java.util.Calendar
-import java.util.Locale
 
 /**
  * Presentation model of the main screen.
@@ -39,13 +36,10 @@ import java.util.Locale
 class MainActivityViewModel(
     private val favorites: FavoritesRepository = Repositories.favorites,
     private val history: HistoryRepository = Repositories.history,
+    private val webViewDataDirs: WebViewDataDirManager = DefaultWebViewDataDirManager(),
 ): ActiveModel() {
     companion object {
         var TAG: String = MainActivityViewModel::class.java.simpleName
-        const val WEB_VIEW_DATA_FOLDER = "app_webview"
-        const val WEB_VIEW_CACHE_FOLDER = "WebView"
-        const val WEB_VIEW_DATA_BACKUP_DIRECTORY_SUFFIX = "_backup"
-        const val INCOGNITO_DATA_DIRECTORY_SUFFIX = "incognito"
     }
 
     var loaded = false
@@ -118,7 +112,7 @@ class MainActivityViewModel(
 
     fun logVisitedHistory(title: String?, url: String, faviconHash: String?) {
         Log.d(TAG, "logVisitedHistory: $url")
-        if ((url == lastHistoryItem?.url) || Config.isHomePageUrl(url) || !url.startsWith("http", true)) {
+        if ((url == lastHistoryItem?.url) || HomePagePolicy.isHomePageUrl(url, Config.localHomePageUrl) || !url.startsWith("http", true)) {
             return
         }
 
@@ -182,101 +176,29 @@ class MainActivityViewModel(
     ): Boolean {
         val becomingIncognitoMode = !config.incognitoMode
         if (!becomingIncognitoMode) {
-            if (!config.isWebEngineGecko()) {
+            if (!WebEnginePolicy.isGecko(config.webEngine)) {
                 clearEngineSession()
             }
             clearOpenTabs()
-            if (!config.isWebEngineGecko()) {
-                clearIncognitoData().join()
+            if (!WebEnginePolicy.isGecko(config.webEngine)) {
+                withContext(Dispatchers.IO) {
+                    webViewDataDirs.clearIncognitoData()
+                }
             }
         }
         config.incognitoMode = becomingIncognitoMode
         return becomingIncognitoMode
     }
 
+    /**
+     * Moves the WebView data directories aside for an incognito session, so it runs on an isolated
+     * store. Only the WebView engine needs it (Gecko keeps its own), and it must happen before the
+     * first WebView is materialised.
+     */
     fun prepareSwitchToIncognito() {
         Log.d(TAG, "prepareSwitchToIncognito")
-        if (AppContext.provideConfig().isWebEngineGecko()) return
-        //to isolate incognito mode data:
-        //in api >= 28 we just use another directory for WebView data
-        //on earlier apis we backup-ing existing WebView data directory
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            val incognitoWebViewData = File(
-                TVBro.instance.filesDir.parentFile!!.absolutePath +
-                        "/" + WEB_VIEW_DATA_FOLDER + "_" + INCOGNITO_DATA_DIRECTORY_SUFFIX
-            )
-            if (incognitoWebViewData.exists()) {
-                Log.i(TAG, "Looks like we already in incognito mode")
-                return
-            }
-            WebView.setDataDirectorySuffix(INCOGNITO_DATA_DIRECTORY_SUFFIX)
-        } else {
-            val webViewData = File(
-                TVBro.instance.filesDir.parentFile!!.absolutePath +
-                        "/" + WEB_VIEW_DATA_FOLDER
-            )
-            val backupedWebViewData = File(
-                TVBro.instance.filesDir.parentFile!!.absolutePath +
-                        "/" + WEB_VIEW_DATA_FOLDER + WEB_VIEW_DATA_BACKUP_DIRECTORY_SUFFIX
-            )
-            if (backupedWebViewData.exists()) {
-                Log.i(TAG, "Looks like we already in incognito mode")
-                return
-            }
-            webViewData.renameTo(backupedWebViewData)
-            val webViewCache =
-                File(TVBro.instance.cacheDir.absolutePath + "/" + WEB_VIEW_CACHE_FOLDER)
-            val backupedWebViewCache = File(
-                TVBro.instance.cacheDir.absolutePath + "/" + WEB_VIEW_CACHE_FOLDER +
-                        WEB_VIEW_DATA_BACKUP_DIRECTORY_SUFFIX
-            )
-            webViewCache.renameTo(backupedWebViewCache)
-        }
-    }
-
-    fun clearIncognitoData() = modelScope.launch(Dispatchers.IO) {
-        Log.d(TAG, "clearIncognitoData")
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            val webViewData = File(
-                TVBro.instance.filesDir.parentFile!!.absolutePath +
-                        "/" + WEB_VIEW_DATA_FOLDER + "_" + INCOGNITO_DATA_DIRECTORY_SUFFIX
-            )
-            deleteDirectory(webViewData)
-            var webViewCache =
-                File(
-                    TVBro.instance.cacheDir.absolutePath + "/" + WEB_VIEW_CACHE_FOLDER +
-                            "_" + INCOGNITO_DATA_DIRECTORY_SUFFIX
-                )
-            if (!webViewCache.exists()) {
-                webViewCache = File(
-                    TVBro.instance.cacheDir.absolutePath + "/" +
-                            WEB_VIEW_CACHE_FOLDER.lowercase(Locale.getDefault()) +
-                            "_" + INCOGNITO_DATA_DIRECTORY_SUFFIX
-                )
-            }
-            deleteDirectory(webViewCache)
-        } else {
-            val webViewData = File(
-                TVBro.instance.filesDir.parentFile!!.absolutePath +
-                        "/" + WEB_VIEW_DATA_FOLDER
-            )
-            deleteDirectory(webViewData)
-            val webViewCache =
-                File(TVBro.instance.cacheDir.absolutePath + "/" + WEB_VIEW_CACHE_FOLDER)
-            deleteDirectory(webViewCache)
-
-            val backupedWebViewData = File(
-                TVBro.instance.filesDir.parentFile!!.absolutePath +
-                        "/" + WEB_VIEW_DATA_FOLDER + WEB_VIEW_DATA_BACKUP_DIRECTORY_SUFFIX
-            )
-            backupedWebViewData.renameTo(webViewData)
-            val backupedWebViewCache = File(
-                TVBro.instance.cacheDir.absolutePath + "/" + WEB_VIEW_CACHE_FOLDER +
-                        WEB_VIEW_DATA_BACKUP_DIRECTORY_SUFFIX
-            )
-            backupedWebViewCache.renameTo(webViewCache)
-        }
+        if (WebEnginePolicy.isGecko(config.webEngine)) return
+        webViewDataDirs.prepareIncognitoSession()
     }
 
     override fun onClear() {

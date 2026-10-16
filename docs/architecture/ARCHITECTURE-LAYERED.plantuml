@@ -14,6 +14,11 @@ package "1. UI Layer" {
   [MediaListPresenter\n(stream list dialog)] as MLP
   [PermissionOrchestrator\n(permission/result routing)] as PO
   [IntentHandler\n(deep links + history result)] as IH
+  [BookmarksController\n(bookmark panel + CRUD)] as BC
+  [CursorMenuController\n(cursor menu + link actions)] as CMC
+  [TabThumbnailPresenter\n(thumbnail repaint)] as TTP
+  [DownloadCoordinator\n(permission walk + service bind)] as DC
+  [InstallPermissionHelper\n(APK install intent)] as IPH
   [HistoryActivity\n(list + search + multi-select)] as HA
   [DownloadsActivity\n(active + history + actions)] as DA
   [ActionBar/View Layer\n(TabsView, BookmarksPanelView, ActionBar)] as AB
@@ -31,6 +36,15 @@ package "2. Presentation Models (ActiveModel)" {
   [ActiveDownloadsModel\n(active tasks + listeners)] as ADAM
 }
 
+package "2b. Host Seams (view interfaces)" {
+  [WebEngineCallbackHost] as WECH
+  [TabViewHost] as TVH
+  [AutoUpdateHost] as AUH
+  [WebViewDataDirManager] as WVDM
+  [DefaultWebViewDataDirManager] as DWVDM
+  [DownloadHost\n(bind/unbind + permissions)] as DH
+}
+
 package "3. Domain (pure, framework-free)" {
   [NavigationPolicy\n(scheme routing + redirect blocking)] as NP
   [PopupPolicy\n(popup blocking rules)] as PP
@@ -39,6 +53,8 @@ package "3. Domain (pure, framework-free)" {
   [UrlNormalizer\n(URL normalization)] as UN
   [LinkActionPolicy\n(link action decisions)] as LAP
   [SiteDomains\n(same-site/domain checks)] as SDom
+  [HomePagePolicy\n(built-in home page check)] as HPP
+  [WebEnginePolicy\n(engine identity check)] as WEP
 }
 
 package "4. Repository (suspend-only)" {
@@ -80,9 +96,17 @@ MA --> TC
 MA --> MLP
 MA --> PO
 MA --> IH
+MA --> BC
+MA --> CMC
+MA --> TTP
+MA --> DC
+BC --> MVM
+BC --> PC
+CMC --> TC
 MA --> AMR
 HA --> AMR
 DA --> AMR
+DA --> IPH
 AB --> TVM
 SD --> SM
 SD --> ABM
@@ -96,7 +120,28 @@ AMR --> ABM
 AMR --> AUM
 AMR --> HM
 AMR --> ADHM
+AMR --> TVM
+AMR --> MVM
+AMR --> SM
+AMR --> ABM
+AMR --> AUM
+AMR --> HM
+AMR --> ADHM
 AMR --> ADAM
+
+' Host seams (models never touch Activity/dialog classes)
+MA ..|> WECH
+MA ..|> TVH
+MA ..|> AUH
+MA ..|> DH
+WECB ..> WECH : host calls
+TVM --> TVH : changeTab(host)
+AUM --> AUH : showUpdateDialogIfNeeded(host)
+MVM --> WVDM : incognito dirs
+DWVDM ..|> WVDM
+MVM ..> DWVDM : default
+PO --> DC : download permission walk
+DC ..> DH : bind/permissions(host)
 
 TVM --> R
 MVM --> R
@@ -132,6 +177,9 @@ WECB --> NP
 WECB --> PP
 WECB --> NTP
 WECB --> SDom
+WECB --> HPP
+MA --> HPP
+MA --> WEP
 WV ..|> WIF
 GV ..|> WIF
 WV --> WEH
@@ -142,6 +190,7 @@ WECB ..> WEH
 TVB --> R
 TVB --> AMR
 DS --> DR
+DS --> IPH
 DT --> DR
 
 ' Observables (back up)
@@ -150,6 +199,7 @@ MVM ..> MA : observable state
 SM ..> MA : observable
 SM ..> SD : observable
 ABM ..> SD : observable
+ABM ..> MA : loadError
 AUM ..> SD : observable
 HM ..> HA : observable
 ADHM ..> DA : observable

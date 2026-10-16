@@ -1,8 +1,6 @@
 package com.phlox.tvwebbrowser.activity.main
 
 import android.util.Log
-import android.view.View
-import android.view.ViewGroup
 import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.TVBro
 import com.phlox.tvwebbrowser.model.HostConfig
@@ -20,6 +18,18 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.net.URL
+
+/**
+ * The view side of tab switching: materialises a tab's engine view and supplies the window it is
+ * attached to, so [TabsModel] never handles a `ViewGroup` itself. Implemented by the main screen.
+ */
+interface TabViewHost {
+    /** Materialises [tab]'s engine view; false when it cannot be created (the switch is aborted). */
+    fun createView(tab: WebTabState): Boolean
+
+    /** Attaches [tab]'s engine to this host's window. */
+    fun attachEngineToWindow(tab: WebTabState, callback: WebEngineWindowProviderCallback)
+}
 
 /**
  * The open tabs of the current browsing mode.
@@ -173,8 +183,7 @@ class TabsModel(
 
     fun changeTab(
         newTab: WebTabState,
-        webViewProvider: (tab: WebTabState) -> View?,
-        webViewParent: ViewGroup,
+        viewHost: TabViewHost,
         webEngineWindowProviderCallback: WebEngineWindowProviderCallback
     ) {
         if (currentTab.value == newTab && newTab.webEngine.getView() != null) return
@@ -191,16 +200,14 @@ class TabsModel(
             newTab.selected = true
             currentTab.value = newTab
         }
-        var wv = newTab.webEngine.getView()
         var needReloadUrl = false
-        if (wv == null) {
-            wv = webViewProvider(newTab)
-            if (wv == null) {
+        if (newTab.webEngine.getView() == null) {
+            if (!viewHost.createView(newTab)) {
                 return
             }
             needReloadUrl = !newTab.restoreWebView()
         }
-        newTab.webEngine.onAttachToWindow(webEngineWindowProviderCallback, webViewParent)
+        viewHost.attachEngineToWindow(newTab, webEngineWindowProviderCallback)
         if (needReloadUrl) {
             newTab.webEngine.loadUrl(newTab.url)
         }

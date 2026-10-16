@@ -5,12 +5,18 @@ This document gives a more layered visualisation with brief descriptions of each
 ## Layer 1 - UI (Presentation Layer)
 | Component | Purpose | Key Notes |
 |---|---|---|
-| **MainActivity** | Root activity; implements `WebEngineCallbackHost`. Composition root for the screen: builds the models and the view collaborators, wires the engine seam and the toolbar, and forwards. | Reads config only for pre-model engine checks (deliberate). Observes presentation models; delegates its UI work to the controllers below. |
+| **MainActivity** | Root activity; implements `WebEngineCallbackHost`, `TabViewHost`, `AutoUpdateHost`. Composition root for the screen: builds the models and the view collaborators, wires the engine seam and the toolbar, and forwards. | Reads config only for pre-model engine checks (deliberate). Observes presentation models; renders model events (adblock `loadError`); delegates its UI work to the controllers below. |
 | **PanelController** | Tabs/bookmarks panel visibility and the focus hand-off to a row. | Claims the container focus with `requestFocusFromTouch()`, then `RowFocusPanel.requestRowFocus()` once the content is settled. |
 | **ToolbarController** | Toolbar overlay show/hide/style, the menu toggle, and the in-page fullscreen window flags. | Owns the `isFullscreen` state; `autoHideMenuOverlay()` is a no-op under the keep-toolbar-open behaviour. |
 | **MediaListPresenter** | The "streams on this page" list dialog and its background metadata prefetch. | Wraps `MediaListAdapter`; releases it on dismiss. |
 | **PermissionOrchestrator** | Routes permission/activity-result callbacks (voice search → engine → downloads) and owns the shared request-code counter. | Consults the handlers in the same order as before. |
 | **IntentHandler** | Deep links, the "open in same tab" extra and the History activity result. | Talks to the activity through navigate/open-tab/change-tab/auto-hide callbacks. |
+| **IntentHandler** | Deep links, the "open in same tab" extra and the History activity result. | Talks to the activity through navigate/open-tab/change-tab/auto-hide callbacks. |
+| **BookmarksController** | Bookmark panel toggle, bookmark CRUD (add/remove/edit) and favorite editing. | Renders into `vb.vBookmarks`; reads/writes through `MainActivityViewModel`; delegates the panel to `PanelController`. |
+| **CursorMenuController** | Fullscreen enter/exit, the cursor menu, the link-actions popup and the "site wants to open an unknown URL" dialog. | Owns the two popup lifetimes; takes the `BackNavigationEventsAdapter` and `ToolbarController`. |
+| **TabThumbnailPresenter** | The debounced thumbnail repaint and its bitmap/placeholder rendering. | Given keep-toolbar-open and "is current tab" predicates; owns the repaint `Runnable`. |
+| **DownloadCoordinator** | The download permission walk and the download-service binding. | Talks to `DownloadHost` (bind/unbind + `hasPermission`/`requestPermission`), implemented by `MainActivity`. |
+| **InstallPermissionHelper** | Launches the system APK installer for a downloaded file. | Shared by `DownloadsActivity` and `DownloadService`; MediaStore-aware Uri (content Uri from API 30, path below). |
 | **HistoryActivity** | History list with search (voice), multi-select delete, infinite scroll. | Binds to `HistoryModel`; forwards selection to caller via result. |
 | **DownloadsActivity** | Active + completed downloads, open/install APK, open folder, cancel/delete. | Binds to `ActiveDownloadsModel` + `DownloadsHistoryModel`. |
 | **ActionBar/View Layer** (ActionBar, TabsView, BookmarksPanelView) | Toolbar, tabs panel (RecyclerView), bookmarks panel (RecyclerView + "Add this page"). | Observes models; uses `PanelRowFocusDelegate`/`RowFocusPanel` for deterministic D-pad row focus. Never touches repositories. |
@@ -19,11 +25,11 @@ This document gives a more layered visualisation with brief descriptions of each
 ## Layer 2 - Presentation Models (ActiveModel)
 | Component | Purpose | Key Notes |
 |---|---|---|
-| **TabsModel** | Manages open tabs, current selection, persistence, lifecycle (pause/save/detach). | Exposes `tabsStates` (ObservableList), `currentTab` (ObservableValue). Provides intents: `onOpenTab`, `onCloseTab`, `onToggleAdBlock`, `moveTab`, `changeTab`. |
-| **MainActivityViewModel** | Home page links/bookmarks, history logging (debounced), incognito mode cleanup/switch orchestration. | Owns `bookmarks` and `currentPageBookmarked`. Handles WebView data dir isolation across API levels. |
+| **TabsModel** | Manages open tabs, current selection, persistence, lifecycle (pause/save/detach). | Exposes `tabsStates` (ObservableList), `currentTab` (ObservableValue). Provides intents: `onOpenTab`, `onCloseTab`, `onToggleAdBlock`, `moveTab`, `changeTab`. `changeTab` materialises/attaches through an injected `TabViewHost` (no `ViewGroup` in the model). |
+| **MainActivityViewModel** | Home page links/bookmarks, history logging (debounced), incognito mode cleanup/switch orchestration. | Owns `bookmarks` and `currentPageBookmarked`. WebView data-dir isolation is delegated to the injected `WebViewDataDirManager`. |
 | **SettingsModel** | App settings as observables backed by `Config`. | Exposes observable prefs (theme, keepToolbarOpen, userAgentString). View assigns = intent. |
-| **AdblockModel** | Brave adblock client lifecycle, loading/filter matching. | Loads/updates EasyList; maps request types to filter options. Emits state via observables; UI side effects handled via host/events. |
-| **AutoUpdateModel** | Update checking, state, dialog/action orchestration. | Checks GitHub Releases (semver-aware), manages auto-check cadence; exposes `isUpdateAvailable()`. |
+| **AdblockModel** | Brave adblock client lifecycle, loading/filter matching. | Loads/updates EasyList; maps request types to filter options via the pure `AdblockRequestType` (unit-tested without the native engine). Emits state via observables (incl. `loadError`); the host renders it. |
+| **AutoUpdateModel** | Update checking + state; the dialog/action flow runs through `AutoUpdateHost`. | Checks GitHub Releases (semver-aware), manages auto-check cadence; exposes `isUpdateAvailable()`. |
 | **HistoryModel** | Paginated history list/search. | `loadItems(offset)` or search; owns `lastLoadedItems`. Repository injected with default. |
 | **DownloadsHistoryModel** | Paginated completed downloads. | Tracks all loaded items + last page. |
 | **ActiveDownloadsModel** | Active download tasks + listener registry. | Coordinates cancel/update/error/all-complete notifications. |
@@ -37,13 +43,16 @@ This document gives a more layered visualisation with brief descriptions of each
 | **AddressInputPolicy** | Resolves typed input to URL (search or direct). | Pure. |
 | **UrlNormalizer** | Normalizes URLs. | Pure. |
 | **LinkActionPolicy** | Determines link target/action eligibility (HTTP URL checks). | Pure. |
+| **LinkActionPolicy** | Determines link target/action eligibility (HTTP URL checks). | Pure. |
 | **SiteDomains** | Same-site/domain comparison for cross-site checks. | Pure. |
+| **HomePagePolicy** | Built-in-home-page check (remote URL, `about:home` alias or the loopback URL). | Pure; the loopback URL is passed in because the asset server sets it at runtime. |
+| **WebEnginePolicy** | Web-engine identity check (Gecko or not). | Pure; the engine string comes from `Config`. |
 
 ## Layer 4 - Repository (suspend-only)
 | Component | Purpose | Key Notes |
 |---|---|---|
 | **Repositories** | Manual DI container (lazy singletons). Wires DAOs → Repos. | Single construction point; models use ctor defaults. |
-| **HistoryRepository** | History CRUD + search + pagination + deleteByUrl (dedup). | All suspend. `search(q,q)` with DAO LIKE (exact substring; behavior pinned). |
+| **HistoryRepository** | History CRUD + search + pagination + deleteByUrl (dedup). | All suspend. `search(q)` wraps `%q%` for a partial match on title/url. |
 | **FavoritesRepository** | Bookmarks CRUD + lookup by URL/id + useful marker. | Indexed by URL (favorites_url_idx). |
 | **TabsRepository** | Tabs CRUD, positions, unselect-all, bulk delete. | Persists tab state metadata. |
 | **DownloadsRepository** | Downloads CRUD + pagination. | Persists download entries. |

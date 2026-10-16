@@ -1,7 +1,8 @@
 # Architecture (post-MVVM refactor)
 
-This document describes the current architecture on `master`: the view-purity pass, plus the
-follow-up split of the main screen's UI work into view collaborators. It includes a high-level
+This document describes the current architecture: the view-purity pass, the split of the main
+screen's UI work into view collaborators, and the follow-up pass that moved the remaining model-side
+UI side effects behind injected host interfaces. It includes a high-level
 diagram (Mermaid) and notes on contracts, dependency direction, and data flow.
 
 ## Key Contracts
@@ -10,7 +11,10 @@ diagram (Mermaid) and notes on contracts, dependency direction, and data flow.
 - **Observables**: `ObservableValue<T>`, `ObservableList<T>` extend custom `Subscribable` with lifecycle-aware subscribe. Views observe; models mutate state.
 - **WebEngineCallback**: Plain class (per-tab adapter), not an inner Activity. Injected with models; UI access only via `WebEngineCallbackHost`. Pure policy delegated to `domain/`. `DownloadRequest` bundles download params.
 - **WebEngineCallbackHost**: View seam implemented by `MainActivity` (activity operations, UI updates, panels, menus, permissions, fullscreen).
-- **Domain**: Framework-free decision objects (`NavigationPolicy`, `PopupPolicy`, `SiteDomains`, `AddressInputPolicy`, `UrlNormalizer`, `LinkActionPolicy`, `NewTabPositionPolicy`).
+- **TabViewHost**: View seam implemented by `MainActivity` (`createView`/`attachEngineToWindow`), injected into `TabsModel.changeTab` so the model never handles a `ViewGroup`.
+- **AutoUpdateHost**: View seam implemented by `MainActivity` (dialogs, install-permission handling, download), injected into `AutoUpdateModel.showUpdateDialogIfNeeded` so the model owns only the decision.
+- **WebViewDataDirManager**: The isolated WebView data/cache directories an incognito session runs on; `DefaultWebViewDataDirManager` is the WebView-engine implementation, injected into `MainActivityViewModel`.
+- **Domain**: Framework-free decision objects (`NavigationPolicy`, `PopupPolicy`, `SiteDomains`, `AddressInputPolicy`, `UrlNormalizer`, `LinkActionPolicy`, `NewTabPositionPolicy`, `HomePagePolicy`, `WebEnginePolicy`).
 - **Repositories**: One per DAO, all `suspend`. `Repositories` is manual DI container (lazy singletons). Models have ctor params with production defaults for testability.
 
 ## Main-screen view collaborators
@@ -26,9 +30,18 @@ callbacks it needs — they never reach into the activity's private members:
 | `MediaListPresenter` | The "streams on this page" list dialog and its background metadata prefetch. | activity + `TabsModel` |
 | `PermissionOrchestrator` | Routing of permission/activity-result callbacks (voice search → engine → downloads) and the shared request-code counter. | `VoiceSearchHelper`, `DownloadCoordinator`, engine-permission callback |
 | `IntentHandler` | Deep links, the "open in same tab" extra, and the History activity result. | `TabsModel` + navigate/open-tab/change-tab/auto-hide callbacks |
+| `BookmarksController` | Bookmark panel toggle, bookmark CRUD and favorite editing. | activity, lifecycle scope, binding, `MainActivityViewModel`, `PanelController` + current-tab/navigate callbacks |
+| `CursorMenuController` | Fullscreen enter/exit, the cursor menu, the link-actions popup and the external-app dialog. | activity, binding, `Handler`, `ToolbarController`, `BackNavigationEventsAdapter` |
+| `TabThumbnailPresenter` | The debounced thumbnail repaint and its bitmap/placeholder rendering. | binding, `Handler`, lifecycle scope + keep-toolbar-open/current-tab predicates |
+| `DownloadCoordinator` | The download permission walk and the download-service binding, through `DownloadHost`. | `DownloadHost` + on-download-started callback |
 
 These are view collaborators, not models: they hold no domain state and only render/forward to the
 binding, the models and the callbacks handed to them.
+
+The same rule applies where a model would otherwise need the screen directly: `TabsModel.changeTab`
+takes a `TabViewHost`, `AutoUpdateModel.showUpdateDialogIfNeeded` takes an `AutoUpdateHost`,
+`DownloadCoordinator` talks to a `DownloadHost`, and `AdblockModel` publishes a `loadError` flag the
+host renders. All are implemented by `MainActivity`.
 
 ## High-Level Diagram
 
@@ -41,6 +54,10 @@ graph TD
         MLP["MediaListPresenter"]
         PO["PermissionOrchestrator"]
         IH["IntentHandler"]
+        BC["BookmarksController"]
+        CMC["CursorMenuController"]
+        TTP["TabThumbnailPresenter"]
+        DC["DownloadCoordinator"]
         HA["HistoryActivity"]
         DA["DownloadsActivity"]
         AB["ActionBar/TabsView/BookmarksPanelView"]
@@ -61,6 +78,7 @@ graph TD
     subgraph DOM["Domain (pure)"]
         NP["NavigationPolicy"]; PP["PopupPolicy"]; NTP["NewTabPositionPolicy"]
         AIP["AddressInputPolicy"]; UN["UrlNormalizer"]; LAP["LinkActionPolicy"]; SDom["SiteDomains"]
+        HPP["HomePagePolicy"]; WEP["WebEnginePolicy"]
     end
 
     subgraph REPO["Repository (suspend)"]
@@ -85,6 +103,8 @@ graph TD
     SD --> PM; AB --> TVM
 
     MA --> PC & TC & MLP & PO & IH
+    MA --> BC & CMC & TTP & DC
+    BC --> MVM; CMC --> TC
     MA --> WECB; WECB --> MA; WECB --> PM; WECB --> DOM
     ENG --> WIF; ENG --> WEH
 
@@ -113,5 +133,8 @@ graph TD
 
 - MainActivity reads `config` directly only for engine-construction checks (before models exist) — deliberate.
 - Popup decisions use `runBlocking` in the synchronous engine callback (documented).
-- History search uses exact substring match in current behavior (pinned by test; fix is behavior change).
+- History search does a partial (`%query%`) match on the title or the url, newest first.
+- APK installs (DownloadsActivity and DownloadService) both go through `InstallPermissionHelper.launchInstaller`, which is MediaStore-aware (a `content://` Uri from API 30, an absolute path below).
+- The `ActiveModelsRepository` no-arg-constructor contract is pinned by a reflection test over the known models (`ActiveModelsContractTest`).
+- Next architecture margin (not started): the `MainActivity` composition/lifecycle body, the global `TVBro.instance`/`AppContext.get()` coupling (including models), and integration-test coverage. Evidence and ordering in `ARCHITECTURE-REVIEW.md`.
 - Rendered diagrams live next to this file: `ARCHITECTURE.plantuml`/`.png`/`.svg`/`.pdf` (overview) and `ARCHITECTURE-LAYERED.*` (layered view with component descriptions). PDFs are produced from the SVG (PlantUML's `-tpdf` needs Batik, which is not available here).
