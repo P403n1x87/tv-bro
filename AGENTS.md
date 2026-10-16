@@ -31,11 +31,14 @@ the model/host seam polish. Work on a feature branch; **open a PR only when aske
   `AdblockModel.loadError` (host resets it). `MainActivity` implements all of them.
 - Models own state; a view assigning a model property is the accepted "intent" pattern. In tests,
   pass repository fakes (existing tests build in-memory Room instances).
+- Models take every dependency — repositories, `Config`, and Context/`filesDir`/connectivity
+  accessors — as ctor params with production defaults. Models must not read `AppContext`/`TVBro`
+  directly (the default lambdas may, but only at the composition edge).
 - Deliberate exception to view purity: `MainActivity` reads `config` for pre-model engine checks
   (`incognitoMode`, `isWebEngineGecko()`).
 - First architecture margin is closed; the next one is (a) the `MainActivity.onCreate`/lifecycle body,
-  (b) global `TVBro.instance`/`AppContext.get()` coupling (~38 sites, incl. models), (c)
-  integration-test coverage. Details/evidence: `docs/architecture/ARCHITECTURE-REVIEW.md`.
+  (b) global `TVBro.instance`/`AppContext.get()` coupling outside the models (engine/adapters/
+  services), (c) integration-test coverage. Details/evidence: `docs/architecture/ARCHITECTURE-REVIEW.md`.
 
 ## Build / test
 - Linux: JDK 21 exported, plus JDK 17 at `/usr/lib/jvm/java-17-openjdk-amd64` (`buildSrc` pins

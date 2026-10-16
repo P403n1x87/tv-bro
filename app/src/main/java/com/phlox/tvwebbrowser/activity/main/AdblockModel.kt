@@ -16,7 +16,10 @@ import java.io.File
 import java.net.URL
 import java.util.*
 
-class AdblockModel : ActiveModel() {
+class AdblockModel(
+    val config: Config = AppContext.provideConfig(),
+    private val filesDir: () -> File = { TVBro.instance.filesDir },
+) : ActiveModel() {
     companion object {
         val TAG: String = AdblockModel::class.java.simpleName
 
@@ -31,7 +34,6 @@ class AdblockModel : ActiveModel() {
      * host resets it once it has shown the message.
      */
     val loadError = ObservableValue(false)
-    val config = AppContext.provideConfig()
 
     init {
         loadAdBlockList(false)
@@ -49,7 +51,7 @@ class AdblockModel : ActiveModel() {
         val client = AdBlockClient()
         var success = false
         withContext(Dispatchers.IO) ioContext@ {
-            val serializedFile = File(TVBro.instance.filesDir, SERIALIZED_LIST_FILE)
+            val serializedFile = File(filesDir(), SERIALIZED_LIST_FILE)
             if ((!needUpdate) && serializedFile.exists() && client.deserialize(serializedFile.absolutePath)) {
                 success = true
                 return@ioContext

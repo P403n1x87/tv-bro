@@ -84,7 +84,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.net.URL
@@ -779,7 +778,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         tabsModel.currentTab.value?.apply {
             webEngine.onPause()
             onPause()
-            runBlocking { tabsModel.saveTab(this@apply) }
+            tabsModel.saveTabInBackground(this)
         }
         super.onPause()
     }

@@ -132,7 +132,8 @@ graph TD
 ## Notes
 
 - MainActivity reads `config` directly only for engine-construction checks (before models exist) — deliberate.
-- Popup decisions use `runBlocking` in the synchronous engine callback (documented).
+- Models take their settings (`Config`) and the app services they need (Context/files/network accessors) as constructor parameters with production defaults; a model never reads `AppContext`/`TVBro` itself.
+- Popup decisions keep `runBlocking` in the synchronous engine callback, but only as a fallback: `TabsModel.onPageStarted` warms the tab's host config off the main thread so it normally resolves from memory. `MainActivity.onPause` persists the tab through `TabsModel.saveTabInBackground` instead of blocking the UI thread.
 - History search does a partial (`%query%`) match on the title or the url, newest first.
 - APK installs (DownloadsActivity and DownloadService) both go through `InstallPermissionHelper.launchInstaller`, which is MediaStore-aware (a `content://` Uri from API 30, an absolute path below).
 - The `ActiveModelsRepository` no-arg-constructor contract is pinned by a reflection test over the known models (`ActiveModelsContractTest`).

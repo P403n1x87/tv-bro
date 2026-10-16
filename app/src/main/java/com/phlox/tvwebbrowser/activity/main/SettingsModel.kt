@@ -5,13 +5,13 @@ import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.utils.activemodel.ActiveModel
 import com.phlox.tvwebbrowser.utils.observable.ObservableValue
 
-class SettingsModel : ActiveModel() {
+class SettingsModel(
+    private val config: Config = AppContext.provideConfig(),
+) : ActiveModel() {
     companion object {
         val TAG = SettingsModel::class.java.simpleName
         const val TV_BRO_UA_PREFIX = "TV Bro/1.0 "
     }
-
-    private val config = AppContext.provideConfig()
 
     //Home page settings
     var homePage by config::homePage

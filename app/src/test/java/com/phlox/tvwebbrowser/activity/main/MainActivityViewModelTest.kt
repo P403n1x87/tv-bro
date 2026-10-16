@@ -51,7 +51,9 @@ class MainActivityViewModelTest {
     fun setUp() {
         val app = RuntimeEnvironment.getApplication()
         config = Config(app.getSharedPreferences("main_test", Context.MODE_PRIVATE))
-        AppContext.init(app, config)
+        // A deliberately different instance than the one the model is built with: the model's
+        // behaviour must follow the Config it is handed, not a global (AppContext's).
+        AppContext.init(app, Config(app.getSharedPreferences("main_global_test", Context.MODE_PRIVATE)))
         // The incognito tests only exercise the WebView branch; pin the engine so the outcome does
         // not depend on what the host recommends.
         config.webEngine = Config.ENGINE_WEB_VIEW
@@ -66,6 +68,7 @@ class MainActivityViewModelTest {
             favorites = favorites,
             history = history,
             webViewDataDirs = webViewDataDirs,
+            config = config,
         )
     }
 

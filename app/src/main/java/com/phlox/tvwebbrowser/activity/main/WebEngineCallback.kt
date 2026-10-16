@@ -213,12 +213,14 @@ class WebEngineCallback(
     }
 
     override fun shouldBlockNewWindow(dialog: Boolean, userGesture: Boolean): Boolean {
-        // Synchronous callback: the popup decision has to be returned now, so the (normally
-        // suspending) host lookup is bridged with a plain runBlocking. That form runs the
-        // coroutine on an event loop owned by *this* thread, which joinBlocking() pumps itself
-        // while it waits. An explicit dispatcher must not be used here: the lookup resumes from
-        // Room's query executor, and a dispatcher like Dispatchers.Main.immediate would post the
-        // resumption to a queue that this blocked thread never drains again (deadlock/ANR).
+        // Synchronous callback: the popup decision has to be returned now. TabsModel warms the
+        // tab's host config on page start, so findHostConfig normally resolves from memory and this
+        // bridge touches no I/O; the runBlocking is only the fallback for a popup that fires before
+        // the warm-up lands. That form runs the coroutine on an event loop owned by *this* thread,
+        // which joinBlocking() pumps itself while it waits. An explicit dispatcher must not be used
+        // here: the lookup resumes from Room's query executor, and a dispatcher like
+        // Dispatchers.Main.immediate would post the resumption to a queue that this blocked thread
+        // never drains again (deadlock/ANR).
         val hostConfig = runBlocking { tabsModel.findHostConfig(tab, false) }
         return PopupPolicy.shouldBlockNewWindow(dialog, userGesture, hostConfig?.popupBlockLevel)
     }

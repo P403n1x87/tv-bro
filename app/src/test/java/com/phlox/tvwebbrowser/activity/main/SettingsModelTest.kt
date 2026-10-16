@@ -2,7 +2,6 @@ package com.phlox.tvwebbrowser.activity.main
 
 import android.app.Application
 import android.content.Context
-import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.Config
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -28,8 +27,7 @@ class SettingsModelTest {
     fun setUp() {
         val app = RuntimeEnvironment.getApplication()
         config = Config(app.getSharedPreferences("settings_test", Context.MODE_PRIVATE))
-        AppContext.init(app, config)
-        model = SettingsModel()
+        model = SettingsModel(config)
     }
 
     @Test

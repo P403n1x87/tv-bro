@@ -1,6 +1,7 @@
 package com.phlox.tvwebbrowser.activity.downloads
 
 import android.app.Application
+import android.net.Uri
 import androidx.room.Room
 import com.phlox.tvwebbrowser.model.Download
 import com.phlox.tvwebbrowser.repository.DownloadsRepository
@@ -43,7 +44,7 @@ class ActiveDownloadsModelTest {
             .setTransactionExecutor(directExecutor)
             .build()
         downloads = DownloadsRepository(db.downloadDao())
-        model = ActiveDownloadsModel(downloads)
+        model = ActiveDownloadsModel(downloads, contentResolver = { app.contentResolver })
     }
 
     @After
@@ -123,6 +124,19 @@ class ActiveDownloadsModelTest {
     @Test
     fun deletingAnItemRemovesItFromTheLog() = runBlocking {
         downloads.add(Download("https://example.com/a.apk", "a.apk", "/tmp/nonexistent.apk",
+            Download.OperationAfterDownload.NOP, null, null, null, null, null))
+        val stored = downloads.all().single()
+
+        model.deleteItem(stored)
+
+        assertTrue(downloads.all().isEmpty())
+    }
+
+    @Test
+    @RobolectricConfig(sdk = [30])
+    fun deletingAContentUriOnApi30GoesThroughTheInjectedResolverAndStillClearsTheLog() = runBlocking {
+        val uri = Uri.parse("content://com.phlox.tvwebbrowser.test/Download/a.apk")
+        downloads.add(Download("https://example.com/a.apk", "a.apk", uri.toString(),
             Download.OperationAfterDownload.NOP, null, null, null, null, null))
         val stored = downloads.all().single()
 
