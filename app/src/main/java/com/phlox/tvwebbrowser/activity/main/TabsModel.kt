@@ -162,6 +162,15 @@ class TabsModel(
         }
     }
 
+    /**
+     * The "open a tab" intent (a link's new-tab request, a popup the user allowed): [tab] is
+     * inserted at [index] and the caller then materialises its engine view and switches to it. The
+     * list observer updates the stored positions.
+     */
+    fun onOpenTab(tab: WebTabState, index: Int) {
+        tabsStates.add(index.coerceIn(0, tabsStates.size), tab)
+    }
+
     fun changeTab(
         newTab: WebTabState,
         webViewProvider: (tab: WebTabState) -> View?,

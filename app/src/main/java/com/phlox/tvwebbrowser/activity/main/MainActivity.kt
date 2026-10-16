@@ -69,6 +69,7 @@ import com.phlox.tvwebbrowser.databinding.ActivityMainBinding
 import com.phlox.tvwebbrowser.domain.AddressInputPolicy
 import com.phlox.tvwebbrowser.domain.LinkActionPolicy
 import com.phlox.tvwebbrowser.domain.NavigationPolicy
+import com.phlox.tvwebbrowser.domain.NewTabPositionPolicy
 import com.phlox.tvwebbrowser.domain.PopupPolicy
 import com.phlox.tvwebbrowser.model.Download
 import com.phlox.tvwebbrowser.model.FavoriteItem
@@ -705,7 +706,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         }
         val tab = WebTabState(url = url, incognito = settingsModel.incognitoMode)
         createWebView(tab) ?: return null
-        tabsModel.tabsStates.add(index, tab)
+        tabsModel.onOpenTab(tab, index)
         changeTab(tab)
         if (navigateImmediately) {
             navigate(url)
@@ -1185,8 +1186,8 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         }
 
         override fun onOpenInNewTabRequested(url: String, navigateImmediately: Boolean): WebEngine? {
-            var index = tabsModel.tabsStates.indexOf(tabsModel.currentTab.value)
-            index = if (index == -1) tabsModel.tabsStates.size else index + 1
+            val index = NewTabPositionPolicy.insertIndexAfter(
+                tabsModel.tabsStates.indexOf(tabsModel.currentTab.value), tabsModel.tabsStates.size)
             return openInNewTab(url, index, true, navigateImmediately)
         }
 
@@ -1413,8 +1414,9 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
             val tab = WebTabState(incognito = settingsModel.incognitoMode)
             val webView = createWebView(tab) ?: return null
             val currentTab = this@MainActivity.tabsModel.currentTab.value ?: return null
-            val index = tabsModel.tabsStates.indexOf(currentTab) + 1
-            tabsModel.tabsStates.add(index, tab)
+            val index = NewTabPositionPolicy.insertIndexAfter(
+                tabsModel.tabsStates.indexOf(currentTab), tabsModel.tabsStates.size)
+            tabsModel.onOpenTab(tab, index)
             changeTab(tab)
             return webView
         }
