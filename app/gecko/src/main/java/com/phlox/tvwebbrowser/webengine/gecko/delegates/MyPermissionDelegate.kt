@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.core.content.ContextCompat
-import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.webengine.gecko.GeckoWebEngine
 import com.phlox.tvwebbrowser.webengine.gecko.R
 import org.mozilla.geckoview.GeckoResult
@@ -34,7 +33,7 @@ class MyPermissionDelegate(private val webEngine: GeckoWebEngine): PermissionDel
             PermissionDelegate.PERMISSION_PERSISTENT_STORAGE -> R.string.request_storage
             PermissionDelegate.PERMISSION_XR -> R.string.request_xr
             PermissionDelegate.PERMISSION_AUTOPLAY_AUDIBLE, PermissionDelegate.PERMISSION_AUTOPLAY_INAUDIBLE ->
-                return if (!AppContext.provideConfig().allowAutoplayMedia) {
+                return if (!webEngine.config.allowAutoplayMedia) {
                 GeckoResult.fromValue(ContentPermission.VALUE_DENY)
             } else {
                 GeckoResult.fromValue(ContentPermission.VALUE_ALLOW)

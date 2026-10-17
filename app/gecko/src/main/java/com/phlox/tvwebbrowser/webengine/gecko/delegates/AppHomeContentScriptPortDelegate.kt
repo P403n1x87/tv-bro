@@ -5,7 +5,6 @@ import android.util.Base64
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.singleton.FaviconsPool
 import com.phlox.tvwebbrowser.utils.Utils
 import com.phlox.tvwebbrowser.webengine.gecko.GeckoWebEngine
@@ -29,7 +28,7 @@ class AppHomeContentScriptPortDelegate(val port: WebExtension.Port, val webEngin
                 }
                 "onHomePageLoaded" -> {
                     val callback = webEngine.callback ?: return
-                    val cfg = AppContext.provideConfig()
+                    val cfg = webEngine.config
                     fun linksToJson(links: List<com.phlox.tvwebbrowser.model.HomePageLink>): String {
                         val jsArr = JSONArray()
                         for (item in links) {
@@ -39,7 +38,7 @@ class AppHomeContentScriptPortDelegate(val port: WebExtension.Port, val webEngin
                     }
                     val bookmarks = linksToJson(callback.getHomePageLinks())
                     val history = linksToJson(callback.getHomePageHistoryLinks())
-                    if (Utils.isFireTV(AppContext.get())) {
+                    if (Utils.isFireTV(webEngine.appContext)) {
                         webEngine.evaluateJavascript("hideVoiceSearchUI()")
                     }
                     webEngine.evaluateJavascript("renderSections($bookmarks, $history)")
@@ -50,7 +49,7 @@ class AppHomeContentScriptPortDelegate(val port: WebExtension.Port, val webEngin
                     val data = msgJson.getJSONObject("data")
                     val engine = data.getString("engine")
                     val customSearchEngineURL = data.getString("customSearchEngineURL")
-                    AppContext.provideConfig().searchEngineURL.value = customSearchEngineURL
+                    webEngine.config.searchEngineURL.value = customSearchEngineURL
                 }
                 "onEditBookmark" -> {
                     val favoriteId = msgJson.getLong("data")

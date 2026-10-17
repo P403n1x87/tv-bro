@@ -1,7 +1,6 @@
 package com.phlox.tvwebbrowser.webengine.gecko.delegates
 
 import android.util.Log
-import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.webengine.gecko.GeckoWebEngine
 import kotlinx.coroutines.runBlocking
 import org.mozilla.geckoview.AllowOrDeny
@@ -177,7 +176,7 @@ class MyNavigationDelegate(private val webEngine: GeckoWebEngine) : GeckoSession
         if (errorTemplate != null) return errorTemplate
 
         return try {
-            errorTemplate = AppContext.get().resources.assets
+            errorTemplate = webEngine.appContext.resources.assets
                 .open(ERROR_TEMPLATE_FILE)
                 .bufferedReader()
                 .use(BufferedReader::readText)
