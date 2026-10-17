@@ -34,7 +34,7 @@ class GeckoViewWithVirtualCursor @JvmOverloads constructor(
         onEmulatedKeyEvent = { keyEvent ->
             cursorDrawerDelegate.dispatchKeyEvent(keyEvent)
         },
-        motionAxesTranslationEnabled = { !config.disableMotionAxesDpadNavigation },
+        motionAxesTranslationEnabled = { !config.cursorConfig.disableMotionAxesDpadNavigation },
         isSoftwareKeyboardVisible = {
             ViewCompat.getRootWindowInsets(rootView)?.isVisible(WindowInsetsCompat.Type.ime()) == true
         },

@@ -375,7 +375,7 @@ class CursorDrawerDelegate(val context: Context, val surface: View, val config: 
             val dTime = newTime - lastCursorUpdate
             lastCursorUpdate = newTime
 
-            val cfg = config
+            val cfg = config.cursorConfig
             val speedCap = maxSpeedBaselinePx * (cfg.cursorMaxSpeedPercent / 100f)
             val accelerationFactor = 0.05f * (cfg.cursorAccelerationPercent / 100f) * dTime
             //float decelerationFactor = 1 - Math.min(0.5f, 0.005f * dTime);

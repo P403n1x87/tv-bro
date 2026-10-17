@@ -2,6 +2,7 @@ package com.phlox.tvwebbrowser.activity.main
 
 import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.Config
+import com.phlox.tvwebbrowser.domain.HomePagePolicy
 import com.phlox.tvwebbrowser.utils.activemodel.ActiveModel
 import com.phlox.tvwebbrowser.utils.observable.ObservableValue
 
@@ -44,29 +45,14 @@ class SettingsModel(
     fun setSearchEngineURL(url: String) {
         config.searchEngineURL.value = url
         if (homePageMode == Config.HomePageMode.SEARCH_ENGINE) {
-            updateHomeAsSearchEngine(url)
+            homePage = HomePagePolicy.searchEngineHomePage(url)
         }
-    }
-
-    private fun updateHomeAsSearchEngine(url: String) {
-        val regexForUrl = """^https?://[^#?/]+""".toRegex()
-        val homePageUrl = regexForUrl.find(url)?.value ?: Config.HOME_URL_ALIAS
-        homePage = homePageUrl
     }
 
     fun setHomePageProperties(homePageMode: Config.HomePageMode, customHomePageUrl: String?) {
         this.homePageMode = homePageMode
-        when (homePageMode) {
-            Config.HomePageMode.SEARCH_ENGINE -> {
-                updateHomeAsSearchEngine(config.searchEngineURL.value)
-            }
-            Config.HomePageMode.HOME_PAGE, Config.HomePageMode.BLANK -> {
-                homePage = Config.HOME_URL_ALIAS
-            }
-            Config.HomePageMode.CUSTOM -> {
-                homePage = customHomePageUrl ?: Config.HOME_URL_ALIAS
-            }
-        }
+        homePage = HomePagePolicy.homePageUrlFor(
+            homePageMode, customHomePageUrl, config.searchEngineURL.value)
     }
 
     //Browsing
@@ -117,16 +103,16 @@ class SettingsModel(
 
     //Controls
     var disableMotionAxesDpadNavigation: Boolean
-        get() = config.disableMotionAxesDpadNavigation
-        set(value) { config.disableMotionAxesDpadNavigation = value }
+        get() = config.cursorConfig.disableMotionAxesDpadNavigation
+        set(value) { config.cursorConfig.disableMotionAxesDpadNavigation = value }
 
     var cursorMaxSpeedPercent: Int
-        get() = config.cursorMaxSpeedPercent
-        set(value) { config.cursorMaxSpeedPercent = value }
+        get() = config.cursorConfig.cursorMaxSpeedPercent
+        set(value) { config.cursorConfig.cursorMaxSpeedPercent = value }
 
     var cursorAccelerationPercent: Int
-        get() = config.cursorAccelerationPercent
-        set(value) { config.cursorAccelerationPercent = value }
+        get() = config.cursorConfig.cursorAccelerationPercent
+        set(value) { config.cursorConfig.cursorAccelerationPercent = value }
 
     //Advanced
     var webEngine: String

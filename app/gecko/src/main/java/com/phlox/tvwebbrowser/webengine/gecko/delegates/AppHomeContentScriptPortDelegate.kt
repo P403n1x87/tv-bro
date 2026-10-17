@@ -5,6 +5,7 @@ import android.util.Base64
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.phlox.tvwebbrowser.SearchEngines
 import com.phlox.tvwebbrowser.singleton.FaviconsPool
 import com.phlox.tvwebbrowser.utils.Utils
 import com.phlox.tvwebbrowser.webengine.gecko.GeckoWebEngine
@@ -43,7 +44,7 @@ class AppHomeContentScriptPortDelegate(val port: WebExtension.Port, val webEngin
                     }
                     webEngine.evaluateJavascript("renderSections($bookmarks, $history)")
                     webEngine.evaluateJavascript(
-                        "applySearchEngine(\"${cfg.guessSearchEngineName()}\", \"${cfg.searchEngineURL.value}\")")
+                        "applySearchEngine(\"${SearchEngines.nameFor(cfg.searchEngineURL.value)}\", \"${cfg.searchEngineURL.value}\")")
                 }
                 "setSearchEngine" -> {
                     val data = msgJson.getJSONObject("data")

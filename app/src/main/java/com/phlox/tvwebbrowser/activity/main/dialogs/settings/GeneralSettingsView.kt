@@ -3,6 +3,7 @@ package com.phlox.tvwebbrowser.activity.main.dialogs.settings
 import android.content.Context
 import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.R
+import com.phlox.tvwebbrowser.SearchEngines
 import com.phlox.tvwebbrowser.activity.main.SettingsModel
 
 class GeneralSettingsView(
@@ -11,7 +12,7 @@ class GeneralSettingsView(
 
     private val settingsModel = deps.settings
 
-    private val engineTitles get() = Config.SearchEnginesTitles.toList()
+    private val engineTitles get() = SearchEngines.titles.toList()
 
     init {
         // Legacy UA string - now the default one should be used instead.
@@ -38,10 +39,7 @@ class GeneralSettingsView(
         )
     }
 
-    private fun currentEngineIndex(): Int {
-        val index = Config.SearchEnginesURLs.indexOf(settingsModel.searchEngineURL)
-        return if (index == -1) engineTitles.lastIndex else index
-    }
+    private fun currentEngineIndex() = SearchEngines.indexFor(settingsModel.searchEngineURL)
 
     private fun searchEngineItem() = SettingsItem.Choice(
         iconRes = R.drawable.ic_settings_search_24dp,
@@ -61,7 +59,7 @@ class GeneralSettingsView(
                     rebuild()
                 }
             } else {
-                settingsModel.setSearchEngineURL(Config.SearchEnginesURLs[position])
+                settingsModel.setSearchEngineURL(SearchEngines.urls[position])
                 rebuild()
             }
         }

@@ -52,6 +52,8 @@ import androidx.webkit.WebViewFeature
 import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.Config.PlayerKind
 import com.phlox.tvwebbrowser.R
+import com.phlox.tvwebbrowser.domain.HomePagePolicy
+import com.phlox.tvwebbrowser.domain.HomePagePolicy.HomeAliasTarget
 import com.phlox.tvwebbrowser.player.MediaDiscoveryNotifier
 import com.phlox.tvwebbrowser.player.MediaMetadataCache
 import com.phlox.tvwebbrowser.player.MediaMetadataPrefetcher
@@ -596,23 +598,18 @@ open class WebViewEx(context: Context, val callback: Callback, val jsInterface: 
     override fun loadUrl(url: String) {
         when {
             Config.HOME_URL_ALIAS == url -> {
-                when (config.homePageMode) {
-                    Config.HomePageMode.BLANK -> {
+                when (val target = HomePagePolicy.homeAliasTarget(config.homePageMode, config.homePage)) {
+                    HomeAliasTarget.Blank -> {
                         loadDataWithBaseURL(null, "", "text/html", "UTF-8", null)
                     }
-                    Config.HomePageMode.CUSTOM, Config.HomePageMode.SEARCH_ENGINE -> {
+                    is HomeAliasTarget.Load -> {
                         try {
-                            currentOriginalUrl = config.homePage.toUri()
-                            super.loadUrl(config.homePage)
+                            currentOriginalUrl = target.url.toUri()
+                            super.loadUrl(target.url)
                         } catch (e: Exception) {
                             Log.e(TAG, "LoadUrl error", e)
                             loadDataWithBaseURL(null, "", "text/html", "UTF-8", null)
                         }
-
-                    }
-                    Config.HomePageMode.HOME_PAGE -> {
-                        currentOriginalUrl = Config.HOME_PAGE_URL.toUri()
-                        super.loadUrl(Config.HOME_PAGE_URL)
                     }
                 }
 
