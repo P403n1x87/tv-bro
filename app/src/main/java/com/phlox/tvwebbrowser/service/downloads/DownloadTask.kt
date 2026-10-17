@@ -1,5 +1,6 @@
 package com.phlox.tvwebbrowser.service.downloads
 
+import android.content.ContentResolver
 import android.content.ContentValues
 import android.net.Uri
 import android.os.Build
@@ -8,7 +9,6 @@ import android.provider.MediaStore
 import android.util.Base64
 import android.util.Log
 import android.webkit.CookieManager
-import com.phlox.tvwebbrowser.TVBro
 import com.phlox.tvwebbrowser.model.Download
 import com.phlox.tvwebbrowser.repository.Repositories
 import com.phlox.tvwebbrowser.utils.DownloadUtils
@@ -33,7 +33,7 @@ interface DownloadTask {
     }
 }
 
-class FileDownloadTask(override var downloadInfo: Download, private val userAgent: String?, val callback: DownloadTask.Callback) : Runnable, DownloadTask {
+class FileDownloadTask(override var downloadInfo: Download, private val userAgent: String?, val callback: DownloadTask.Callback, private val contentResolver: ContentResolver) : Runnable, DownloadTask {
     companion object {
         val TAG = FileDownloadTask::class.java.simpleName
     }
@@ -98,7 +98,7 @@ class FileDownloadTask(override var downloadInfo: Download, private val userAgen
                 downloadInfo.filepath = File(File(downloadInfo.filepath).parentFile, downloadInfo.filename).absolutePath
             }
 
-            output = prepareDownloadOutput(downloadInfo)
+            output = prepareDownloadOutput(downloadInfo, contentResolver)
             Log.d(TAG, "URI: " + downloadInfo.filename)
             val data = ByteArray(4096)
             var total: Long = 0
@@ -128,21 +128,21 @@ class FileDownloadTask(override var downloadInfo: Download, private val userAgen
             }
 
             connection?.disconnect()
-            cancelDownloadIfNeeded(downloadInfo)
+            cancelDownloadIfNeeded(downloadInfo, contentResolver)
         }
         downloadInfo.size = downloadInfo.bytesReceived
         callback.onDone(this)
     }
 }
 
-class BlobDownloadTask(override var downloadInfo: Download, val blobBase64Data: String, val callback: DownloadTask.Callback) : Runnable, DownloadTask {
+class BlobDownloadTask(override var downloadInfo: Download, val blobBase64Data: String, val callback: DownloadTask.Callback, private val contentResolver: ContentResolver) : Runnable, DownloadTask {
 
     override fun run() {
         downloadInfo.id = runBlocking { Repositories.downloads.add(downloadInfo) }
 
         try {
             val blobAsBytes: ByteArray = Base64.decode(blobBase64Data.replaceFirst("data:${downloadInfo.mimeType};base64,", ""), 0)
-            val output = prepareDownloadOutput(downloadInfo)
+            val output = prepareDownloadOutput(downloadInfo, contentResolver)
             output.buffered().use{ it.write(blobAsBytes) }
             downloadInfo.size = blobAsBytes.size.toLong()
             downloadInfo.bytesReceived = downloadInfo.size
@@ -151,19 +151,19 @@ class BlobDownloadTask(override var downloadInfo: Download, val blobBase64Data: 
             callback.onError(this, 0, e.toString())
             return
         } finally {
-            cancelDownloadIfNeeded(downloadInfo)
+            cancelDownloadIfNeeded(downloadInfo, contentResolver)
         }
         callback.onDone(this)
     }
 }
 
-class StreamDownloadTask(override var downloadInfo: Download, val stream: InputStream, val callback: DownloadTask.Callback) : Runnable, DownloadTask {
+class StreamDownloadTask(override var downloadInfo: Download, val stream: InputStream, val callback: DownloadTask.Callback, private val contentResolver: ContentResolver) : Runnable, DownloadTask {
     override fun run() {
         downloadInfo.id = runBlocking { Repositories.downloads.add(downloadInfo) }
 
         var output: OutputStream? = null
         try {
-            output = prepareDownloadOutput(downloadInfo)
+            output = prepareDownloadOutput(downloadInfo, contentResolver)
             val data = ByteArray(4096)
             var total: Long = 0
             var count = stream.read(data)
@@ -191,17 +191,16 @@ class StreamDownloadTask(override var downloadInfo: Download, val stream: InputS
             } catch (ignored: IOException) {
             }
 
-            cancelDownloadIfNeeded(downloadInfo)
+            cancelDownloadIfNeeded(downloadInfo, contentResolver)
         }
         downloadInfo.size = downloadInfo.bytesReceived
         callback.onDone(this)
     }
 }
 
-private fun cancelDownloadIfNeeded(downloadInfo: Download) {
+private fun cancelDownloadIfNeeded(downloadInfo: Download, contentResolver: ContentResolver) {
     val filePath = downloadInfo.filepath
     if (filePath.isEmpty()) return
-    val contentResolver = TVBro.instance.contentResolver
     if (downloadInfo.cancelled) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val rowsDeleted = contentResolver.delete(Uri.parse(filePath), null)
@@ -219,8 +218,7 @@ private fun cancelDownloadIfNeeded(downloadInfo: Download) {
     }
 }
 
-private fun prepareDownloadOutput(downloadInfo: Download): OutputStream {
-    val contentResolver = TVBro.instance.contentResolver
+private fun prepareDownloadOutput(downloadInfo: Download, contentResolver: ContentResolver): OutputStream {
     return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
         val downloadsCollection =
             MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)

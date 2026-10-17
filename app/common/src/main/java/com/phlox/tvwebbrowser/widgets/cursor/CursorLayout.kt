@@ -10,7 +10,7 @@ import android.view.MotionEvent
 import android.widget.FrameLayout
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import com.phlox.tvwebbrowser.AppContext
+import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.utils.DPADNavigationEventsAdapter
 
 
@@ -24,12 +24,22 @@ class CursorLayout @JvmOverloads constructor(context: Context, attrs: AttributeS
         set(value) {
             setWillNotDraw(!value)
         }
-    lateinit var cursorDrawerDelegate: CursorDrawerDelegate
+
+    /**
+     * The app [Config], handed by the composition root right after inflation. The cursor widgets
+     * read the live cursor settings from it instead of the `AppContext` global.
+     */
+    lateinit var config: Config
+
+    /** Built on first use, so it can pick up [config] set by the host after inflation. */
+    val cursorDrawerDelegate: CursorDrawerDelegate by lazy {
+        CursorDrawerDelegate(context, this, config).also { it.init() }
+    }
     private val inputEventsAdapter = DPADNavigationEventsAdapter(
         onEmulatedKeyEvent = { keyEvent ->
             cursorDrawerDelegate.dispatchKeyEvent(keyEvent)
         },
-        motionAxesTranslationEnabled = { !AppContext.provideConfig().disableMotionAxesDpadNavigation },
+        motionAxesTranslationEnabled = { !config.disableMotionAxesDpadNavigation },
         isSoftwareKeyboardVisible = {
             ViewCompat.getRootWindowInsets(rootView)?.isVisible(WindowInsetsCompat.Type.ime()) == true
         },
@@ -44,8 +54,6 @@ class CursorLayout @JvmOverloads constructor(context: Context, attrs: AttributeS
             return
         }
         setWillNotDraw(false)
-        cursorDrawerDelegate = CursorDrawerDelegate(context, this)
-        cursorDrawerDelegate.init()
     }
 
     override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {

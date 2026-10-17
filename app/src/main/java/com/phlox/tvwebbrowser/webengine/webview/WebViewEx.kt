@@ -49,7 +49,6 @@ import androidx.webkit.ScriptHandler
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
-import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.Config.PlayerKind
 import com.phlox.tvwebbrowser.R
@@ -117,7 +116,8 @@ open class WebViewEx(context: Context, val callback: Callback, val jsInterface: 
     private var externalPlayerStartedAt = 0L
     private var externalPlayerUrl: String? = null
     private val uiHandler = Handler(Looper.getMainLooper())
-    private val config = AppContext.provideConfig()
+    // The engine hands the JS bridge its Config; reuse the same live instance here.
+    private val config = jsInterface.config
 
     interface Callback {
         fun getActivity(): Activity?

@@ -17,11 +17,10 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowManager
-import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.utils.Utils
 
-class CursorDrawerDelegate(val context: Context, val surface: View) {
+class CursorDrawerDelegate(val context: Context, val surface: View, val config: Config) {
     private var cursorRadius: Int = 0
     private var cursorRadiusPressed: Int = 0
     private var cursorRadiusAnimationMultiplier: Float = 1f
@@ -376,7 +375,7 @@ class CursorDrawerDelegate(val context: Context, val surface: View) {
             val dTime = newTime - lastCursorUpdate
             lastCursorUpdate = newTime
 
-            val cfg = AppContext.provideConfig()
+            val cfg = config
             val speedCap = maxSpeedBaselinePx * (cfg.cursorMaxSpeedPercent / 100f)
             val accelerationFactor = 0.05f * (cfg.cursorAccelerationPercent / 100f) * dTime
             //float decelerationFactor = 1 - Math.min(0.5f, 0.005f * dTime);
