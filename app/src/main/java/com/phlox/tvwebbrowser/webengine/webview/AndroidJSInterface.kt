@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.http.SslError
 import android.webkit.JavascriptInterface
 import com.phlox.tvwebbrowser.Config
+import com.phlox.tvwebbrowser.SearchEngines
 import com.phlox.tvwebbrowser.domain.HomePagePolicy
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.model.Download
@@ -89,7 +90,7 @@ class AndroidJSInterface(
             val history = linksToJson(callback.getHomePageHistoryLinks())
             webEngine.evaluateJavascript("renderSections($bookmarks, $history)")
             webEngine.evaluateJavascript(
-                "applySearchEngine(\"${config.guessSearchEngineName()}\", \"${config.searchEngineURL.value}\")")
+                "applySearchEngine(\"${SearchEngines.nameFor(config.searchEngineURL.value)}\", \"${config.searchEngineURL.value}\")")
         }
     }
 

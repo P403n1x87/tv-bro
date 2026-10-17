@@ -102,7 +102,7 @@ class MainActivityViewModel(
 
     private suspend fun loadHomePageLinks() {
         Log.d(TAG, "loadHomePageLinks")
-        if (config.homePageMode == Config.HomePageMode.HOME_PAGE) {
+        if (HomePagePolicy.usesBuiltInHomePage(config.homePageMode)) {
             homePageLinks.replaceAll(
                 favorites.allBookmarks()
                     .map { HomePageLink.fromBookmarkItem(it) })

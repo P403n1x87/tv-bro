@@ -53,9 +53,9 @@ class AutoUpdateModel(
         set(value) { config.autoCheckUpdates = value }
 
     init {
-        lastUpdateNotificationTime = if (config.prefs.contains(Config.LAST_UPDATE_USER_NOTIFICATION_TIME_KEY))
-            Calendar.getInstance().apply { timeInMillis = config.prefs.getLong(Config.LAST_UPDATE_USER_NOTIFICATION_TIME_KEY, 0) } else
-            Calendar.getInstance()
+        lastUpdateNotificationTime = config.lastUpdateUserNotificationTime
+            ?.let { stored -> Calendar.getInstance().apply { timeInMillis = stored } }
+            ?: Calendar.getInstance()
     }
 
     fun checkUpdate(force: Boolean, onDoneCallback: () -> Unit) = modelScope.launch(Dispatchers.Main) {
@@ -90,9 +90,7 @@ class AutoUpdateModel(
             throw IllegalStateException()
         }
         lastUpdateNotificationTime = now
-        config.prefs.edit()
-            .putLong(Config.LAST_UPDATE_USER_NOTIFICATION_TIME_KEY, lastUpdateNotificationTime.timeInMillis)
-            .apply()
+        config.lastUpdateUserNotificationTime = lastUpdateNotificationTime.timeInMillis
 
         host.showUpdateDialog(
             onDownload = download@{
