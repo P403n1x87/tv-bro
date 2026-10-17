@@ -76,10 +76,19 @@ vocabulary), see `ARCHITECTURE-OVERVIEW.md`.
 | Component | Purpose | Key Notes |
 |---|---|---|
 | **WebEngine** | Interface abstracting WebView/GeckoView. | View lifecycle, navigation, JS, media, virtual cursor, thumbnails. |
-| **WebViewWebEngine** | WebView implementation. | Document-start overlay zapper (when supported), media candidate detection (incl. query-param manifests), prefetch metadata. |
-| **GeckoWebEngine** | GeckoView implementation. | Delegates-based (Content/Navigation/Media/etc.), media candidate extraction, prefetch metadata. |
+| **WebViewWebEngine** | WebView implementation. | Document-start overlay zapper (when supported), media candidate detection (incl. query-param manifests), prefetch metadata. Live-stream recovery delegated to `MediaAutoReplay`. |
+| **GeckoWebEngine** | GeckoView implementation. | Delegates-based (Content/Navigation/Media/etc.), media candidate extraction, prefetch metadata. Live-stream recovery delegated to `MediaAutoReplay`. |
 | **WebEngineCallback** | Per-tab adapter: policy + model updates. | Plain class; injected models; talks to UI via host. Delegates to domain where pure. Uses runBlocking only for synchronous popup decision (documented). |
 | **WebEngineWindowProviderCallback** | Engine→app callback interface. | Defines host-facing operations engine needs. |
+
+## Layer 6b - Shared player module (`:app:player`)
+| Component | Purpose | Key Notes |
+|---|---|---|
+| **MediaUrlIdentity** | Collapses rotating signatures/cache-busters for one stream to a single identity. | Pure; query parameters are dropped only when they select a resource, or when the path itself names the media. |
+| **MediaRequestCatalog** | Bounded, ephemeral observations of the requests the browser made. | Process-level singleton (`shared`); read by the Gecko delegate and the native player. |
+| **MediaAutoReplay** | Reloads the page and replays a live stream the native player gave up on. | Engine-agnostic: the caller injects `onReload`/`findReplayUrl`/`onReplay` and a `Scheduler`, so both browser-core adapters share one state machine instead of drifting. One automatic replay per user-initiated playback. |
+| **PlaybackRetryPolicy** | Pure retry/backoff decisions and the "a refresh can recover this" question. | `canRecoverByRefresh` is live-scoped, so a stalled non-live stream does not restart from zero. |
+| **NativeVideoActivity** | The built-in ExoPlayer screen. | Owns the live-window detection; reports a `PlaybackResult` whose `refreshable` flag tells the launching engine a reload+replay is worth trying. |
 
 ## Layer 7 - Service/Application
 | Component | Purpose | Key Notes |

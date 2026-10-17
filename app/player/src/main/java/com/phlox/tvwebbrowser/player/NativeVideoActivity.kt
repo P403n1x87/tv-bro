@@ -20,6 +20,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Timeline
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
@@ -37,7 +38,7 @@ import java.util.UUID
 @UnstableApi
 class NativeVideoActivity : Activity() {
     enum class ReturnAction { BACK, ENDED, FAILED }
-    data class PlaybackResult(val positionMs: Long, val action: ReturnAction)
+    data class PlaybackResult(val positionMs: Long, val action: ReturnAction, val refreshable: Boolean = false)
     data class Subtitle(val url: String, val language: String, val label: String)
     data class PlaybackRequest(val source: MediaRequestCatalog.Request, val context: MediaRequestContext,
         val positionMs: Long, val speed: Float, val volume: Float = 1f, val textEnabled: Boolean = false,
@@ -96,15 +97,23 @@ class NativeVideoActivity : Activity() {
     private var lastPlayDurationMs = 0L
     private var errorPositionMs = -1L
     private var resumeAfterErrorMs = 0L
+    // Set once the timeline shows a live window. A live stream slides forward, so retrying at the
+    // position where it stalled asks for a segment that has already been purged; resuming at the
+    // live edge instead is what a page refresh would do anyway.
+    private var liveStream = false
+    // Set when we give up on a retryable failure; the host may reload the page and replay the
+    // same stream from the live edge (see WebViewEx / GeckoWebEngine).
+    private var refreshableOnFailure = false
     private val handler = Handler(Looper.getMainLooper())
     private val ensurePlaybackRunnable = Runnable { ensurePlayback() }
     private val retryPlaybackRunnable = Runnable { retryPlayback() }
     private val bufferTimeout = Runnable {
         if (player?.playbackState == Player.STATE_BUFFERING && player?.playWhenReady == true) {
-            val pos = player?.currentPosition ?: 0L
-            Log.w(TAG, "bufferTimeout positionMs=$pos")
+            val pos = if (liveStream) -1L else (player?.currentPosition ?: 0L)
+            Log.w(TAG, "bufferTimeout positionMs=$pos live=$liveStream")
             noteFailure()
             if (!scheduleRetry(pos)) {
+                refreshableOnFailure = PlaybackRetryPolicy.canRecoverByRefresh(liveStream)
                 returnAction = ReturnAction.FAILED
                 finish()
             }
@@ -187,6 +196,10 @@ class NativeVideoActivity : Activity() {
             }
         })
         p.addListener(object : Player.Listener {
+            override fun onTimelineChanged(timeline: Timeline, reason: Int) {
+                // Remember "live" once the manifest is parsed; keep it through later errors.
+                if (!timeline.isEmpty) liveStream = p.isCurrentMediaItemLive
+            }
             override fun onPlaybackStateChanged(playbackState: Int) {
                 Log.i(TAG, "state=$playbackState positionMs=${p.currentPosition}")
                 scheduleBufferTimeout()
@@ -220,11 +233,11 @@ class NativeVideoActivity : Activity() {
             override fun onPlayerError(error: PlaybackException) {
                 Log.e(TAG, "errorCode=${error.errorCodeName}")
                 noteFailure()
-                if (!PlaybackRetryPolicy.isTransient(error.errorCode) ||
-                    !scheduleRetry(resumePositionFor(error))) {
-                    returnAction = ReturnAction.FAILED
-                    finish()
-                }
+                val transient = PlaybackRetryPolicy.isTransient(error.errorCode)
+                if (transient && scheduleRetry(resumePositionFor(error))) return
+                refreshableOnFailure = PlaybackRetryPolicy.canRecoverByRefresh(error.errorCode, liveStream)
+                returnAction = ReturnAction.FAILED
+                finish()
             }
         })
         val subtitles = current.subtitles.map { subtitle ->
@@ -391,7 +404,7 @@ class NativeVideoActivity : Activity() {
     }
 
     private fun resumePositionFor(error: PlaybackException): Long =
-        if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) -1L
+        if (liveStream || error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) -1L
         else errorPositionMs.takeIf { it >= 0 } ?: (player?.currentPosition ?: 0L)
 
     /**
@@ -448,7 +461,7 @@ class NativeVideoActivity : Activity() {
             val current = handoff?.takeIf { it.token == intent.getStringExtra("handoffToken") }
             if (current != null) {
                 handoff = null
-                val result = PlaybackResult(if (current.request.positionMs < 0) -1 else position, returnAction)
+                val result = PlaybackResult(if (current.request.positionMs < 0) -1 else position, returnAction, refreshableOnFailure)
                 // ActivityThread removes the old SurfaceView after onDestroy returns.
                 handler.post { current.callback(result) }
             }

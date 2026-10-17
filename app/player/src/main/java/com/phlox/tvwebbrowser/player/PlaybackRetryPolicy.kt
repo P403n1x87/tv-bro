@@ -33,4 +33,16 @@ object PlaybackRetryPolicy {
 
     /** Exponential backoff for a 1-based [attempt]: BASE, BASE*2, BASE*4, ... */
     fun backoffMs(attempt: Int): Long = BASE_BACKOFF_MS shl (attempt - 1).coerceAtLeast(0)
+
+    /**
+     * Whether the host can recover a stalled live stream by reloading the page and replaying it
+     * from the live edge. Only live streams qualify: their window slides forward, so a refresh
+     * moves to a segment that still exists. A non-live stream would just restart from zero, which
+     * is worse than reporting the failure.
+     */
+    fun canRecoverByRefresh(live: Boolean): Boolean = live
+
+    /** [canRecoverByRefresh] for an exhausted retryable [errorCode]; [live] comes from the timeline. */
+    fun canRecoverByRefresh(errorCode: Int, live: Boolean): Boolean =
+        isTransient(errorCode) && (live || errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW)
 }

@@ -23,11 +23,37 @@ class MediaUrlIdentityTest {
         assertEquals("cdn.example/v/master.m3u8", MediaUrlIdentity.key("https://cdn.example/v/master.m3u8"))
     }
 
+    @Test fun dropsCacheBusterOnNamedManifest() {
+        val a = "https://cdn1.obstreamx.click/live/allzroed5s.m3u8?_=1792260359926"
+        val b = "https://cdn1.obstreamx.click/live/allzroed5s.m3u8?_=1792260473000"
+        assertEquals(MediaUrlIdentity.key(a), MediaUrlIdentity.key(b))
+        assertEquals("cdn1.obstreamx.click/live/allzroed5s.m3u8", MediaUrlIdentity.key(a))
+    }
+
+    @Test fun dropsRotatingCredentialsOnNamedManifest() {
+        val a = "https://cdn.example/v/master.m3u8?token=abc&t=1"
+        val b = "https://cdn.example/v/master.m3u8?token=def&t=2"
+        assertEquals(MediaUrlIdentity.key(a), MediaUrlIdentity.key(b))
+    }
+
+    @Test fun keepsMeaningfulQueryOnNamedManifest() {
+        val low = "https://cdn.example/v/master.m3u8?quality=low"
+        val high = "https://cdn.example/v/master.m3u8?quality=high"
+        assertNotEquals(MediaUrlIdentity.key(low), MediaUrlIdentity.key(high))
+        assertEquals(MediaUrlIdentity.key(low), MediaUrlIdentity.key("https://cdn.example/v/master.m3u8?quality=low"))
+    }
+
+    @Test fun keepsDistinctNamedManifestsApart() {
+        assertNotEquals(
+            MediaUrlIdentity.key("https://cdn.example/live/a.m3u8?_=1"),
+            MediaUrlIdentity.key("https://cdn.example/live/b.m3u8?_=1"))
+    }
+
     @Test fun queryWithoutResourceParamKeptVerbatim() {
-        val a = "https://cdn.example/v/master.m3u8?token=abc"
-        val b = "https://cdn.example/v/master.m3u8?token=def"
+        val a = "https://cdn.example/v/stream?token=abc"
+        val b = "https://cdn.example/v/stream?token=def"
         assertNotEquals(MediaUrlIdentity.key(a), MediaUrlIdentity.key(b))
-        assertEquals(MediaUrlIdentity.key(a), MediaUrlIdentity.key("https://cdn.example/v/master.m3u8?token=abc"))
+        assertEquals(MediaUrlIdentity.key(a), MediaUrlIdentity.key("https://cdn.example/v/stream?token=abc"))
     }
 
     @Test fun keepsProgressiveQueryVariantsApart() {

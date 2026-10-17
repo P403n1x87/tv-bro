@@ -324,6 +324,7 @@ architecture with §2–§5.
 | Engine registration/dispatch | `WebEngineFactory`, `WebEngineProviderCallback`, `WebEngineWindowProviderCallback` |
 | Browser-core adapters | `WebViewWebEngine` (+ `WebViewEx`, `AndroidJSInterface`); `GeckoWebEngine` (+ its delegates) in `:app:gecko` |
 | Per-tab adapter | `WebEngineCallback` |
+| Shared media/player plumbing (`:app:player`) | `MediaUrlIdentity`, `MediaRequestCatalog`, `MediaAutoReplay`, `PlaybackRetryPolicy`, `NativeVideoActivity` |
 | Settings object | `Config` |
 | Application/platform handle | `AppContext`, `TVBro` |
 | Built-in asset server | `LocalAssetServer` |

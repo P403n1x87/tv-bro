@@ -95,5 +95,10 @@ the model/host seam polish. Work on a feature branch; **open a PR only when aske
   (no-op when configured off).
 - Gecko auto-redirect: use `request.hasUserGesture`, not `!isDirectNavigation`.
 - Stream list: `MediaUrlIdentity.key()` collapses signature rotations.
+- Live streams: retries resume at the live edge; when they exhaust, the host reloads the page and
+  replays the identity-matched stream via the shared `MediaAutoReplay` (used by both engine
+  adapters; one automatic replay per user playback). Whether a failure is refresh-recoverable is
+  `PlaybackRetryPolicy.canRecoverByRefresh` and is live-scoped, so a non-live stall never restarts
+  from zero.
 - Settings: declarative `SettingsItem` + `SettingsRowFactory`, pages rebuild with `post { }`.
 - Native player BACK is opted out of predictive back (`enableOnBackInvokedCallback=false`).
