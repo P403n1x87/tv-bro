@@ -27,4 +27,29 @@ class PlaybackRetryPolicyTest {
         assertEquals(4000L, PlaybackRetryPolicy.backoffMs(2))
         assertEquals(8000L, PlaybackRetryPolicy.backoffMs(3))
     }
+
+    @Test fun onlyLiveStreamsQualifyForRefresh() {
+        assertTrue(PlaybackRetryPolicy.canRecoverByRefresh(live = true))
+        assertFalse(PlaybackRetryPolicy.canRecoverByRefresh(live = false))
+    }
+
+    @Test fun exhaustedTransientErrorOnLiveStreamIsRefreshable() {
+        assertTrue(PlaybackRetryPolicy.canRecoverByRefresh(
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED, live = true))
+    }
+
+    @Test fun transientErrorOnVodIsNotRefreshable() {
+        assertFalse(PlaybackRetryPolicy.canRecoverByRefresh(
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED, live = false))
+    }
+
+    @Test fun behindLiveWindowIsRefreshableEvenWithoutATimeline() {
+        assertTrue(PlaybackRetryPolicy.canRecoverByRefresh(
+            PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW, live = false))
+    }
+
+    @Test fun deterministicErrorOnLiveStreamIsNotRefreshable() {
+        assertFalse(PlaybackRetryPolicy.canRecoverByRefresh(
+            PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED, live = true))
+    }
 }

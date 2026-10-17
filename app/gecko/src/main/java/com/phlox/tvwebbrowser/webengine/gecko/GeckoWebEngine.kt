@@ -13,6 +13,8 @@ import android.widget.Toast
 import androidx.annotation.UiThread
 import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.model.WebTabState
+import com.phlox.tvwebbrowser.player.HandlerScheduler
+import com.phlox.tvwebbrowser.player.MediaAutoReplay
 import com.phlox.tvwebbrowser.player.MediaMetadataCache
 import com.phlox.tvwebbrowser.player.MediaMetadataPrefetcher
 import com.phlox.tvwebbrowser.player.MediaRequestCatalog
@@ -181,6 +183,22 @@ class GeckoWebEngine(
         private set
     var appWebExtensionBackgroundPortDelegate: AppWebExtensionBackgroundPortDelegate? = null
     private lateinit var webExtObserver: (WebExtension?) -> Unit
+    // Reloads the page and replays a live stream the native player gave up on (see MediaAutoReplay).
+    private val autoReplay = MediaAutoReplay(
+        scheduler = HandlerScheduler(uiHandler),
+        onReload = {
+            url?.let { MediaRequestCatalog.shared.clearPage(it) }
+            session.reload()
+        },
+        findReplayUrl = { key ->
+            val page = url
+            if (page == null) null
+            else MediaRequestCatalog.shared.snapshot(page, session.settings.usePrivateMode)
+                .filter { MediaUrlIdentity.key(it.url) == key }
+                .maxByOrNull { it.time }?.url
+        },
+        onReplay = ::launchNativePlayer,
+    )
 
     override val url: String?
         get() = navigationDelegate.locationURL
@@ -472,9 +490,14 @@ class GeckoWebEngine(
     }
 
     override fun playMediaCandidate(candidate: MediaCandidate) {
+        autoReplay.onUserPlaybackStarted()
+        launchNativePlayer(candidate.url)
+    }
+
+    private fun launchNativePlayer(candidateUrl: String) {
         val page = url ?: return
         val ua = userAgentString ?: GeckoSession.getDefaultUserAgent()
-        NativeMediaResolver.resolve(candidate.url, page, session.settings.usePrivateMode, ua) { resolved, reason ->
+        NativeMediaResolver.resolve(candidateUrl, page, session.settings.usePrivateMode, ua) { resolved, reason ->
             if (resolved == null) {
                 Log.i(TAG, "play-media-candidate: $reason")
                 Toast.makeText(appContext, R.string.native_playback_unavailable, Toast.LENGTH_SHORT).show()
@@ -486,9 +509,7 @@ class GeckoWebEngine(
                 Config.PlayerKind.BUILT_IN -> try {
                     NativeVideoActivity.launch(appContext, NativeVideoActivity.PlaybackRequest(
                         source, resolved.context, 0L, 1f)) { result ->
-                        if (result.action == NativeVideoActivity.ReturnAction.FAILED) {
-                            Toast.makeText(appContext, R.string.native_playback_unavailable, Toast.LENGTH_SHORT).show()
-                        }
+                        onPlaybackResult(result, source.url)
                     }
                 } catch (error: Exception) {
                     Log.w(TAG, "play-media-candidate failed: ${error.javaClass.simpleName}")
@@ -499,6 +520,16 @@ class GeckoWebEngine(
                     PlayerLauncher.openExternal(activity, source.url, ua, source.page, cookie)
                 }
             }
+        }
+    }
+
+    private fun onPlaybackResult(result: NativeVideoActivity.PlaybackResult, failedUrl: String) {
+        if (result.action != NativeVideoActivity.ReturnAction.FAILED) return
+        if (result.refreshable && autoReplay.canStart()) {
+            Toast.makeText(appContext, R.string.stream_reloading, Toast.LENGTH_SHORT).show()
+            autoReplay.start(MediaUrlIdentity.key(failedUrl))
+        } else {
+            Toast.makeText(appContext, R.string.native_playback_unavailable, Toast.LENGTH_SHORT).show()
         }
     }
 

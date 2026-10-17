@@ -59,6 +59,8 @@ import com.phlox.tvwebbrowser.player.MediaMetadataCache
 import com.phlox.tvwebbrowser.player.MediaMetadataPrefetcher
 import com.phlox.tvwebbrowser.player.MediaRequestCatalog
 import com.phlox.tvwebbrowser.player.MediaRequestContext
+import com.phlox.tvwebbrowser.player.HandlerScheduler
+import com.phlox.tvwebbrowser.player.MediaAutoReplay
 import com.phlox.tvwebbrowser.player.MediaUrlIdentity
 import com.phlox.tvwebbrowser.player.NativeVideoActivity
 import com.phlox.tvwebbrowser.player.PlaybackFailure
@@ -120,6 +122,17 @@ open class WebViewEx(context: Context, val callback: Callback, val jsInterface: 
     private val uiHandler = Handler(Looper.getMainLooper())
     // The engine hands the JS bridge its Config; reuse the same live instance here.
     private val config = jsInterface.config
+    // Reloads the page and replays a live stream the native player gave up on (see MediaAutoReplay).
+    private val autoReplay = MediaAutoReplay(
+        scheduler = HandlerScheduler(uiHandler),
+        onReload = {
+            detectedMedia.clear()
+            detectedMediaIdentities.clear()
+            reload()
+        },
+        findReplayUrl = { key -> detectedMediaIdentities[key]?.takeIf { detectedMedia.containsKey(it) } },
+        onReplay = { url -> playInInternalPlayer(CastCandidate(url, detectedMedia[url] ?: emptyMap(), inferCastKind(url))) },
+    )
 
     interface Callback {
         fun getActivity(): Activity?
@@ -859,6 +872,7 @@ open class WebViewEx(context: Context, val callback: Callback, val jsInterface: 
 
     /** Plays one detected stream in the configured player, bypassing the page controls. */
     fun playMediaCandidate(url: String) {
+        autoReplay.onUserPlaybackStarted()
         playCandidate(CastCandidate(url, detectedMedia[url] ?: emptyMap(), inferCastKind(url)),
             config.playerKind, 0L)
     }
@@ -900,7 +914,11 @@ open class WebViewEx(context: Context, val callback: Callback, val jsInterface: 
         try {
             NativeVideoActivity.launch(activity,
                 NativeVideoActivity.PlaybackRequest(source, requestContext, startMs, 1f)) { result ->
-                if (result.action == NativeVideoActivity.ReturnAction.FAILED) {
+                if (result.action != NativeVideoActivity.ReturnAction.FAILED) return@launch
+                if (result.refreshable && autoReplay.canStart()) {
+                    Toast.makeText(context, R.string.stream_reloading, Toast.LENGTH_SHORT).show()
+                    autoReplay.start(MediaUrlIdentity.key(source.url))
+                } else {
                     Toast.makeText(context, R.string.native_playback_unavailable, Toast.LENGTH_SHORT).show()
                 }
             }

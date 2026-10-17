@@ -208,6 +208,7 @@
     <string name="cast_open_builtin">Open in built-in player</string>
     <string name="cast_trying_next">Trying another stream…</string>
     <string name="native_playback_unavailable">Native playback is unavailable, continuing in the browser</string>
+    <string name="stream_reloading">Reloading the page to resume the stream…</string>
     <string name="external_playback_failed_title">Did the video not play?</string>
     <string name="external_playback_failed_message">Some streams only work in the built-in player, because they require the browser to identify itself on every request and external players cannot do that.</string>
     <string name="cast_no_media">No playable media found on this page</string>
