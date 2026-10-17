@@ -139,3 +139,4 @@ graph TD
 - The `ActiveModelsRepository` no-arg-constructor contract is pinned by a reflection test over the known models (`ActiveModelsContractTest`).
 - Next architecture margin (not started): the `MainActivity` composition/lifecycle body, the global `TVBro.instance`/`AppContext.get()` coupling (including models), and integration-test coverage. Evidence and ordering in `ARCHITECTURE-REVIEW.md`.
 - Rendered diagrams live next to this file: `ARCHITECTURE.plantuml`/`.png`/`.svg`/`.pdf` (overview) and `ARCHITECTURE-LAYERED.*` (layered view with component descriptions). PDFs are produced from the SVG (PlantUML's `-tpdf` needs Batik, which is not available here).
+- `ARCHITECTURE-OVERVIEW.md` is the technology-neutral, concept-first companion to this document: it describes the same macro-components (layers, state holders, storage, seams, engine adapters, composition points, start-up) in generic language, with a translation table back to the concrete names used here.

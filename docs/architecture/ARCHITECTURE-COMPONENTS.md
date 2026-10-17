@@ -1,6 +1,8 @@
 # Architecture - Layered View with Component Descriptions
 
 This document gives a more layered visualisation with brief descriptions of each main component.
+For a technology-neutral, concept-first description of the same architecture (no language/framework
+vocabulary), see `ARCHITECTURE-OVERVIEW.md`.
 
 ## Layer 1 - UI (Presentation Layer)
 | Component | Purpose | Key Notes |
