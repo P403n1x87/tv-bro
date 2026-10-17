@@ -5,13 +5,16 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebResourceRequest
+import android.webkit.WebSettings
 import android.webkit.WebView
 import androidx.webkit.WebViewCompat
 import com.phlox.tvwebbrowser.Config
+import com.phlox.tvwebbrowser.domain.UserAgentPolicy
 import com.phlox.tvwebbrowser.model.WebTabState
 import com.phlox.tvwebbrowser.utils.Utils
 import com.phlox.tvwebbrowser.webengine.WebEngine
@@ -48,10 +51,26 @@ class WebViewWebEngine(
     override var userAgentString: String? = null
         set(value) {
             field = value
-            if (value != null) {
-                webView?.settings?.userAgentString = value
-            }
+            webView?.let { applyUserAgent(it, value) }
         }
+
+    /**
+     * Applies the requested User-Agent, or the WebView default with the `; wv` in-app marker
+     * removed when the user kept "Default". Site players commonly reject the marker with a 403.
+     *
+     * [WebSettings.getDefaultUserAgent] is API 26 while the geckoExcluded flavor supports API 24+,
+     * so below O there is no public default-UA accessor: a freshly created view — the only path
+     * that reads a `null` field — still carries the stock default, so the marker is stripped from
+     * whatever is currently set instead.
+     */
+    private fun applyUserAgent(view: WebView, userAgent: String?) {
+        val base = userAgent
+            ?: if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                UserAgentPolicy.withoutInAppMarker(WebSettings.getDefaultUserAgent(appContext))
+            else
+                UserAgentPolicy.withoutInAppMarker(view.settings.userAgentString)
+        view.settings.userAgentString = base
+    }
 
     override fun saveState(): Any {
         val bundle = Bundle()
@@ -117,7 +136,9 @@ class WebViewWebEngine(
     @Throws(Exception::class)
     override fun getOrCreateView(activityContext: Context): View {
         if (webView == null) {
-            webView = WebViewEx(activityContext, webViewCallback, jsInterface)
+            val created = WebViewEx(activityContext, webViewCallback, jsInterface)
+            applyUserAgent(created, userAgentString)
+            webView = created
         }
         return webView!!
     }
