@@ -39,7 +39,7 @@ class CursorLayout @JvmOverloads constructor(context: Context, attrs: AttributeS
         onEmulatedKeyEvent = { keyEvent ->
             cursorDrawerDelegate.dispatchKeyEvent(keyEvent)
         },
-        motionAxesTranslationEnabled = { !config.disableMotionAxesDpadNavigation },
+        motionAxesTranslationEnabled = { !config.cursorConfig.disableMotionAxesDpadNavigation },
         isSoftwareKeyboardVisible = {
             ViewCompat.getRootWindowInsets(rootView)?.isVisible(WindowInsetsCompat.Type.ime()) == true
         },

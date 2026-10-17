@@ -3,10 +3,21 @@ package com.phlox.tvwebbrowser
 import android.annotation.SuppressLint
 import android.content.SharedPreferences
 import android.os.Build
+import com.phlox.tvwebbrowser.config.CursorConfig
 import com.phlox.tvwebbrowser.utils.Utils
 import com.phlox.tvwebbrowser.utils.observable.ObservableValue
 
-class Config(val prefs: SharedPreferences) {
+/**
+ * Typed access to the stored settings: a member mirrors a preference key, decodes the stored value
+ * and writes it back — nothing else. Decisions over those values belong in `domain/` (app module)
+ * or in [SearchEngines] (shared with the Gecko module); the one migration still in here — the
+ * legacy "search engine as home page" flag — is storage's own job.
+ */
+class Config(
+    val prefs: SharedPreferences,
+    private val installedByApk: () -> Boolean = { Utils.isInstalledByAPK(AppContext.get()) }
+) {
+    val cursorConfig: CursorConfig = CursorConfig(prefs)
     companion object {
         const val SEARCH_ENGINE_URL_PREF_KEY = "search_engine_url"
         const val SEARCH_ENGINE_AS_HOME_PAGE_KEY = "search_engine_as_home_page"
@@ -19,13 +30,6 @@ class Config(val prefs: SharedPreferences) {
         const val TV_BRO_UA_PREFIX = "TV Bro/1.0 "
         const val HOME_URL_ALIAS = "about:home"
         const val KEEP_SCREEN_ON_KEY = "keep_screen_on"
-        /** When true, analog stick / hat axes from generic motion events are not translated to DPAD keys. */
-        const val DISABLE_MOTION_AXES_DPAD_NAVIGATION_KEY = "disable_motion_axes_dpad_navigation"
-        /** Percent of built-in default (100 = default). Range [CURSOR_PHYSICS_PERCENT_MIN], [CURSOR_PHYSICS_PERCENT_MAX]. */
-        const val CURSOR_MAX_SPEED_PERCENT_KEY = "cursor_max_speed_percent"
-        const val CURSOR_ACCELERATION_PERCENT_KEY = "cursor_acceleration_percent"
-        const val CURSOR_PHYSICS_PERCENT_MIN = 25
-        const val CURSOR_PHYSICS_PERCENT_MAX = 200
         const val INCOGNITO_MODE_KEY = "incognito_mode"
         const val INCOGNITO_MODE_HINT_SUPPRESS_KEY = "incognito_mode_hint_suppress"
         const val DIRECT_NAVIGATION_MODE_HINT_SUPPRESS_KEY = "direct_navigation_mode_hint_suppress"
@@ -51,13 +55,11 @@ class Config(val prefs: SharedPreferences) {
         const val ENGINE_GECKO_VIEW = "GeckoView"
         const val ENGINE_WEB_VIEW = "WebView"
 
-        const val DEFAULT_ADBLOCK_LIST_URL = "https://easylist.to/easylist/easylist.txt"
-        val SearchEnginesTitles = arrayOf("Google", "Bing", "Yahoo!", "DuckDuckGo", "Yandex", "Startpage", "Custom")
-        val SearchEnginesNames = arrayOf("google", "bing", "yahoo", "ddg", "yandex", "startpage", "custom")
-        val SearchEnginesURLs = listOf("https://www.google.com/search?q=[query]", "https://www.bing.com/search?q=[query]",
-            "https://search.yahoo.com/search?p=[query]", "https://duckduckgo.com/?q=[query]",
-            "https://yandex.com/search/?text=[query]", "https://www.startpage.com/sp/search?query=[query]", "")
+        /** Engines the app can run, in recommendation order — the [webEngine] default picks from here. */
         val SupportedWebEngines = arrayOf(ENGINE_GECKO_VIEW, ENGINE_WEB_VIEW)
+
+        const val DEFAULT_ADBLOCK_LIST_URL = "https://easylist.to/easylist/easylist.txt"
+
         const val HOME_PAGE_URL = "https://tvbro.phlox.dev/appcontent/home/"
         //const val HOME_PAGE_URL = "http://10.0.2.2:5000/appcontent/home/"
 
@@ -84,12 +86,23 @@ class Config(val prefs: SharedPreferences) {
     }
 
     enum class HomePageMode {
-        HOME_PAGE, SEARCH_ENGINE, CUSTOM, BLANK
+        HOME_PAGE, SEARCH_ENGINE, CUSTOM, BLANK;
+
+        companion object {
+            /** Stored ordinal → mode; an unknown value falls back to [HOME_PAGE]. */
+            fun fromStored(ordinal: Int): HomePageMode =
+                entries.getOrElse(ordinal) { HOME_PAGE }
+        }
     }
 
     /** Player a detected stream is handed to. Default is the built-in ExoPlayer. */
     enum class PlayerKind {
-        BUILT_IN, SYSTEM, EXTERNAL
+        BUILT_IN, SYSTEM, EXTERNAL;
+
+        companion object {
+            /** Stored ordinal → kind; an unknown value falls back to [BUILT_IN]. */
+            fun fromStored(ordinal: Int): PlayerKind = entries.getOrElse(ordinal) { BUILT_IN }
+        }
     }
 
     var incognitoMode: Boolean
@@ -117,34 +130,6 @@ class Config(val prefs: SharedPreferences) {
             prefs.edit().putBoolean(KEEP_SCREEN_ON_KEY, value).apply()
         }
 
-    var disableMotionAxesDpadNavigation: Boolean
-        get() = prefs.getBoolean(DISABLE_MOTION_AXES_DPAD_NAVIGATION_KEY, false)
-        set(value) {
-            prefs.edit().putBoolean(DISABLE_MOTION_AXES_DPAD_NAVIGATION_KEY, value).apply()
-        }
-
-    /** Virtual cursor max speed as a percent of the default (screen-width–based) cap. */
-    var cursorMaxSpeedPercent: Int
-        get() = prefs.getInt(CURSOR_MAX_SPEED_PERCENT_KEY, 100)
-            .coerceIn(CURSOR_PHYSICS_PERCENT_MIN, CURSOR_PHYSICS_PERCENT_MAX)
-        set(value) {
-            prefs.edit().putInt(
-                CURSOR_MAX_SPEED_PERCENT_KEY,
-                value.coerceIn(CURSOR_PHYSICS_PERCENT_MIN, CURSOR_PHYSICS_PERCENT_MAX)
-            ).apply()
-        }
-
-    /** Virtual cursor acceleration as a percent of the default ramp-up per frame. */
-    var cursorAccelerationPercent: Int
-        get() = prefs.getInt(CURSOR_ACCELERATION_PERCENT_KEY, 100)
-            .coerceIn(CURSOR_PHYSICS_PERCENT_MIN, CURSOR_PHYSICS_PERCENT_MAX)
-        set(value) {
-            prefs.edit().putInt(
-                CURSOR_ACCELERATION_PERCENT_KEY,
-                value.coerceIn(CURSOR_PHYSICS_PERCENT_MIN, CURSOR_PHYSICS_PERCENT_MAX)
-            ).apply()
-        }
-
     var theme = object : ObservableValue<Theme>(Theme.SYSTEM) {
         override var value: Theme = Theme.entries[prefs.getInt(THEME_KEY, 0)]
             set(value) {
@@ -163,8 +148,7 @@ class Config(val prefs: SharedPreferences) {
                     HomePageMode.SEARCH_ENGINE.ordinal
                 } else it
             }
-            .let { if (it < 0 || it >= HomePageMode.values().size) 0 else it }
-            .let { HomePageMode.values()[it] }
+            .let { HomePageMode.fromStored(it) }
         set(value) {
             prefs.edit().putInt(HOME_PAGE_MODE, value.ordinal).apply()
         }
@@ -175,7 +159,7 @@ class Config(val prefs: SharedPreferences) {
             prefs.edit().putString(HOME_PAGE_KEY, value).apply()
         }
 
-    var searchEngineURL = ObservableStringPreference(SearchEnginesURLs[0], SEARCH_ENGINE_URL_PREF_KEY)
+    var searchEngineURL = ObservableStringPreference(SearchEngines.urls[0], SEARCH_ENGINE_URL_PREF_KEY)
 
     var webEngine: String
         get() {
@@ -210,9 +194,7 @@ class Config(val prefs: SharedPreferences) {
         }
 
     var playerKind: PlayerKind
-        get() = prefs.getInt(PLAYER_KIND_KEY, 0)
-            .let { if (it < 0 || it >= PlayerKind.entries.size) 0 else it }
-            .let { PlayerKind.entries[it] }
+        get() = PlayerKind.fromStored(prefs.getInt(PLAYER_KIND_KEY, 0))
         set(value) { prefs.edit().putInt(PLAYER_KIND_KEY, value.ordinal).apply() }
 
     var blockAutomaticRedirects: Boolean
@@ -269,7 +251,7 @@ class Config(val prefs: SharedPreferences) {
         }
 
     var autoCheckUpdates: Boolean
-        get() = prefs.getBoolean(AUTO_CHECK_UPDATES_KEY, Utils.isInstalledByAPK(AppContext.get()))
+        get() = prefs.getBoolean(AUTO_CHECK_UPDATES_KEY, installedByApk())
         set(value) {
             prefs.edit().putBoolean(AUTO_CHECK_UPDATES_KEY, value).apply()
         }
@@ -280,19 +262,25 @@ class Config(val prefs: SharedPreferences) {
             prefs.edit().putString(UPDATE_CHANNEL_KEY, value).apply()
         }
 
+    /**
+     * Time of the last "update available" user notification, `null` when none was ever shown — the
+     * difference matters: a fresh install must count as "just now shown" so the offer waits.
+     */
+    var lastUpdateUserNotificationTime: Long?
+        get() = if (prefs.contains(LAST_UPDATE_USER_NOTIFICATION_TIME_KEY))
+            prefs.getLong(LAST_UPDATE_USER_NOTIFICATION_TIME_KEY, 0) else null
+        set(value) {
+            val editor = prefs.edit()
+            if (value == null) editor.remove(LAST_UPDATE_USER_NOTIFICATION_TIME_KEY)
+            else editor.putLong(LAST_UPDATE_USER_NOTIFICATION_TIME_KEY, value)
+            editor.apply()
+        }
+
     var appVersionCodeMark: Int
         get() = prefs.getInt(APP_VERSION_CODE_MARK_KEY, 0)
         set(value) {
             prefs.edit().putInt(APP_VERSION_CODE_MARK_KEY, value).apply()
         }
-
-    /** The short name of the configured search engine (its "custom" entry when unknown). */
-    fun guessSearchEngineName(): String {
-        val url = searchEngineURL.value
-        val index = SearchEnginesURLs.indexOf(url)
-        return if (index != -1 && index < SearchEnginesNames.size)
-            SearchEnginesNames[index] else SearchEnginesNames[SearchEnginesNames.size - 1]
-    }
 
     inner class ObservableStringPreference(default: String, private val prefsKey: String) : ObservableValue<String>(default) {
         override var value: String = prefs.getString(prefsKey, default)!!

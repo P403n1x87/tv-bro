@@ -31,8 +31,8 @@ class ControlsSettingsView(
             SettingsItem.Slider(
                 iconRes = R.drawable.ic_settings_mouse_24dp,
                 titleRes = R.string.cursor_max_speed,
-                min = Config.CURSOR_PHYSICS_PERCENT_MIN,
-                max = Config.CURSOR_PHYSICS_PERCENT_MAX,
+                min = com.phlox.tvwebbrowser.config.CursorConfig.CURSOR_PHYSICS_PERCENT_MIN,
+                max = com.phlox.tvwebbrowser.config.CursorConfig.CURSOR_PHYSICS_PERCENT_MAX,
                 value = { settingsModel.cursorMaxSpeedPercent },
                 valueText = { context.getString(R.string.cursor_physics_percent, it) },
                 onValueChange = { settingsModel.cursorMaxSpeedPercent = it }
@@ -42,8 +42,8 @@ class ControlsSettingsView(
             SettingsItem.Slider(
                 iconRes = R.drawable.ic_settings_mouse_24dp,
                 titleRes = R.string.cursor_acceleration,
-                min = Config.CURSOR_PHYSICS_PERCENT_MIN,
-                max = Config.CURSOR_PHYSICS_PERCENT_MAX,
+                min = com.phlox.tvwebbrowser.config.CursorConfig.CURSOR_PHYSICS_PERCENT_MIN,
+                max = com.phlox.tvwebbrowser.config.CursorConfig.CURSOR_PHYSICS_PERCENT_MAX,
                 value = { settingsModel.cursorAccelerationPercent },
                 valueText = { context.getString(R.string.cursor_physics_percent, it) },
                 onValueChange = { settingsModel.cursorAccelerationPercent = it }
