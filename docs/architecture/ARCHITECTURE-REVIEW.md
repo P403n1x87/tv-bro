@@ -49,7 +49,7 @@ This review analyzes the new architecture against core software design principle
 The polish pass above is complete, but it is the *first* margin, not the end. A fresh pass over the
 tree (numbers as of commit `1ce745b`, unless a row says otherwise) shows the remaining improvements
 are a different kind of work — mostly large, invasive or test-shape changes rather than small
-extractions. Ordered by value/effort (item 1 has since landed; the numbering is kept so the
+extractions. Ordered by value/effort (items 1 and 6 have since landed; the numbering is kept so the
 cross-reference from `ARCHITECTURE-OVERVIEW.md` stays valid):
 
 | # | Area | Evidence | Effort / value |
@@ -59,7 +59,7 @@ cross-reference from `ARCHITECTURE-OVERVIEW.md` stays valid):
 | 3 | `Config` grab-bag | 14 KB, ~60 members, 65 `Config.` call sites under `activity/`; still mixes SharedPreferences storage with decisions (item 7 moved only two pure predicates). | High / medium |
 | 4 | `runBlocking` on the UI path | `MainActivity.onPause` blocked the main thread on Room + the tab-state file; `WebEngineCallback.shouldBlockNewWindow` is a synchronous engine callback. | **Mostly done**: `onPause` persists through `TabsModel.saveTabInBackground`; `TabsModel.onPageStarted` warms the tab's host config off the main thread so the popup bridge resolves from memory, keeping `runBlocking` as the documented fallback for a popup that beats the warm-up. Low–medium / medium. |
 | 5 | `WebEngineCallbackHost` is wide | 335-LOC adapter with a many-member host interface (ISP smell) | Medium / low–medium |
-| 6 | Test shape, not count | 164 tests, all unit (`app/src/test`); there is **no `androidTest`/Robolectric** for panel focus, D-pad, toolbar URL box or back handling. | Medium / high for regression safety |
+| 6 | ~~Test shape, not count~~ **Done** | Was 164 tests, all model/repository units, with nothing pinned for panel focus, D-pad, toolbar URL box or back handling. Now 192: `ActionBarTest` (the address box state machine, the key handling, the focus flags behind the D-pad chain), `PanelRowFocusDelegateTest` (the row hand-off), `PanelControllerTest` (panel focus claim/mutual exclusion/return) and `BackNavigationEventsAdapterTest` (press/release, cross-channel suppression, controller long-press) — all Robolectric over the real inflated layouts (`app/src/test`, same task as the rest of the suite). | Done — a full `MainActivity` launch stays out of reach on the JVM (the ad-block model loads a native library; the download-service binding's shadow passes a null `ComponentName`), so that level would need an instrumented `androidTest` setup. |
 | 7 | Packaging | `:app:common` is 4092 LOC (Config + singletons + utils + cursor widgets); the engine factory/provider seam is the last global inside it. Gecko only sees `:app:common` (correct), but `common` is a grab-bag. | High / low–medium |
 
 ## Recommendation
@@ -68,8 +68,13 @@ models own their state without touching Activity/dialog classes, the host seams 
 `AutoUpdateHost`, `DownloadHost`, `WebViewDataDirManager`) are the only UI escape hatches, and the
 pure decisions live in `domain/`. Keep new UI side effects behind such a seam rather than in a model.
 
-The next margin is integration-test coverage (item ⑥) now that the composition body landed (item ①);
-the engine/adapter/widget/service layer no longer reads globals, and what remains
+The integration-test margin (item ⑥) is closed too: the toolbar URL box, the panel focus hand-off
+and the back-channel handling are pinned by Robolectric screen tests over the real inflated layouts.
+The next margin is now the remaining structural items — the `Config` grab-bag (item 3), the wide
+`WebEngineCallbackHost` (item 5) and the `:app:common` packaging (item 7) — plus, if deeper
+regression safety is wanted, an instrumented `androidTest` layer that can launch the whole
+`MainActivity` (the JVM cannot load the ad-block native library nor shadow the download binding).
+The engine/adapter/widget/service layer no longer reads globals, and what remains
 (`FaviconsPool`/`Config`/`ShortcutMgr`/`AppDatabase`/`Repositories` and the restart flags) is
 process-level state.
 

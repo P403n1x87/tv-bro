@@ -44,18 +44,29 @@ the model/host seam polish. Work on a feature branch; **open a PR only when aske
   directly (the default lambdas may, but only at the composition edge).
 - Deliberate exception to view purity: `MainActivity` reads `config` for pre-model engine checks
   (`incognitoMode`, `isWebEngineGecko()`).
-- First architecture margin is closed, and so is its follow-up (the `MainActivity.onCreate` body now
-  delegates to `SessionObservers`/`SessionStartup`); the next one is integration-test coverage. The
-  global `TVBro.instance`/`AppContext.get()` coupling is now gone from models, engines, adapters,
-  widgets and download tasks; what is left is process-level state (singletons, restart flags) plus a
-  few inert mentions in comments. Details/evidence: `docs/architecture/ARCHITECTURE-REVIEW.md`.
+- First architecture margin is closed, and so are its two follow-ups (the `MainActivity.onCreate` body
+  now delegates to `SessionObservers`/`SessionStartup`, and the four flagged screen areas — toolbar
+  URL box, panel focus, D-pad chain, back handling — have Robolectric screen tests); the next margin
+  is the remaining structural items (`Config` grab-bag, wide `WebEngineCallbackHost`, `:app:common`
+  packaging). The global `TVBro.instance`/`AppContext.get()` coupling is now gone from models,
+  engines, adapters, widgets and download tasks; what is left is process-level state (singletons,
+  restart flags) plus a few inert mentions in comments. Details/evidence:
+  `docs/architecture/ARCHITECTURE-REVIEW.md`.
 
 ## Build / test
 - Linux: JDK 21 exported, plus JDK 17 at `/usr/lib/jvm/java-17-openjdk-amd64` (`buildSrc` pins
   `jvmToolchain(17)` → both required). macOS: `JAVA_HOME="$HOME/java/jdk-21.0.12.1+1/Contents/Home"`.
   Android SDK at `$HOME/.android/sdk`; AVD `tvbro_tv_api36`.
 - Run Gradle tasks **serially** (concurrent builds corrupt the Kotlin incremental state).
-- Tests: `:app:player:testDebugUnitTest` (`:app:testDebugUnitTest`), `:app:testP403n1x87GeckoIncludedDebugUnitTest`.
+- Tests: `:app:player:testDebugUnitTest` (`:app:testDebugUnitTest`), `:app:testP403n1x87GeckoIncludedDebugUnitTest`
+  (192: model/repository units + the Robolectric screen tests — `ActionBarTest`,
+  `PanelControllerTest`, `PanelRowFocusDelegateTest`, `BackNavigationEventsAdapterTest`, over real
+  inflated layouts, `sdk = 26`, plain `Application`). Screen-test gotchas: hand
+  `binding.flWebViewContainer.config` its `Config` after inflate (as `MainActivity.onCreate` does,
+  else `CursorLayout.onSizeChanged` throws); build `KeyEvent`s with real `downTime`/`eventTime`
+  (`KeyEvent(action, code)` carries 0, so time-window logic never matches); the URL box enters edit
+  mode on key **ACTION_UP**, not down. A full `MainActivity` launch is not possible on the JVM
+  (ad-block native lib, null `ComponentName` from the binding shadow) → that needs `androidTest`.
 - Debug APK: `./gradlew :app:assembleP403n1x87GeckoIncludedDebug -PenableAbiSplits`.
 - Launch a URL: `am start -a android.intent.action.VIEW -d "http://example.com" -p <appId>`; click
   `input tap <x> <y>`. `p403n1x87` → `com.phlox.tvwebbrowser.p403n1x87`, else `…webbrowser`.
