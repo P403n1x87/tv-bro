@@ -1,9 +1,11 @@
 # Architecture (post-MVVM refactor)
 
 This document describes the current architecture: the view-purity pass, the split of the main
-screen's UI work into view collaborators, and the follow-up pass that moved the remaining model-side
-UI side effects behind injected host interfaces. It includes a high-level
-diagram (Mermaid) and notes on contracts, dependency direction, and data flow.
+screen's UI work into view collaborators, the follow-up pass that moved the remaining model-side
+UI side effects behind injected host interfaces, and the pass that turned the screen's creation body
+into an outline (composition, widget binding, subscriptions and session load each in their own
+collaborator). It includes a high-level diagram (Mermaid) and notes on contracts, dependency
+direction, and data flow.
 
 ## Key Contracts
 
@@ -19,9 +21,11 @@ diagram (Mermaid) and notes on contracts, dependency direction, and data flow.
 
 ## Main-screen view collaborators
 
-`MainActivity` is the host (`WebEngineCallbackHost`) and the composition root for the screen. Its UI
-work is split into cohesive collaborators, each constructed in `onCreate` with the binding, models and
-callbacks it needs — they never reach into the activity's private members:
+`MainActivity` is the host (`WebEngineCallbackHost`) and the composition root for the screen. Its
+`onCreate` is an outline: it composes the models, the view collaborators and the widget bindings
+(`composeModels`/`inflateViews`/`composeViews`/`bindViews`), then starts the session and leaves the rendering to the
+collaborators below — each constructed with the binding, models and callbacks it needs, so they never
+reach into the activity's private members:
 
 | Collaborator | Owns | Wired with |
 |---|---|---|
@@ -34,9 +38,11 @@ callbacks it needs — they never reach into the activity's private members:
 | `CursorMenuController` | Fullscreen enter/exit, the cursor menu, the link-actions popup and the external-app dialog. | activity, binding, `Handler`, `ToolbarController`, `BackNavigationEventsAdapter` |
 | `TabThumbnailPresenter` | The debounced thumbnail repaint and its bitmap/placeholder rendering. | binding, `Handler`, lifecycle scope + keep-toolbar-open/current-tab predicates |
 | `DownloadCoordinator` | The download permission walk and the download-service binding, through `DownloadHost`. | `DownloadHost` + on-download-started callback |
+| `SessionObservers` | The model→widget subscriptions: user agent, night mode, keep-screen-on, overlay style, ad-block load error, home-page links, bookmarks, current tab and the tab strip. | Lifecycle-bound, keeping the notification flags and the order the composition root used to have. The activity is the host for the three side effects: recreate on a night-mode change, the ad-block toast, and the page-level repaint when the current tab changes. |
+| `SessionStartup` | Bringing a session up: engine-factory initialisation, the progress bar, the view-model/tab persistence load, then the saved tab / deep link / home page and the start-up update check. | The activity is the host: launch-intent handling, open-tab/change-tab and the post-load work come in as callbacks, so it never reaches into the composition root. |
 
-These are view collaborators, not models: they hold no domain state and only render/forward to the
-binding, the models and the callbacks handed to them.
+These are view collaborators, not models: they hold no domain state and only render/forward (and, for
+`SessionStartup`, assemble) through the binding, the models and the callbacks handed to them.
 
 The same rule applies where a model would otherwise need the screen directly: `TabsModel.changeTab`
 takes a `TabViewHost`, `AutoUpdateModel.showUpdateDialogIfNeeded` takes an `AutoUpdateHost`,
@@ -57,6 +63,8 @@ graph TD
         BC["BookmarksController"]
         CMC["CursorMenuController"]
         TTP["TabThumbnailPresenter"]
+        SO["SessionObservers"]
+        SS["SessionStartup"]
         DC["DownloadCoordinator"]
         HA["HistoryActivity"]
         DA["DownloadsActivity"]
@@ -104,6 +112,7 @@ graph TD
 
     MA --> PC & TC & MLP & PO & IH
     MA --> BC & CMC & TTP & DC
+    MA --> SO & SS; SO --> TC & BC; SS --> TC
     BC --> MVM; CMC --> TC
     MA --> WECB; WECB --> MA; WECB --> PM; WECB --> DOM
     ENG --> WIF; ENG --> WEH
@@ -113,7 +122,7 @@ graph TD
 
     TVB --> R & AMR; DS & DT --> REPO
 
-    UI <-->|observes| PM; UI -->|intents| PM
+    PM -->|notifies| SO; UI -->|intents| PM
 ```
 
 ## Dependency Direction
@@ -137,6 +146,6 @@ graph TD
 - History search does a partial (`%query%`) match on the title or the url, newest first.
 - APK installs (DownloadsActivity and DownloadService) both go through `InstallPermissionHelper.launchInstaller`, which is MediaStore-aware (a `content://` Uri from API 30, an absolute path below).
 - The `ActiveModelsRepository` no-arg-constructor contract is pinned by a reflection test over the known models (`ActiveModelsContractTest`).
-- Next architecture margin (not started): the `MainActivity` composition/lifecycle body, the global `TVBro.instance`/`AppContext.get()` coupling (including models), and integration-test coverage. Evidence and ordering in `ARCHITECTURE-REVIEW.md`.
+- Next architecture margin: integration-test coverage. The `MainActivity` creation body landed (the collaborator table above) and the global `TVBro.instance`/`AppContext.get()` coupling is closed down to process-level state. Evidence and ordering in `ARCHITECTURE-REVIEW.md`.
 - Rendered diagrams live next to this file: `ARCHITECTURE.plantuml`/`.png`/`.svg`/`.pdf` (overview) and `ARCHITECTURE-LAYERED.*` (layered view with component descriptions). PDFs are produced from the SVG (PlantUML's `-tpdf` needs Batik, which is not available here).
 - `ARCHITECTURE-OVERVIEW.md` is the technology-neutral, concept-first companion to this document: it describes the same macro-components (layers, state holders, storage, seams, engine adapters, composition points, start-up) in generic language, with a translation table back to the concrete names used here.

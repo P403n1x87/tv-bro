@@ -24,11 +24,15 @@ the model/host seam polish. Work on a feature branch; **open a PR only when aske
   composition root drives; the provider hands them to each engine it creates, so
   `WebViewWebEngine`/`AndroidJSInterface` take both as ctor params instead of reading
   `AppContext`/`TVBro`.
-- `MainActivity` is the composition root/host; its UI work is delegated to `PanelController`,
-  `ToolbarController`, `MediaListPresenter`, `PermissionOrchestrator`, `IntentHandler`,
-  `BookmarksController`, `CursorMenuController`, `TabThumbnailPresenter` and `DownloadCoordinator`,
-  wired in `onCreate`. Collaborators must not read `MainActivity` privates — take deps/callbacks via
-  ctor (e.g. `DownloadCoordinator` takes a `DownloadHost`).
+- `MainActivity` is the composition root/host; `onCreate` is an outline (`composeModels`,
+  `inflateViews`, `composeViews`, `bindViews`, then `sessionObservers.observe()` +
+  `sessionStartup.load(intent)`).
+  Its UI work is delegated to `PanelController`, `ToolbarController`, `MediaListPresenter`,
+  `PermissionOrchestrator`, `IntentHandler`, `BookmarksController`, `CursorMenuController`,
+  `TabThumbnailPresenter`, `DownloadCoordinator`, `SessionObservers` (every model→widget
+  subscription) and `SessionStartup` (engine init + session restore). Collaborators must not read
+  `MainActivity` privates — take deps/callbacks via ctor (e.g. `DownloadCoordinator` takes a
+  `DownloadHost`).
 - Models must not touch Activity/dialog classes: UI side effects go through a host seam or an
   observable the host renders — `TabViewHost` (`TabsModel.changeTab`), `AutoUpdateHost`
   (`AutoUpdateModel.showUpdateDialogIfNeeded`), `DownloadHost` (`DownloadCoordinator`),
@@ -40,11 +44,11 @@ the model/host seam polish. Work on a feature branch; **open a PR only when aske
   directly (the default lambdas may, but only at the composition edge).
 - Deliberate exception to view purity: `MainActivity` reads `config` for pre-model engine checks
   (`incognitoMode`, `isWebEngineGecko()`).
-- First architecture margin is closed; the next one is (a) the `MainActivity.onCreate`/lifecycle body,
-  (b) integration-test coverage. The global `TVBro.instance`/`AppContext.get()` coupling is now gone
-  from models, engines, adapters, widgets and download tasks; what is left is process-level state
-  (singletons, restart flags) plus a few inert mentions in comments. Details/evidence:
-  `docs/architecture/ARCHITECTURE-REVIEW.md`.
+- First architecture margin is closed, and so is its follow-up (the `MainActivity.onCreate` body now
+  delegates to `SessionObservers`/`SessionStartup`); the next one is integration-test coverage. The
+  global `TVBro.instance`/`AppContext.get()` coupling is now gone from models, engines, adapters,
+  widgets and download tasks; what is left is process-level state (singletons, restart flags) plus a
+  few inert mentions in comments. Details/evidence: `docs/architecture/ARCHITECTURE-REVIEW.md`.
 
 ## Build / test
 - Linux: JDK 21 exported, plus JDK 17 at `/usr/lib/jvm/java-17-openjdk-amd64` (`buildSrc` pins

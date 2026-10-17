@@ -159,8 +159,10 @@ A **screen** is the platform's unit of visible interaction. Two kinds of compone
 - **View collaborators**: short-lived helpers that each own one visible concern — the overlay panel
   and its focus hand-off, the toolbar, the media-stream list dialog, the permission routing, the
   deep-link handling, the bookmark panel, the cursor menu, the thumbnail repaint, the download
-  permission walk. They hold no domain state; they render and forward, and they receive everything
-  they touch as initialisation parameters instead of reaching into the screen.
+  permission walk, the subscription of state changes into the widgets, and the session start-up
+  (engine initialisation and state restore). They hold no domain state; they render and forward, and
+  they receive everything they touch as initialisation parameters instead of reaching into the
+  screen.
 - **Widgets**: the reusable visible controls (toolbar, panes, cursor surface, focus helpers).
 
 Screens and widgets read state from the state holders (§2.4) and must never open the storage layer
@@ -244,7 +246,10 @@ Nothing else wires the application. The two places are:
 2. **Main screen creation.** The screen is the composition point for the *screen*: it takes the
    shared objects, asks the registry for its state holders, creates the view collaborators (§2.7),
    gives the widgets the values they need, and implements every seam the state holders and the engine
-   expect.
+   expect. The body itself is an outline — compose the state holders, inflate the screen, compose the
+   collaborators, bind the widgets — followed by the two collaborators that do the work: one subscribes
+   the widgets to the state changes, the other brings the session up (engine initialisation, restore of
+   the saved state, then the pending deep link or the start page).
 
 The intent is that these two bodies stay wiring-only: no decisions and no storage logic live there.
 
@@ -312,7 +317,8 @@ architecture with §2–§5.
 | State-holder base and registry | `ActiveModel`, `ActiveModelsRepository` (pinned by `ActiveModelsContractTest`) |
 | Change notifications | `ObservableValue`, `ObservableList` (over `Subscribable`) |
 | Screens | `MainActivity` / `IncognitoModeMainActivity`, `HistoryActivity`, `DownloadsActivity` |
-| View collaborators | `PanelController`, `ToolbarController`, `MediaListPresenter`, `PermissionOrchestrator`, `IntentHandler`, `BookmarksController`, `CursorMenuController`, `TabThumbnailPresenter`, `DownloadCoordinator` |
+| View collaborators | `PanelController`, `ToolbarController`, `MediaListPresenter`, `PermissionOrchestrator`, `IntentHandler`, `BookmarksController`, `CursorMenuController`, `TabThumbnailPresenter`, `DownloadCoordinator`, `SessionObservers` (the widget subscriptions) |
+| Session start-up | `SessionStartup` (engine initialisation, state restore, the start page/deep link) |
 | Seams | `WebEngineCallbackHost`, `TabViewHost`, `AutoUpdateHost`, `DownloadHost` (plus the small `Callback` contracts on the widgets) |
 | Browser-core contract | `WebEngine` |
 | Engine registration/dispatch | `WebEngineFactory`, `WebEngineProviderCallback`, `WebEngineWindowProviderCallback` |

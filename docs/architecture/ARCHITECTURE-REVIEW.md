@@ -41,17 +41,20 @@ This review analyzes the new architecture against core software design principle
 | `ActiveModelsRepository` contract | A model missing its no-arg ctor broke at runtime, not build time | **Done**: `ActiveModelsContractTest` reflects over the known models. | Done |
 | `DefaultWebViewDataDirManager` | Read `AppContext.get()` at construction (before init in some paths) | **Done**: directories resolve through providers at use time; test covers the move/restore cycle. | Done |
 | MainActivity clusters | Bookmark, cursor-menu/link and thumbnail concerns still sat in the activity | **Done**: `BookmarksController`, `CursorMenuController`, `TabThumbnailPresenter` (each ctor-injected). | Done |
+| MainActivity composition body | `onCreate` was still the last big function: it built the models, the view collaborators, the widget bindings, the model→widget subscriptions and then kicked off the session load | **Done**: `onCreate` is now an outline (`composeModels`/`inflateViews`/`composeViews`/`bindViews`, then start); the subscriptions moved to `SessionObservers`, the engine init + session restore to `SessionStartup`, and the dead `prefs` field went away. | Done |
 | Doc/diagram drift | Diagrams missed the new collaborators/seams | **Done**: PlantUML sources updated and png/svg/pdf re-rendered; docs list the new pieces. | Done |
 | `Config` grab-bag | Mixes preference storage with pure decision logic | **Done**: `isHomePageUrl`/`isWebEngineGecko` moved to `domain/HomePagePolicy`/`WebEnginePolicy`; the unused `isWebEngineNotSet` dropped. | Done |
 
 ## Known Deferred (the next margin)
 The polish pass above is complete, but it is the *first* margin, not the end. A fresh pass over the
-tree (numbers as of commit `1ce745b`) shows the remaining improvements are a different kind of work —
-mostly large, invasive or test-shape changes rather than small extractions. Ordered by value/effort:
+tree (numbers as of commit `1ce745b`, unless a row says otherwise) shows the remaining improvements
+are a different kind of work — mostly large, invasive or test-shape changes rather than small
+extractions. Ordered by value/effort (item 1 has since landed; the numbering is kept so the
+cross-reference from `ARCHITECTURE-OVERVIEW.md` stays valid):
 
 | # | Area | Evidence | Effort / value |
 |---|---|---|---|
-| 1 | `MainActivity.onCreate` is the last big function | 166 LOC; the activity is 1163 LOC / 75 `override fun` / 16 `lateinit`, implementing 5 host interfaces. A `StartupCoordinator`/`SessionComposer` (activity as host) would shrink it. | Medium / medium — composition root, so returns diminish and wiring legibility must not regress. |
+| 1 | ~~`MainActivity.onCreate` is the last big function~~ **Done** | Was 166 LOC, with the activity at 1163 LOC / 75 `override fun` / 16 `lateinit` and 5 host interfaces. `onCreate` is now 26 LOC (the activity is 1078 LOC): `composeModels`/`inflateViews`/`composeViews`/`bindViews`, then `sessionObservers.observe()` + `sessionStartup.load(intent)`. | Done — the model→widget subscriptions live in `SessionObservers`, the engine initialisation + session restore in `SessionStartup`; the dead `prefs` field and eight dead imports went with them. |
 | 2 | Global service-locator coupling | 19 sites across 14 non-test files (`TVBro.instance`, `AppContext.get()`) — down from 38; only the process-level singletons and restart flags are left, and three of the 19 are inert mentions in comments. No model, engine, adapter, widget or service task reads a global. | **In progress**: the presentation layer is fully constructor-injected (settings, files dir, connectivity, content resolver, application context) with production defaults. The last model that read a global, `WebTabState`, now takes the directories it writes to (thumbnail cache, tab-state files) from its callers. The WebView engine and its JS bridge take the application context and the app `Config` handed down through `WebEngineFactory.initialize` (which no longer reads a global itself), and `WebEngineCallback` uses its host's `PackageManager`. The Gecko engine mirrors it: `GeckoWebEngine` takes the application context and the app `Config` the provider stores from `initialize` (and `GeckoWebEngine.initialize` receives the `Config` instead of reading it), its delegates read both off the engine (`MyPermissionDelegate`, `MyNavigationDelegate`, `AppHomeContentScriptPortDelegate`), and the D-pad `GeckoViewWithVirtualCursor` takes the `Config` too. The adapter/widget/service layer is done as well: `WebViewEx` and the cursor widgets (`CursorDrawerDelegate`, `CursorLayout`) take the app `Config` from their holders (the JS bridge; the composition root, which hands it to the inflated `CursorLayout`; `GeckoViewWithVirtualCursor`'s ctor), and the download tasks (`FileDownloadTask`, `BlobDownloadTask`, `StreamDownloadTask`) take the `ContentResolver` from `DownloadService` instead of `TVBro.instance`. **Remaining:** the process-level singletons (`FaviconsPool`, `Config`, `ShortcutMgr`, `AppDatabase`, `Repositories`) and restart flags (`AdvancedSettingsView`, `IncognitoModeMainActivity`) — that group is arguably legitimate process state and is deferred as such. High / high — the deepest coupling. |
 | 3 | `Config` grab-bag | 14 KB, ~60 members, 65 `Config.` call sites under `activity/`; still mixes SharedPreferences storage with decisions (item 7 moved only two pure predicates). | High / medium |
 | 4 | `runBlocking` on the UI path | `MainActivity.onPause` blocked the main thread on Room + the tab-state file; `WebEngineCallback.shouldBlockNewWindow` is a synchronous engine callback. | **Mostly done**: `onPause` persists through `TabsModel.saveTabInBackground`; `TabsModel.onPageStarted` warms the tab's host config off the main thread so the popup bridge resolves from memory, keeping `runBlocking` as the documented fallback for a popup that beats the warm-up. Low–medium / medium. |
@@ -65,8 +68,8 @@ models own their state without touching Activity/dialog classes, the host seams 
 `AutoUpdateHost`, `DownloadHost`, `WebViewDataDirManager`) are the only UI escape hatches, and the
 pure decisions live in `domain/`. Keep new UI side effects behind such a seam rather than in a model.
 
-The next margin is (in order) the `MainActivity` composition/lifecycle body and integration-test
-coverage; the engine/adapter/widget/service layer no longer reads globals, and what remains
+The next margin is integration-test coverage (item ⑥) now that the composition body landed (item ①);
+the engine/adapter/widget/service layer no longer reads globals, and what remains
 (`FaviconsPool`/`Config`/`ShortcutMgr`/`AppDatabase`/`Repositories` and the restart flags) is
 process-level state.
 

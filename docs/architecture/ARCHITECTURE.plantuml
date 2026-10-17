@@ -15,6 +15,8 @@ package "UI (Activities/Views)" {
   [BookmarksController] as BC
   [CursorMenuController] as CMC
   [TabThumbnailPresenter] as TTP
+  [SessionObservers] as SO
+  [SessionStartup] as SS
   [DownloadCoordinator] as DC
   [InstallPermissionHelper] as IPH
   [HistoryActivity] as HA
@@ -98,6 +100,15 @@ MA --> IH
 MA --> BC
 MA --> CMC
 MA --> TTP
+MA --> SO
+MA --> SS
+SO --> TC
+SO --> BC
+SO ..> MA : host seams
+SS --> TC
+SS --> MVM : restores state
+SS --> TVM : restores tabs
+SS ..> MA : host callbacks
 MA --> DC
 BC --> MVM
 BC --> PC
@@ -133,7 +144,7 @@ WECB --> PP
 WECB --> NTP
 WECB --> SDom
 WECB --> HPP
-MA --> HPP
+SO --> HPP
 MA --> WEP
 WECB ..> WEH
 WV ..|> WIF
@@ -187,10 +198,10 @@ DS --> IPH
 DT --> DR
 
 ' Observables
-MA <.. MVM : observes
-MA <.. TVM : observes
-MA <.. SM : observes
-MA <.. ABM : observes loadError
+SO <.. MVM : observes
+SO <.. TVM : observes
+SO <.. SM : observes
+SO <.. ABM : observes loadError
 HA <.. HM : observes
 DA <.. ADHM : observes
 DA <.. ADAM : observes
