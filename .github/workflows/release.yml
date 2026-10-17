@@ -1,4 +1,4 @@
-name: Release
+name: CI
 
 on:
   #A "vX.Y.Z" tag cuts a release. Tags are normally created for you by `gh release create` (see the
