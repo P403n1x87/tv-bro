@@ -8,7 +8,7 @@ skinparam ranksep 40
 title TV-Bro Architecture - Layered View
 
 package "1. UI Layer" {
-  [MainActivity\n(implements WebEngineCallbackHost\n+ lifecycle + wiring)] as MA
+  [MainActivity\n(implements WebEngineCallbackHost\n+ composition root)] as MA
   [PanelController\n(side panels + row focus)] as PC
   [ToolbarController\n(overlay + fullscreen)] as TC
   [MediaListPresenter\n(stream list dialog)] as MLP
@@ -17,6 +17,8 @@ package "1. UI Layer" {
   [BookmarksController\n(bookmark panel + CRUD)] as BC
   [CursorMenuController\n(cursor menu + link actions)] as CMC
   [TabThumbnailPresenter\n(thumbnail repaint)] as TTP
+  [SessionObservers\n(state -> widget subscriptions)] as SO
+  [SessionStartup\n(engine init + session load)] as SS
   [DownloadCoordinator\n(permission walk + service bind)] as DC
   [InstallPermissionHelper\n(APK install intent)] as IPH
   [HistoryActivity\n(list + search + multi-select)] as HA
@@ -99,6 +101,10 @@ MA --> IH
 MA --> BC
 MA --> CMC
 MA --> TTP
+MA --> SO
+MA --> SS
+SO ..> MA : host seams
+SS ..> MA : host callbacks
 MA --> DC
 BC --> MVM
 BC --> PC
@@ -195,11 +201,12 @@ DT --> DR
 
 ' Observables (back up)
 TVM ..> AB : observable state
-MVM ..> MA : observable state
-SM ..> MA : observable
+SO <.. TVM : observable state
+SO <.. MVM : observable state
+SO <.. SM : observable
 SM ..> SD : observable
 ABM ..> SD : observable
-ABM ..> MA : loadError
+SO <.. ABM : loadError
 AUM ..> SD : observable
 HM ..> HA : observable
 ADHM ..> DA : observable

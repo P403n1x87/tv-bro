@@ -10,7 +10,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.SharedPreferences
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -27,28 +26,22 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.Window
-import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
-import android.view.animation.AccelerateInterpolator
 import android.view.animation.Animation
 import android.view.animation.AnimationUtils
-import android.view.animation.DecelerateInterpolator
 import android.webkit.CookieManager
 import android.webkit.WebStorage
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.R
-import com.phlox.tvwebbrowser.TVBro
 import com.phlox.tvwebbrowser.activity.IncognitoModeMainActivity
 import com.phlox.tvwebbrowser.activity.downloads.DownloadsActivity
 import com.phlox.tvwebbrowser.activity.history.HistoryActivity
@@ -59,7 +52,6 @@ import com.phlox.tvwebbrowser.activity.main.view.CursorMenuView
 import com.phlox.tvwebbrowser.activity.main.view.tabs.TabsAdapter.Listener
 import com.phlox.tvwebbrowser.databinding.ActivityMainBinding
 import com.phlox.tvwebbrowser.domain.AddressInputPolicy
-import com.phlox.tvwebbrowser.domain.HomePagePolicy
 import com.phlox.tvwebbrowser.domain.WebEnginePolicy
 import com.phlox.tvwebbrowser.model.HostConfig
 import com.phlox.tvwebbrowser.model.WebTabState
@@ -72,7 +64,6 @@ import com.phlox.tvwebbrowser.utils.Utils
 import com.phlox.tvwebbrowser.utils.UpdateChecker
 import com.phlox.tvwebbrowser.utils.VoiceSearchHelper
 import com.phlox.tvwebbrowser.utils.activemodel.ActiveModelsRepository
-import com.phlox.tvwebbrowser.utils.childs
 import com.phlox.tvwebbrowser.utils.sameDay
 import com.phlox.tvwebbrowser.player.MediaDiscoveryNotifier
 import com.phlox.tvwebbrowser.webengine.WebEngine
@@ -82,7 +73,6 @@ import com.phlox.tvwebbrowser.widgets.NotificationView
 import com.phlox.tvwebbrowser.widgets.cursor.CursorDrawerDelegate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Runnable
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -110,7 +100,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     protected lateinit var settingsModel: SettingsModel
     private lateinit var adblockModel: AdblockModel
     private lateinit var autoUpdateModel: AutoUpdateModel
-    private lateinit var uiHandler: Handler
+    private val uiHandler = Handler()
     private lateinit var panelController: PanelController
     private lateinit var toolbarController: ToolbarController
     private lateinit var mediaListPresenter: MediaListPresenter
@@ -120,7 +110,8 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     private lateinit var cursorMenuController: CursorMenuController
     private lateinit var thumbnailPresenter: TabThumbnailPresenter
     private val mediaDiscoveryListener: () -> Unit = { uiHandler.post { updateMediaCounter() } }
-    private lateinit var prefs: SharedPreferences
+    private lateinit var sessionObservers: SessionObservers
+    private lateinit var sessionStartup: SessionStartup
     protected val config = AppContext.provideConfig()
     private val voiceSearchHelper = VoiceSearchHelper(this, VOICE_SEARCH_REQUEST_CODE,
         MY_PERMISSIONS_REQUEST_VOICE_SEARCH_PERMISSIONS)
@@ -145,6 +136,22 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
             Process.killProcess(pidToKill)
         }
 
+        composeModels(incognitoMode)
+        inflateViews()
+        composeViews()
+        bindViews()
+
+        // The composition root wires and starts; it neither observes nor renders: the model changes
+        // are rendered by [SessionObservers] and the session state is brought up by [SessionStartup].
+        sessionObservers.observe()
+        sessionStartup.load(intent)
+    }
+
+    /**
+     * Fetches this screen's models. They are process-wide, so the repository hands out the shared
+     * instances and a re-created activity keeps the state the previous one had.
+     */
+    private fun composeModels(incognitoMode: Boolean) {
         viewModel = ActiveModelsRepository.get(MainActivityViewModel::class, this)
         if (incognitoMode) {
             viewModel.prepareSwitchToIncognito()
@@ -153,25 +160,28 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         adblockModel = ActiveModelsRepository.get(AdblockModel::class, this)
         tabsModel = ActiveModelsRepository.get(TabsModel::class, this)
         autoUpdateModel = ActiveModelsRepository.get(AutoUpdateModel::class, this)
-        uiHandler = Handler()
-        MediaDiscoveryNotifier.addListener(mediaDiscoveryListener)
-        prefs = getSharedPreferences(TVBro.MAIN_PREFS_NAME, Context.MODE_PRIVATE)
+    }
+
+    /** Inflates the screen and hands the cursor widgets their live tuning from Config. */
+    private fun inflateViews() {
         vb = ActivityMainBinding.inflate(layoutInflater)
         setContentView(vb.root)
 
         // The cursor widgets read the live cursor tuning from Config; the composition root hands
         // them the instance after inflation (they never locate it themselves).
         vb.flWebViewContainer.config = config
+    }
 
-        // The view-layer collaborators: each owns one slice of the activity's UI work and reaches it
-        // only through the binding and the models/callbacks handed to it here.
-        panelController = PanelController(vb) {
-            tabsModel.currentTab.value?.webEngine?.getView()?.requestFocus()
-        }
+    /**
+     * Builds the view-layer collaborators: each owns one slice of the activity's UI work and reaches
+     * it only through the binding, the models and the callbacks handed to it here.
+     */
+    private fun composeViews() {
+        panelController = PanelController(vb) { focusCurrentEngine() }
         toolbarController = ToolbarController(
             this, vb,
             keepScreenOn = { settingsModel.keepScreenOn.value },
-            focusEngine = { tabsModel.currentTab.value?.webEngine?.getView()?.requestFocus() },
+            focusEngine = { focusCurrentEngine() },
         )
         mediaListPresenter = MediaListPresenter(this, tabsModel)
         permissionOrchestrator = PermissionOrchestrator(
@@ -204,14 +214,36 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
             keepToolbarOpen = { settingsModel.keepToolbarOpen.value },
             isCurrentTab = { tabByTitleIndex(vb.vTabs.current) == it },
         )
+        sessionObservers = SessionObservers(
+            this, vb, config, settingsModel, adblockModel, viewModel, tabsModel,
+            toolbarController, bookmarksController,
+            onCurrentTabChanged = { onWebViewUpdated(it) },
+        )
+        sessionStartup = SessionStartup(
+            this, vb, config, viewModel, settingsModel, tabsModel, toolbarController,
+            handleIntent = { handleIntent(it) },
+            openInNewTab = { url, index, needToHideMenuOverlay, navigateImmediately ->
+                openInNewTab(url, index, needToHideMenuOverlay, navigateImmediately)
+            },
+            changeTab = { changeTab(it) },
+            onLoaded = {
+                checkForUpdatesOnStartup()
+                updateUpdateBadge()
+            },
+        )
+    }
 
+    /**
+     * Hands the models and the collaborators to the views; the views never locate them. The back
+     * dispatcher is wired last so the escape hatches are all in place before the first BACK.
+     */
+    private fun bindViews() {
         vb.ivMiniatures.visibility = View.INVISIBLE
         vb.rlActionBar.visibility = View.VISIBLE
         vb.progressBar.visibility = View.GONE
 
         vb.vTabs.listener = tabsListener
         vb.vBookmarks.listener = bookmarksController.listener
-        // The composition root hands the models to the views; the views never locate them.
         vb.vTabs.bind(tabsModel)
 
         vb.vActionBar.callback = this
@@ -221,84 +253,33 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         vb.vCursorMenu.shouldSuppressDirectNavigationHint = { settingsModel.directNavigationModeHintSuppress }
         vb.vCursorMenu.onDirectNavigationHintSuppressed = { settingsModel.directNavigationModeHintSuppress = true }
 
-        settingsModel.userAgentString.subscribe(this.lifecycle, false) {
-            for (tab in tabsModel.tabsStates) {
-                tab.webEngine.userAgentString = it
-            }
-        }
-
-        settingsModel.theme.subscribe(this.lifecycle, false) {
-            val mode = when (it) {
-                Config.Theme.BLACK -> AppCompatDelegate.MODE_NIGHT_YES
-                Config.Theme.WHITE -> AppCompatDelegate.MODE_NIGHT_NO
-                else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
-            }
-            if (AppCompatDelegate.getDefaultNightMode() != mode) {
-                AppCompatDelegate.setDefaultNightMode(mode)
-            }
-            WebEngineFactory.onThemeSettingUpdated(it)
-            // MainActivity declares uiMode in android:configChanges, so AppCompat does not recreate
-            // it on a night-mode change and the already-inflated views would keep their old colors.
-            // Recreate explicitly so the top bar and dialogs repaint immediately without a restart.
-            if (!isFinishing && !isDestroyed) recreate()
-        }
-
-        settingsModel.keepScreenOn.subscribe(this.lifecycle) {
-            if (it) {
-                window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            } else {
-                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            }
-        }
-
-        // The toolbar overlay style follows the setting live, so the settings page never touches the
-        // activity to restyle it.
-        settingsModel.keepToolbarOpen.subscribe(this.lifecycle) {
-            toolbarController.applyOverlayStyle()
-        }
-
-        // The ad-blocker list load flags its own failure; the host only renders (and acknowledges) it.
-        adblockModel.loadError.subscribe(this.lifecycle) { failed ->
-            if (failed) {
-                Utils.showToast(this, R.string.adblock_load_error)
-                adblockModel.loadError.value = false
-            }
-        }
-
-        viewModel.homePageLinks.subscribe(this) {
-            Log.i(TAG, "homePageLinks updated")
-            val currentUrl = tabsModel.currentTab.value?.url ?: return@subscribe
-            if (HomePagePolicy.isHomePageUrl(currentUrl, Config.localHomePageUrl)) {
-                tabsModel.currentTab.value?.webEngine?.reload()
-            }
-        }
-
-        // Bookmark state is owned by the view model; the view only renders it.
-        viewModel.bookmarks.subscribe(this, false) { bookmarksController.renderBookmarks(it) }
-
-        viewModel.currentPageBookmarked.subscribe(this, false) {
-            bookmarksController.renderCurrentPageBookmarked(it)
-        }
-
-        tabsModel.currentTab.subscribe(this) {
-            vb.vActionBar.setAddressBoxText(it?.url ?: "")
-            it?.let {
-                onWebViewUpdated(it)
-            }
-        }
-
-        tabsModel.tabsStates.subscribe(this, false) {
-            vb.vActionBar.setTabsCounter(it.size)
-            if (it.isEmpty()) {
-                if (!WebEnginePolicy.isGecko(config.webEngine)) {
-                    vb.flWebViewContainer.removeAllViews()
-                }
-            }
-        }
+        // The media counter is a view concern, so its listener is registered here and not by the model.
+        MediaDiscoveryNotifier.addListener(mediaDiscoveryListener)
 
         onBackPressedDispatcher.addCallback(onBackPressedCallback)
+    }
 
-        loadState()
+    /** Puts the focus back on the page. */
+    private fun focusCurrentEngine() {
+        tabsModel.currentTab.value?.webEngine?.getView()?.requestFocus()
+    }
+
+    /**
+     * The startup update check: it is skipped when it already ran today or a result is cached. The
+     * dialog it may raise is a host concern ([AutoUpdateHost]).
+     */
+    private fun checkForUpdatesOnStartup() {
+        if (!autoUpdateModel.needAutoCheckUpdates ||
+            autoUpdateModel.updateChecker.versionCheckResult != null ||
+            autoUpdateModel.lastUpdateNotificationTime.sameDay(Calendar.getInstance())) {
+            return
+        }
+        autoUpdateModel.checkUpdate(false) {
+            updateUpdateBadge()
+            if (autoUpdateModel.updateChecker.hasUpdate()) {
+                autoUpdateModel.showUpdateDialogIfNeeded(this)
+            }
+        }
     }
 
     private var progressBarHideRunnable: Runnable = Runnable {
@@ -502,70 +483,6 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         if (intent.data != null) {
             handleIntent(intent)
         }
-    }
-
-    private fun loadState() = lifecycleScope.launch(Dispatchers.Main) {
-        Log.d(TAG, "loadState")
-        WebEngineFactory.initialize(this@MainActivity, config, vb.flWebViewContainer)
-
-        vb.progressBarGeneric.visibility = View.VISIBLE
-        vb.progressBarGeneric.requestFocus()
-        viewModel.loadState().join()
-        if (settingsModel.restoreTabsOnStartup) {
-            tabsModel.loadState().join()
-        } else {
-            tabsModel.discardSavedState().join()
-        }
-
-        if (!isActive) {
-            return@launch
-        }
-
-        vb.progressBarGeneric.visibility = View.GONE
-
-        // `tabsStates` is retained across activity re-creation (theme toggle), in which case the
-        // observer above is not re-fired, so seed the tab counter here as well.
-        vb.vActionBar.setTabsCounter(tabsModel.tabsStates.size)
-
-        if (intent.data == null) {
-            if (tabsModel.tabsStates.isEmpty()) {
-                openInNewTab(settingsModel.homePage, 0,
-                    needToHideMenuOverlay = true,
-                    navigateImmediately = true
-                )
-            } else {
-                var foundSelectedTab = false
-                for (i in tabsModel.tabsStates.indices) {
-                    val tab = tabsModel.tabsStates[i]
-                    if (tab.selected) {
-                        changeTab(tab)
-                        foundSelectedTab = true
-                        break
-                    }
-                }
-                if (!foundSelectedTab) {//this may happen in some error states
-                    changeTab(tabsModel.tabsStates[0])
-                }
-            }
-        } else {
-            handleIntent(intent)
-        }
-
-        val currentTab = tabsModel.currentTab.value
-        if (currentTab == null || currentTab.url == settingsModel.homePage) {
-            toolbarController.showMenuOverlay()
-        }
-        if (autoUpdateModel.needAutoCheckUpdates &&
-            autoUpdateModel.updateChecker.versionCheckResult == null &&
-                !autoUpdateModel.lastUpdateNotificationTime.sameDay(Calendar.getInstance())) {
-            autoUpdateModel.checkUpdate(false){
-                updateUpdateBadge()
-                if (autoUpdateModel.updateChecker.hasUpdate()) {
-                    autoUpdateModel.showUpdateDialogIfNeeded(this@MainActivity)
-                }
-            }
-        }
-        updateUpdateBadge()
     }
 
     /** Keeps the toolbar settings dot in sync with the last update check result. */
