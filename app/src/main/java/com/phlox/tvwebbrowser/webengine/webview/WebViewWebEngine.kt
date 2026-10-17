@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
@@ -56,10 +57,19 @@ class WebViewWebEngine(
     /**
      * Applies the requested User-Agent, or the WebView default with the `; wv` in-app marker
      * removed when the user kept "Default". Site players commonly reject the marker with a 403.
+     *
+     * [WebSettings.getDefaultUserAgent] is API 26 while the geckoExcluded flavor supports API 24+,
+     * so below O there is no public default-UA accessor: a freshly created view — the only path
+     * that reads a `null` field — still carries the stock default, so the marker is stripped from
+     * whatever is currently set instead.
      */
     private fun applyUserAgent(view: WebView, userAgent: String?) {
-        view.settings.userAgentString = userAgent
-            ?: UserAgentPolicy.withoutInAppMarker(WebSettings.getDefaultUserAgent(appContext))
+        val base = userAgent
+            ?: if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                UserAgentPolicy.withoutInAppMarker(WebSettings.getDefaultUserAgent(appContext))
+            else
+                UserAgentPolicy.withoutInAppMarker(view.settings.userAgentString)
+        view.settings.userAgentString = base
     }
 
     override fun saveState(): Any {
