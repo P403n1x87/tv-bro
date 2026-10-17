@@ -40,8 +40,8 @@ class AutoUpdateModelTest {
         host = FakeHost()
     }
 
-    /** Puts an available update in the checker and pretends the last offer was yesterday. */
-    private fun withAnAvailableUpdate() {
+    /** Puts an available update in the checker, leaving the last-offer time alone. */
+    private fun putAvailableUpdate() {
         model.updateChecker.versionCheckResult = UpdateChecker.UpdateCheckResult(
             "999.0.0",
             UpdateChecker.CHANNEL_RELEASE,
@@ -49,8 +49,28 @@ class AutoUpdateModelTest {
             ArrayList(),
             UpdateChecker.AVAILABLE_CHANNELS,
         )
+    }
+
+    /** Puts an available update in the checker and pretends the last offer was yesterday. */
+    private fun withAnAvailableUpdate() {
+        putAvailableUpdate()
         model.lastUpdateNotificationTime = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
     }
+
+    @Test
+    fun aFreshInstallCountsAsJustOfferedSoTheFirstOfferWaits() {
+        // No notification was ever stored, so the model starts at "now" — the offer must respect
+        // the daily limit until the day moves on (only force gets through).
+        putAvailableUpdate()
+
+        model.showUpdateDialogIfNeeded(host)
+
+        assertEquals(0, host.updateDialogs)
+        model.showUpdateDialogIfNeeded(host, force = true)
+        assertEquals(1, host.updateDialogs)
+    }
+
+
 
     @Test
     fun theUpdateIsOfferedOncePerDay() {
