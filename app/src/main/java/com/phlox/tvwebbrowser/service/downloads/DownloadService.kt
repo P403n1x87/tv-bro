@@ -177,11 +177,11 @@ class DownloadService : Service() {
         download.time = Date().time
         Log.d(TAG, "Start to downloading url: ${download.url}")
         val downloadTask = if (download.base64BlobData != null) {
-            BlobDownloadTask(download, download.base64BlobData!!, downloadTasksListener)
+            BlobDownloadTask(download, download.base64BlobData!!, downloadTasksListener, contentResolver)
         } else if (download.stream != null) {
-            StreamDownloadTask(download, download.stream!!, downloadTasksListener)
+            StreamDownloadTask(download, download.stream!!, downloadTasksListener, contentResolver)
         } else {
-            FileDownloadTask(download, download.userAgentString, downloadTasksListener)
+            FileDownloadTask(download, download.userAgentString, downloadTasksListener, contentResolver)
         }
         model.activeDownloads.add(downloadTask)
         executor.execute(downloadTask)

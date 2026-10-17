@@ -56,7 +56,7 @@ class ActiveDownloadsModelTest {
         val download = Download(url, "a.apk", "/tmp/nonexistent-$id.apk", Download.OperationAfterDownload.NOP,
             null, null, null, null, null)
         download.id = id
-        return FileDownloadTask(download, null, NoOpCallback)
+        return FileDownloadTask(download, null, NoOpCallback, RuntimeEnvironment.getApplication().contentResolver)
     }
 
     @Test

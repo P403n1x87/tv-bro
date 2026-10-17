@@ -159,6 +159,10 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         vb = ActivityMainBinding.inflate(layoutInflater)
         setContentView(vb.root)
 
+        // The cursor widgets read the live cursor tuning from Config; the composition root hands
+        // them the instance after inflation (they never locate it themselves).
+        vb.flWebViewContainer.config = config
+
         // The view-layer collaborators: each owns one slice of the activity's UI work and reaches it
         // only through the binding and the models/callbacks handed to it here.
         panelController = PanelController(vb) {

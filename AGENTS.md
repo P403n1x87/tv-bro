@@ -41,8 +41,10 @@ the model/host seam polish. Work on a feature branch; **open a PR only when aske
 - Deliberate exception to view purity: `MainActivity` reads `config` for pre-model engine checks
   (`incognitoMode`, `isWebEngineGecko()`).
 - First architecture margin is closed; the next one is (a) the `MainActivity.onCreate`/lifecycle body,
-  (b) global `TVBro.instance`/`AppContext.get()` coupling outside the models (engine/adapters/
-  services), (c) integration-test coverage. Details/evidence: `docs/architecture/ARCHITECTURE-REVIEW.md`.
+  (b) integration-test coverage. The global `TVBro.instance`/`AppContext.get()` coupling is now gone
+  from models, engines, adapters, widgets and download tasks; what is left is process-level state
+  (singletons, restart flags) plus a few inert mentions in comments. Details/evidence:
+  `docs/architecture/ARCHITECTURE-REVIEW.md`.
 
 ## Build / test
 - Linux: JDK 21 exported, plus JDK 17 at `/usr/lib/jvm/java-17-openjdk-amd64` (`buildSrc` pins

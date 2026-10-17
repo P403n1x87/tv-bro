@@ -51,7 +51,7 @@ class GeckoViewWithVirtualCursor @JvmOverloads constructor(
         setWillNotDraw(false)
         overScrollMode = OVER_SCROLL_NEVER
         inputMethodManager = context.getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager?
-        cursorDrawerDelegate = CursorDrawerDelegate(context, this)
+        cursorDrawerDelegate = CursorDrawerDelegate(context, this, config)
         cursorDrawerDelegate.customScrollCallback = object : CursorDrawerDelegate.CustomScrollCallback {
             override fun onScroll(scrollX: Int, scrollY: Int): Boolean {
                 return session?.let {

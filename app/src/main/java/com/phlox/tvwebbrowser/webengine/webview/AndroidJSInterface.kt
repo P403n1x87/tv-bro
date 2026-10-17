@@ -14,7 +14,7 @@ import org.json.JSONArray
 class AndroidJSInterface(
     private val webEngine: WebViewWebEngine,
     private val context: Context,
-    private val config: Config,
+    internal val config: Config,
 ) {
     @JavascriptInterface
     fun currentUrl(): String {
