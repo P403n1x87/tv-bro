@@ -35,9 +35,10 @@ interface TabViewHost {
 /**
  * The open tabs of the current browsing mode.
  *
- * Every dependency — the data-layer gateways, the settings and the two application services it
- * needs (the private files directory, the connectivity check) — is a constructor parameter with a
- * production default, so a test can hand it in-memory repositories and its own configuration;
+ * Every dependency — the data-layer gateways, the settings and the application services it needs
+ * (the private files directory, the cache directory, the connectivity check) — is a constructor
+ * parameter with a production default, so a test can hand it in-memory repositories and its own
+ * configuration;
  * [com.phlox.tvwebbrowser.utils.activemodel.ActiveModelsRepository] builds the no-argument
  * constructor Kotlin synthesises.
  */
@@ -46,6 +47,7 @@ class TabsModel(
     private val hostsRepository: HostsRepository = Repositories.hosts,
     private val config: Config = AppContext.provideConfig(),
     private val filesDir: () -> File? = { AppContext.get().filesDir },
+    private val cacheDir: () -> File? = { AppContext.get().cacheDir },
     private val networkAvailable: () -> Boolean = { Utils.isNetworkConnected(TVBro.instance) },
 ) : ActiveModel() {
     companion object {
@@ -106,7 +108,7 @@ class TabsModel(
             tabsRepository.unselectAll(config.incognitoMode)
         }
         withContext(Dispatchers.IO) {
-            tab.saveWebViewStateToFile()
+            tab.saveWebViewStateToFile(filesDir())
         }
         if (tab.id != 0L) {
             tabsRepository.update(tab)
@@ -149,7 +151,7 @@ class TabsModel(
         tabsStates.remove(tab)
         modelScope.launch(Dispatchers.Main) {
             tabsRepository.delete(tab)
-            launch { tab.removeFiles() }
+            launch { tab.removeFiles(filesDir(), cacheDir()) }
         }
     }
 
@@ -176,7 +178,7 @@ class TabsModel(
         currentTab.value = null
         tabsRepository.deleteAll(config.incognitoMode)
         withContext(Dispatchers.IO) {
-            tabsClone.forEach { it.removeFiles() }
+            tabsClone.forEach { it.removeFiles(filesDir(), cacheDir()) }
         }
     }
 
@@ -219,7 +221,7 @@ class TabsModel(
             if (!viewHost.createView(newTab)) {
                 return
             }
-            needReloadUrl = !newTab.restoreWebView()
+            needReloadUrl = !newTab.restoreWebView(filesDir())
         }
         viewHost.attachEngineToWindow(newTab, webEngineWindowProviderCallback)
         if (needReloadUrl) {

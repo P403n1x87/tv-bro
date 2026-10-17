@@ -20,6 +20,10 @@ the model/host seam polish. Work on a feature branch; **open a PR only when aske
   `WebEngineCallbackHost` interface (`MainActivity` is the only host). Pure policy in `domain/`
   (`NavigationPolicy`, `PopupPolicy`, `SiteDomains`, `AddressInputPolicy`, `UrlNormalizer`,
   `LinkActionPolicy`, `NewTabPositionPolicy`, `HomePagePolicy`, `WebEnginePolicy`).
+- Engines get the app `Context` and `Config` through `WebEngineFactory.initialize`, which the
+  composition root drives; the provider hands them to each engine it creates, so
+  `WebViewWebEngine`/`AndroidJSInterface` take both as ctor params instead of reading
+  `AppContext`/`TVBro`.
 - `MainActivity` is the composition root/host; its UI work is delegated to `PanelController`,
   `ToolbarController`, `MediaListPresenter`, `PermissionOrchestrator`, `IntentHandler`,
   `BookmarksController`, `CursorMenuController`, `TabThumbnailPresenter` and `DownloadCoordinator`,

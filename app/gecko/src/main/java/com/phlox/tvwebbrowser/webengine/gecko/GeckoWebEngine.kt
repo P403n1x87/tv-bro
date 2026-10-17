@@ -121,7 +121,7 @@ class GeckoWebEngine(val tab: WebTabState): WebEngine,
 
         init {
             WebEngineFactory.registerProvider(WebEngineProvider(ENGINE_NAME, object : WebEngineProviderCallback {
-                override suspend fun initialize(context: Context, webViewContainer: CursorLayout) {
+                override suspend fun initialize(context: Context, config: Config, webViewContainer: CursorLayout) {
                     GeckoWebEngine.initialize(context, webViewContainer)
                 }
 

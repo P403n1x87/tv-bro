@@ -8,18 +8,21 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 /**
  * Owns the tab-thumbnail preview in the top-right corner: the debounced repaint the tabs panel
  * triggers while titles change, and the actual bitmap/placeholder rendering.
  *
- * The activity supplies the "keep the toolbar open" and "is this still the current tab" predicates,
- * so the presenter never reaches back into the composition root.
+ * The activity supplies the "keep the toolbar open" and "is this still the current tab" predicates
+ * plus the cache directory the thumbnails live in, so the presenter never reaches back into the
+ * composition root.
  */
 class TabThumbnailPresenter(
     private val vb: ActivityMainBinding,
     private val uiHandler: Handler,
     private val scope: CoroutineScope,
+    private val cacheDir: () -> File?,
     private val keepToolbarOpen: () -> Boolean,
     private val isCurrentTab: (WebTabState) -> Boolean,
 ) {
@@ -55,7 +58,7 @@ class TabThumbnailPresenter(
                 vb.ivMiniatures.setImageBitmap(currentTab.thumbnail)
             } else if (currentTab.thumbnailHash != null) {
                 withContext(Dispatchers.IO) {
-                    val thumbnail = currentTab.loadThumbnail()
+                    val thumbnail = currentTab.loadThumbnail(cacheDir())
                     withContext(Dispatchers.Main) {
                         if (thumbnail != null) {
                             vb.ivMiniatures.setImageBitmap(currentTab.thumbnail)
