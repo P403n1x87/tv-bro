@@ -9,9 +9,11 @@ import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebResourceRequest
+import android.webkit.WebSettings
 import android.webkit.WebView
 import androidx.webkit.WebViewCompat
 import com.phlox.tvwebbrowser.Config
+import com.phlox.tvwebbrowser.domain.UserAgentPolicy
 import com.phlox.tvwebbrowser.model.WebTabState
 import com.phlox.tvwebbrowser.utils.Utils
 import com.phlox.tvwebbrowser.webengine.WebEngine
@@ -48,10 +50,17 @@ class WebViewWebEngine(
     override var userAgentString: String? = null
         set(value) {
             field = value
-            if (value != null) {
-                webView?.settings?.userAgentString = value
-            }
+            webView?.let { applyUserAgent(it, value) }
         }
+
+    /**
+     * Applies the requested User-Agent, or the WebView default with the `; wv` in-app marker
+     * removed when the user kept "Default". Site players commonly reject the marker with a 403.
+     */
+    private fun applyUserAgent(view: WebView, userAgent: String?) {
+        view.settings.userAgentString = userAgent
+            ?: UserAgentPolicy.withoutInAppMarker(WebSettings.getDefaultUserAgent(appContext))
+    }
 
     override fun saveState(): Any {
         val bundle = Bundle()
@@ -117,7 +126,9 @@ class WebViewWebEngine(
     @Throws(Exception::class)
     override fun getOrCreateView(activityContext: Context): View {
         if (webView == null) {
-            webView = WebViewEx(activityContext, webViewCallback, jsInterface)
+            val created = WebViewEx(activityContext, webViewCallback, jsInterface)
+            applyUserAgent(created, userAgentString)
+            webView = created
         }
         return webView!!
     }
