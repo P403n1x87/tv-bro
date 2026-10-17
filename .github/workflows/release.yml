@@ -15,9 +15,20 @@ on:
       - master
     tags:
       - 'v*'
-  #Every PR runs the exact same build pipeline (minus signing/publishing) so a broken build or a bad
-  #version can never reach a release tag.
+  #Every PR that can affect the build runs the exact same pipeline (minus signing/publishing) so a
+  #broken build or a bad version can never reach a release tag. A documentation-only PR has nothing
+  #to build and is skipped entirely (it reports no check, which is fine because master is not
+  #protected). The list below is deliberately a deny-list rather than an allow-list: anything that is
+  #not obviously documentation — sources, resources, assets, the Gradle files, buildSrc, the wrapper,
+  #the workflows themselves — still triggers a build.
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '**/*.md'
+      - '.gitignore'
+      - '.github/FUNDING.yml'
+      - '.github/ISSUE_TEMPLATE/**'
   #Plain "just build it" runs (never publishes). Dispatching from master also refreshes the cache.
   workflow_dispatch:
 
