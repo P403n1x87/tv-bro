@@ -1,5 +1,6 @@
 package com.phlox.tvwebbrowser.activity.downloads
 
+import android.app.AlertDialog
 import android.content.*
 import android.net.Uri
 import android.os.Build
@@ -34,6 +35,7 @@ class DownloadsActivity : AppCompatActivity(), AdapterView.OnItemClickListener, 
 
     private lateinit var activeDownloadsModel: ActiveDownloadsModel
     private lateinit var downloadsHistoryModel: DownloadsHistoryModel
+    private lateinit var storageModel: DownloadStorageModel
 
     internal var onListScrollListener: AbsListView.OnScrollListener = object : AbsListView.OnScrollListener {
         override fun onScrollStateChanged(view: AbsListView, scrollState: Int) {
@@ -55,6 +57,7 @@ class DownloadsActivity : AppCompatActivity(), AdapterView.OnItemClickListener, 
 
         activeDownloadsModel = ActiveModelsRepository.get(ActiveDownloadsModel::class, this)
         downloadsHistoryModel = ActiveModelsRepository.get(DownloadsHistoryModel::class, this)
+        storageModel = ActiveModelsRepository.get(DownloadStorageModel::class, this)
 
         adapter = DownloadListAdapter(this)
         vb.listView.adapter = adapter
@@ -63,12 +66,22 @@ class DownloadsActivity : AppCompatActivity(), AdapterView.OnItemClickListener, 
         vb.listView.onItemClickListener = this
         vb.listView.onItemLongClickListener = this
 
+        vb.btnClose.setOnClickListener { finish() }
+        vb.btnDeleteAll.setOnClickListener { showDeleteDialog(deleteAll = true) }
+        vb.btnDeleteSelected.setOnClickListener { showDeleteDialog(deleteAll = false) }
+        vb.cbSelectAll.setOnClickListener { adapter.setAllSelected(vb.cbSelectAll.isChecked); updateControls() }
+
+        storageModel.location.subscribe(this, false) { updateStorageSummary() }
+        storageModel.freeSpace.subscribe(this, false) { updateStorageSummary() }
+        storageModel.usedSpace.subscribe(this, false) { updateStorageSummary() }
+
         downloadsHistoryModel.lastLoadedItems.subscribe(this, false, {
             if (it.isNotEmpty()) {
                 vb.tvPlaceholder.visibility = View.GONE
                 adapter.addItems(it)
                 vb.listView.requestFocus()
             }
+            updateControls()
         })
 
         if (downloadsHistoryModel.allItems.isEmpty()) {
@@ -78,11 +91,13 @@ class DownloadsActivity : AppCompatActivity(), AdapterView.OnItemClickListener, 
             adapter.addItems(downloadsHistoryModel.allItems)
             vb.listView.requestFocus()
         }
+        updateControls()
     }
 
     override fun onResume() {
         super.onResume()
         activeDownloadsModel.registerListener(this)
+        storageModel.refresh()
     }
 
     override fun onPause() {
@@ -95,6 +110,12 @@ class DownloadsActivity : AppCompatActivity(), AdapterView.OnItemClickListener, 
         val download = v.download ?: return
 
         if (download.isDateHeader) {
+            return
+        }
+
+        if (adapter.isMultiselectMode) {
+            v.setSelection(!download.selected)
+            updateControls()
             return
         }
 
@@ -137,6 +158,13 @@ class DownloadsActivity : AppCompatActivity(), AdapterView.OnItemClickListener, 
         if (download.isDateHeader) {
             return true
         }
+        if (!adapter.isMultiselectMode) {
+            // Long press enters multi-select; before that the row's own actions were the long-press menu.
+            adapter.isMultiselectMode = true
+            v.setSelection(true)
+            updateControls()
+            return true
+        }
         if (download.size == Download.BROKEN_MARK || download.size == Download.CANCELLED_MARK ||
                 download.size == download.bytesReceived) {
             showFinishedDownloadOptionsPopup(v)
@@ -144,6 +172,65 @@ class DownloadsActivity : AppCompatActivity(), AdapterView.OnItemClickListener, 
             showUnfinishedDownloadOptionsPopup(v)
         }
         return true
+    }
+
+    /** Reflects the list/selection state in the header controls. */
+    private fun updateControls() {
+        val hasDownloads = adapter.realCount > 0
+        vb.btnDeleteAll.visibility = if (hasDownloads) View.VISIBLE else View.GONE
+        if (!hasDownloads) {
+            adapter.isMultiselectMode = false
+        }
+        if (!adapter.isMultiselectMode) {
+            vb.cbSelectAll.visibility = View.GONE
+            vb.btnDeleteSelected.visibility = View.GONE
+            return
+        }
+        vb.cbSelectAll.visibility = View.VISIBLE
+        vb.cbSelectAll.isChecked = adapter.allSelected
+        vb.btnDeleteSelected.visibility =
+            if (adapter.selectedItems.isEmpty()) View.GONE else View.VISIBLE
+        vb.btnDeleteSelected.text =
+            getString(R.string.delete_count, adapter.selectedItems.size)
+    }
+
+    private fun updateStorageSummary() {
+        val used = storageModel.usedSpace.value
+        val free = storageModel.freeSpace.value
+        val location = storageModel.location.value
+        vb.tvStorageSummary.text = if (used != null && free != null && location != null) {
+            getString(R.string.downloads_using_of_in, used, free, location)
+        } else {
+            ""
+        }
+    }
+
+    private fun showDeleteDialog(deleteAll: Boolean) {
+        val selected = adapter.selectedItems
+        if (adapter.realCount == 0L || (!deleteAll && selected.isEmpty())) return
+        AlertDialog.Builder(this)
+            .setTitle(R.string.delete)
+            .setMessage(if (deleteAll) R.string.msg_delete_download_all else R.string.msg_delete_download)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                lifecycleScope.launch(Dispatchers.Main) {
+                    if (deleteAll) {
+                        activeDownloadsModel.deleteAll()
+                        downloadsHistoryModel.reset()
+                        adapter.erase()
+                    } else {
+                        activeDownloadsModel.deleteItems(selected)
+                        downloadsHistoryModel.remove(selected)
+                        adapter.remove(selected)
+                    }
+                    adapter.isMultiselectMode = false
+                    vb.tvPlaceholder.visibility =
+                        if (adapter.realCount == 0L) View.VISIBLE else View.GONE
+                    updateControls()
+                    storageModel.refresh()
+                }
+            }
+            .setNeutralButton(android.R.string.cancel) { _, _ -> }
+            .show()
     }
 
     private fun showUnfinishedDownloadOptionsPopup(v: DownloadListItemView) {
@@ -169,7 +256,7 @@ class DownloadsActivity : AppCompatActivity(), AdapterView.OnItemClickListener, 
             when (menuItem.itemId) {
                 0 -> installAPK(download)
                 1 -> openFolder(v)
-                2 -> deleteItem(v)
+                2 -> confirmDeleteItem(download)
             }
             true
         }
@@ -202,11 +289,22 @@ class DownloadsActivity : AppCompatActivity(), AdapterView.OnItemClickListener, 
         }
     }
 
-    private fun deleteItem(v: DownloadListItemView) = lifecycleScope.launch(Dispatchers.Main) {
-        v.download?.let {
-            activeDownloadsModel.deleteItem(it)
-            adapter.remove(it)
-        }
+    private fun confirmDeleteItem(download: Download) {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.delete)
+            .setMessage(R.string.msg_delete_download)
+            .setPositiveButton(android.R.string.ok) { _, _ -> deleteItem(download) }
+            .setNeutralButton(android.R.string.cancel) { _, _ -> }
+            .show()
+    }
+
+    private fun deleteItem(download: Download) = lifecycleScope.launch(Dispatchers.Main) {
+        activeDownloadsModel.deleteItem(download)
+        downloadsHistoryModel.remove(listOf(download))
+        adapter.remove(download)
+        vb.tvPlaceholder.visibility = if (adapter.realCount == 0L) View.VISIBLE else View.GONE
+        updateControls()
+        storageModel.refresh()
     }
 
     override fun onDownloadUpdated(downloadInfo: Download) {
@@ -221,7 +319,10 @@ class DownloadsActivity : AppCompatActivity(), AdapterView.OnItemClickListener, 
         }
     }
 
-    override fun onAllDownloadsComplete() {}
+    override fun onAllDownloadsComplete() {
+        // A finished download changed the footprint; refresh the header's storage summary.
+        storageModel.refresh()
+    }
 
     fun registerListener(listener: ActiveDownloadsModel.Listener) {
         listeners.add(listener)
@@ -229,6 +330,16 @@ class DownloadsActivity : AppCompatActivity(), AdapterView.OnItemClickListener, 
 
     fun unregisterListener(listener: ActiveDownloadsModel.Listener) {
         listeners.remove(listener)
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        if (adapter.isMultiselectMode) {
+            adapter.isMultiselectMode = false
+            updateControls()
+            return
+        }
+        super.onBackPressed()
     }
 
     companion object {

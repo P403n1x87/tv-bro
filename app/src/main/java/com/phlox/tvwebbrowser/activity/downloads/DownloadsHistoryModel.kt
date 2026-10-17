@@ -34,4 +34,15 @@ class DownloadsHistoryModel(
 
     loading = false
   }
+
+  /** Drops [items] from the cached window so a re-created view does not re-show deleted rows. */
+  fun remove(items: List<Download>) {
+    allItems.removeAll(items.toSet())
+  }
+
+  /** Forgets the cached window after every download has been deleted. */
+  fun reset() {
+    allItems.clear()
+    lastLoadedItems.value = emptyList()
+  }
 }

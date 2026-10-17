@@ -91,6 +91,37 @@ class DownloadCoordinatorTest {
     }
 
     @Test
+    fun aDownloadThatDoesNotFitIsBlockedAndReported() {
+        host.granted += Manifest.permission.WRITE_EXTERNAL_STORAGE
+        host.freeSpace = 100
+
+        coordinator().requestDownload(
+            url = "https://example.com/big.iso", referer = "",
+            originalDownloadFileName = "big.iso", userAgent = null,
+            stream = null, size = 1000
+        )
+
+        assertNull("the download must not start", startedFileName)
+        assertEquals(1, host.noSpaceWarnings.size)
+        assertEquals("big.iso", host.noSpaceWarnings.single().first)
+    }
+
+    @Test
+    fun aDownloadThatFitsStartsWithoutAWarning() {
+        host.granted += Manifest.permission.WRITE_EXTERNAL_STORAGE
+        host.freeSpace = 1000
+
+        coordinator().requestDownload(
+            url = "https://example.com/ok.iso", referer = "",
+            originalDownloadFileName = "ok.iso", userAgent = null,
+            stream = null, size = 1000
+        )
+
+        assertEquals("ok.iso", startedFileName)
+        assertTrue(host.noSpaceWarnings.isEmpty())
+    }
+
+    @Test
     fun bindingFollowsTheScreenLifecycle() {
         val coordinator = coordinator()
 

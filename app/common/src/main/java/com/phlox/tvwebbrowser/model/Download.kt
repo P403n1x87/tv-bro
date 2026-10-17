@@ -31,6 +31,9 @@ class Download() {
     @Ignore
     var isDateHeader = false//user for displaying date headers inside list view
     @Ignore
+    @Volatile
+    var selected = false//used for multi-select deletion inside list view
+    @Ignore
     var mimeType: String? = null
     @Ignore
     var referer: String? = null

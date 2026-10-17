@@ -20,5 +20,7 @@ class DownloadsRepository(private val dao: DownloadDao) {
 
     suspend fun delete(download: Download) = dao.delete(download)
 
+    suspend fun deleteAll() = dao.deleteAll()
+
     suspend fun page(offset: Long): List<Download> = dao.allByLimitOffset(offset)
 }

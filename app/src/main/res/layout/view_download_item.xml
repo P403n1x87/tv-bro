@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:orientation="horizontal" android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:paddingLeft="15dp"
@@ -8,55 +9,49 @@
     android:paddingBottom="10dp"
     android:gravity="center_vertical">
 
-    <LinearLayout
-        android:orientation="vertical"
-        android:layout_height="match_parent"
-        android:layout_width="150dp"
-        android:gravity="center_vertical"
-        android:layout_weight="0">
-
-        <TextView
-            android:text="TextView"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="20sp"
-            android:lines="1"
-            android:ellipsize="end"
-            android:id="@+id/tvTime"
-            android:gravity="center_horizontal"/>
-        <TextView
-            android:text="TextView"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="20sp"
-            android:lines="2"
-            android:ellipsize="end"
-            android:id="@+id/tvSize"
-            android:gravity="center_horizontal"/>
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
+    <CheckBox
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:clickable="false"
+        android:focusable="false"
+        android:id="@+id/cbSelection"
+        android:visibility="gone"/>
+
+    <ImageView
+        android:id="@+id/ivIcon"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginStart="4dp"
+        android:layout_marginEnd="15dp"
+        android:importantForAccessibility="no"
+        android:focusable="false"
+        android:src="@drawable/ic_insert_drive_file_grey_900"/>
+
+    <LinearLayout
         android:orientation="vertical"
-        android:layout_weight="1">
+        android:layout_height="wrap_content"
+        android:layout_width="0dp"
+        android:layout_weight="1"
+        android:gravity="center_vertical">
+
         <TextView
-            android:text="TextView"
+            tools:text="vacation_photo.jpg"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textSize="30sp"
+            android:textSize="24sp"
             android:lines="1"
             android:ellipsize="end"
             android:id="@+id/tvTitle" />
 
         <TextView
-            android:text="TextView"
+            tools:text="5.2 MB · example.com"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textSize="18sp"
+            android:textSize="16sp"
+            android:textColor="@color/day_night_text_color"
             android:lines="1"
             android:ellipsize="end"
-            android:id="@+id/tvURL" />
+            android:id="@+id/tvSubtitle" />
 
         <ProgressBar
             style="?android:attr/progressBarStyleHorizontal"

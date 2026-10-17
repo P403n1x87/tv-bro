@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
+import com.phlox.tvwebbrowser.domain.DownloadStoragePolicy
 import com.phlox.tvwebbrowser.model.Download
 import com.phlox.tvwebbrowser.service.downloads.DownloadService
 import java.io.InputStream
@@ -26,6 +27,12 @@ interface DownloadHost {
     fun hasPermission(permission: String): Boolean
 
     fun requestPermission(permission: String, requestCode: Int)
+
+    /** Free bytes on the download destination; 0 when it cannot be read. */
+    fun downloadFreeSpaceBytes(): Long
+
+    /** Tells the user the download was refused because the destination is full. */
+    fun onDownloadNoSpace(fileName: String, neededBytes: Long, freeBytes: Long)
 }
 
 /**
@@ -109,6 +116,13 @@ class DownloadCoordinator(
     private fun start() {
         val download = pending ?: return
         pending = null
+        if (download.size > 0) {
+            val free = host.downloadFreeSpaceBytes()
+            if (!DownloadStoragePolicy.canFit(free, download.size)) {
+                host.onDownloadNoSpace(download.filename, download.size, free)
+                return
+            }
+        }
         service?.startDownload(download)
         callbacks.onDownloadStarted(download.filename)
     }

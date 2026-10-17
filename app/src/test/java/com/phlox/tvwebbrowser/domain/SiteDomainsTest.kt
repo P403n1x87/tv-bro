@@ -61,6 +61,26 @@ class SiteDomainsTest {
     }
 
     @Test
+    fun hostIsExtractedFromAUrl() {
+        assertEquals("example.com", SiteDomains.hostFromUrl("https://example.com/file.zip"))
+        assertEquals("cdn.example.com", SiteDomains.hostFromUrl("http://cdn.example.com/a?b=c#d"))
+        assertEquals("example.com", SiteDomains.hostFromUrl("https://user:pw@example.com:8080/x"))
+    }
+
+    @Test
+    fun urlsWithoutAHostHaveNoDomain() {
+        assertNull(SiteDomains.domainFromUrl(null))
+        assertNull(SiteDomains.domainFromUrl(""))
+        assertNull(SiteDomains.domainFromUrl("not a url"))
+    }
+
+    @Test
+    fun urlDomainCollapsesToTheRegistrableDomain() {
+        assertEquals("example.com", SiteDomains.domainFromUrl("https://www.example.com/file.zip"))
+        assertEquals("bbc.co.uk", SiteDomains.domainFromUrl("https://www.bbc.co.uk/news"))
+    }
+
+    @Test
     fun unknownHostIsNeverDifferent() {
         // an unparseable host must not be flagged as a cross-site jump
         assertFalse(SiteDomains.isDifferentSite(null, "example.com"))
