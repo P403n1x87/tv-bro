@@ -11,7 +11,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.annotation.UiThread
-import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.model.WebTabState
 import com.phlox.tvwebbrowser.player.MediaMetadataCache
@@ -57,7 +56,11 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
 
-class GeckoWebEngine(val tab: WebTabState): WebEngine,
+class GeckoWebEngine(
+    val tab: WebTabState,
+    internal val appContext: Context,
+    internal val config: Config,
+): WebEngine,
     CursorDrawerDelegate.Callback {
     companion object {
         const val ENGINE_NAME = "GeckoView"
@@ -69,15 +72,15 @@ class GeckoWebEngine(val tab: WebTabState): WebEngine,
         val uiHandler = Handler(Looper.getMainLooper())
 
         @UiThread
-        fun initialize(context: Context, webViewContainer: CursorLayout) {
+        fun initialize(context: Context, config: Config, webViewContainer: CursorLayout) {
             if (!this::runtime.isInitialized) {
                 val builder = GeckoRuntimeSettings.Builder()
-                if (AppContext.provideConfig().webEngineDebug) {
+                if (config.webEngineDebug) {
                     builder.remoteDebuggingEnabled(true)
                     builder.consoleOutput(true)
                 }
                 builder.aboutConfigEnabled(true)
-                    .preferredColorScheme(AppContext.provideConfig().theme.value.toGeckoPreferredColorScheme())
+                    .preferredColorScheme(config.theme.value.toGeckoPreferredColorScheme())
                     .forceUserScalableEnabled(true)
                 builder.contentBlocking(
                         ContentBlocking.Settings.Builder()
@@ -90,7 +93,7 @@ class GeckoWebEngine(val tab: WebTabState): WebEngine,
                     .build())
                 runtime = GeckoRuntime.create(context, builder.build())
 
-                val webExtInstallResult = if (APP_WEB_EXTENSION_VERSION == AppContext.provideConfig().appWebExtensionVersion) {
+                val webExtInstallResult = if (APP_WEB_EXTENSION_VERSION == config.appWebExtensionVersion) {
                     Log.d(TAG, "appWebExtension already installed")
                     runtime.webExtensionController.ensureBuiltIn(
                         "resource://android/assets/extensions/generic/",
@@ -104,12 +107,12 @@ class GeckoWebEngine(val tab: WebTabState): WebEngine,
                 webExtInstallResult.accept({ extension ->
                     Log.d(TAG, "extension accepted: ${extension?.metaData?.description}")
                     appWebExtension.value = extension
-                    AppContext.provideConfig().appWebExtensionVersion = APP_WEB_EXTENSION_VERSION
+                    config.appWebExtensionVersion = APP_WEB_EXTENSION_VERSION
                 }
                 ) { e -> Log.e(TAG, "Error registering WebExtension", e) }
             }
 
-            val webView = GeckoViewWithVirtualCursor(context)
+            val webView = GeckoViewWithVirtualCursor(context, config)
             webViewContainer.addView(webView)
             weakRefToSingleGeckoView = WeakReference(webView)
             webViewContainer.setWillNotDraw(true)//use it only as a container, cursor will be drawn on WebView itself
@@ -121,12 +124,17 @@ class GeckoWebEngine(val tab: WebTabState): WebEngine,
 
         init {
             WebEngineFactory.registerProvider(WebEngineProvider(ENGINE_NAME, object : WebEngineProviderCallback {
+                private var appContext: Context? = null
+                private var config: Config? = null
+
                 override suspend fun initialize(context: Context, config: Config, webViewContainer: CursorLayout) {
-                    GeckoWebEngine.initialize(context, webViewContainer)
+                    appContext = context.applicationContext ?: context
+                    this.config = config
+                    GeckoWebEngine.initialize(context, config, webViewContainer)
                 }
 
                 override fun createWebEngine(tab: WebTabState): WebEngine {
-                    return GeckoWebEngine(tab)
+                    return GeckoWebEngine(tab, appContext!!, config!!)
                 }
 
                 override suspend fun clearCache(ctx: Context) {
@@ -183,10 +191,10 @@ class GeckoWebEngine(val tab: WebTabState): WebEngine,
     init {
         Log.d(TAG, "init")
         session = GeckoSession(GeckoSessionSettings.Builder()
-            .usePrivateMode(AppContext.provideConfig().incognitoMode)
+            .usePrivateMode(config.incognitoMode)
             .viewportMode(GeckoSessionSettings.VIEWPORT_MODE_MOBILE)
             .userAgentMode(GeckoSessionSettings.USER_AGENT_MODE_MOBILE)
-            .useTrackingProtection(tab.adblock ?: AppContext.provideConfig().adBlockEnabled)
+            .useTrackingProtection(tab.adblock ?: config.adBlockEnabled)
             .build()
         )
         session.navigationDelegate = navigationDelegate
@@ -278,12 +286,12 @@ class GeckoWebEngine(val tab: WebTabState): WebEngine,
             session.open(runtime)
         }
         if (Config.HOME_URL_ALIAS == url) {
-            when (AppContext.provideConfig().homePageMode) {
+            when (config.homePageMode) {
                 Config.HomePageMode.BLANK -> {
                     //nothing to do
                 }
                 Config.HomePageMode.CUSTOM, Config.HomePageMode.SEARCH_ENGINE -> {
-                    session.loadUri(AppContext.provideConfig().homePage)
+                    session.loadUri(config.homePage)
                 }
                 Config.HomePageMode.HOME_PAGE -> {
                     //if (HomePageHelper.homePageFilesReady) {
@@ -346,7 +354,7 @@ class GeckoWebEngine(val tab: WebTabState): WebEngine,
             val geckoView = weakRefToSingleGeckoView.get()
             webView = if (geckoView == null) {
                 Log.i(TAG, "Creating new GeckoView")
-                val wv = GeckoViewWithVirtualCursor(activityContext)
+                val wv = GeckoViewWithVirtualCursor(activityContext, config)
                 weakRefToSingleGeckoView = WeakReference(wv)
                 wv
             } else {
@@ -367,7 +375,7 @@ class GeckoWebEngine(val tab: WebTabState): WebEngine,
     }
 
     override fun reload() {
-        val adblockEnabled = tab.adblock ?: AppContext.provideConfig().adBlockEnabled
+        val adblockEnabled = tab.adblock ?: config.adBlockEnabled
         if (session.settings.useTrackingProtection != adblockEnabled) {
             session.settings.useTrackingProtection = adblockEnabled
         }
@@ -469,24 +477,24 @@ class GeckoWebEngine(val tab: WebTabState): WebEngine,
         NativeMediaResolver.resolve(candidate.url, page, session.settings.usePrivateMode, ua) { resolved, reason ->
             if (resolved == null) {
                 Log.i(TAG, "play-media-candidate: $reason")
-                Toast.makeText(AppContext.get(), R.string.native_playback_unavailable, Toast.LENGTH_SHORT).show()
+                Toast.makeText(appContext, R.string.native_playback_unavailable, Toast.LENGTH_SHORT).show()
                 return@resolve
             }
             val source = resolved.source
             val cookie = source.headers.entries.firstOrNull { it.key.equals("Cookie", ignoreCase = true) }?.value
-            when (AppContext.provideConfig().playerKind) {
+            when (config.playerKind) {
                 Config.PlayerKind.BUILT_IN -> try {
-                    NativeVideoActivity.launch(AppContext.get(), NativeVideoActivity.PlaybackRequest(
+                    NativeVideoActivity.launch(appContext, NativeVideoActivity.PlaybackRequest(
                         source, resolved.context, 0L, 1f)) { result ->
                         if (result.action == NativeVideoActivity.ReturnAction.FAILED) {
-                            Toast.makeText(AppContext.get(), R.string.native_playback_unavailable, Toast.LENGTH_SHORT).show()
+                            Toast.makeText(appContext, R.string.native_playback_unavailable, Toast.LENGTH_SHORT).show()
                         }
                     }
                 } catch (error: Exception) {
                     Log.w(TAG, "play-media-candidate failed: ${error.javaClass.simpleName}")
                 }
                 Config.PlayerKind.SYSTEM -> PlayerLauncher.openSystem(
-                    callback?.getActivity() ?: AppContext.get(), source.url, ua, source.page, cookie)
+                    callback?.getActivity() ?: appContext, source.url, ua, source.page, cookie)
                 Config.PlayerKind.EXTERNAL -> callback?.getActivity()?.let { activity ->
                     PlayerLauncher.openExternal(activity, source.url, ua, source.page, cookie)
                 }
