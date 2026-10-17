@@ -73,8 +73,10 @@ the model/host seam polish. Work on a feature branch; **open a PR only when aske
 
 ## Releasing
 - Version comes from git tags (`vX.Y.Z`), never hardcoded; `./gradlew` derives it.
-- CI `.github/workflows/release.yml`: build on every PR that touches code or the build harness; a
-  docs-only PR (`docs/**`, `*.md`, repo metadata) runs no CI at all; publish only from a tag.
+- CI `.github/workflows/release.yml`: a `tests` job runs the three unit suites (one serial Gradle
+  invocation) and `build` depends on it (`needs: tests`), so neither an APK build nor a release
+  happens on red tests; runs on every PR that touches code or the build harness; a docs-only PR
+  (`docs/**`, `*.md`, repo metadata) runs no CI at all; publish only from a tag.
 - `gh release create vX.Y.Z --target <ref>` creates the tag → workflow attaches signed APKs and sets
   the body from `RELEASE_NOTES.md`. Keystore: copy of the debug keystore under `secrets`
   (fallback `signing.keystore`); **never regenerate** (it is what upgrades installs in place).

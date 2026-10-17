@@ -1,4 +1,4 @@
-name: Release
+name: CI
 
 on:
   #A "vX.Y.Z" tag cuts a release. Tags are normally created for you by `gh release create` (see the
@@ -16,11 +16,14 @@ on:
     tags:
       - 'v*'
   #Every PR that can affect the build runs the exact same pipeline (minus signing/publishing) so a
-  #broken build or a bad version can never reach a release tag. A documentation-only PR has nothing
-  #to build and is skipped entirely (it reports no check, which is fine because master is not
-  #protected). The list below is deliberately a deny-list rather than an allow-list: anything that is
-  #not obviously documentation — sources, resources, assets, the Gradle files, buildSrc, the wrapper,
-  #the workflows themselves — still triggers a build.
+  #broken build or a bad version can never reach a release tag. The run executes the `tests` job
+  #first and `build` declares `needs: tests`, so a change that breaks a suite — or simply stops the
+  #test sources from compiling — fails the PR even when the APKs themselves would assemble fine
+  #(which is exactly how a broken master once slipped through). A documentation-only PR has nothing
+  #to build or test and is skipped entirely (it reports no check, which is fine because master is
+  #not protected). The list below is deliberately a deny-list rather than an allow-list: anything
+  #that is not obviously documentation — sources (main *and* test), resources, assets, the Gradle
+  #files, buildSrc, the wrapper, the workflows themselves — still triggers a run.
   pull_request:
     paths-ignore:
       - 'docs/**'
@@ -36,7 +39,39 @@ permissions:
   contents: write
 
 jobs:
+  #The gate for everything downstream: the unit suites (model/repository units + the Robolectric
+  #screen tests) must pass before a single APK is assembled. Its own job means a failing
+  #assertion or uncompilable test source fails fast and reads as exactly that in the checks list,
+  #and — through `build`'s `needs` below — can never be masked by an otherwise green build.
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          #full history + tags so `git describe --tags` derives the same dev version the build
+          #job will use — the test tasks compile the same sources under the same version
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      #All three suites in one invocation: Gradle tasks must run serially (concurrent builds
+      #corrupt the Kotlin incremental state).
+      - name: Run unit tests
+        run: |
+          ./gradlew :app:testP403n1x87GeckoIncludedDebugUnitTest \
+                    :app:testGenericGeckoExcludedDebugUnitTest \
+                    :app:player:testDebugUnitTest
+
   build:
+    #No APK — and therefore no release, since the tag path publishes from this job — without
+    #green tests first.
+    needs: tests
     runs-on: ubuntu-latest
     env:
       #Fork PRs get no secrets, so the signing step below no-ops and the APKs come out unsigned.
