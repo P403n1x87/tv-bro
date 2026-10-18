@@ -148,14 +148,17 @@ jobs:
           arch: x86_64
           disable-animations: true
           script: |
-            ./gradlew :app:connectedP403n1x87GeckoIncludedDebugAndroidTest && test_ok=1 || test_ok=0
-            if [ "$test_ok" = 0 ]; then
+            set +e
+            ./gradlew :app:connectedP403n1x87GeckoIncludedDebugAndroidTest
+            test_ok=$?
+            set -e
+            if [ "$test_ok" -ne 0 ]; then
               adb logcat -d > instrumented-logcat.txt || true
               adb shell uiautomator dump /sdcard/ci-ui.xml > /dev/null 2>&1 || true
               adb pull /sdcard/ci-ui.xml instrumented-ui.xml > /dev/null 2>&1 || true
               adb shell dumpsys window | grep mCurrentFocus > instrumented-window.txt || true
             fi
-            [ "$test_ok" = 1 ]
+            exit $test_ok
 
       - name: Upload failure diagnostics
         if: failure()
