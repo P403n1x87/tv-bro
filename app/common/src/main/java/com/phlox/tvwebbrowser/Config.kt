@@ -45,13 +45,11 @@ class Config(
         const val KEEP_TOOLBAR_OPEN_KEY = "keep_toolbar_open"
         const val RESTORE_TABS_ON_STARTUP_KEY = "restore_tabs_on_startup"
 
-        // const val HOME_PAGE_VERSION_EXTRACTED = "home_page_version_extracted"
         const val INITIAL_BOOKMARKS_SUGGESTIONS_LOADED = "initial_bookmarks_suggestions_loaded"
         const val ADBLOCK_ENABLED_PREF_KEY = "adblock_enabled"
         const val ADBLOCK_LAST_UPDATE_LIST_KEY = "adblock_last_update"
         const val ADBLOCK_LIST_URL_KEY = "adblock_list_url"
         const val APP_WEB_EXTENSION_VERSION_KEY = "app_web_extension_version"
-        const val NOTIFICATION_ABOUT_ENGINE_CHANGE_SHOWN_KEY = "notification_about_engine_change_shown"
         const val APP_VERSION_CODE_MARK_KEY = "app_version_code_mark"
 
         const val ENGINE_GECKO_VIEW = "GeckoView"
@@ -63,7 +61,6 @@ class Config(
         const val DEFAULT_ADBLOCK_LIST_URL = "https://easylist.to/easylist/easylist.txt"
 
         const val HOME_PAGE_URL = "https://tvbro.phlox.dev/appcontent/home/"
-        // const val HOME_PAGE_URL = "http://10.0.2.2:5000/appcontent/home/"
 
         /**
          * Set by the loopback asset server (see LocalAssetServer) when it is running. When null
@@ -239,12 +236,6 @@ class Config(
             prefs.edit().putBoolean(RESTORE_TABS_ON_STARTUP_KEY, value).apply()
         }
 
-    /*var homePageVersionExtracted: Int
-        get() = prefs.getInt(HOME_PAGE_VERSION_EXTRACTED, 0)
-        set(value) {
-            prefs.edit().putInt(HOME_PAGE_VERSION_EXTRACTED, value).apply()
-        }*/
-
     var initialBookmarksSuggestionsLoaded: Boolean
         get() = prefs.getBoolean(INITIAL_BOOKMARKS_SUGGESTIONS_LOADED, false)
         set(value) {
@@ -271,13 +262,6 @@ class Config(
         get() = prefs.getInt(APP_WEB_EXTENSION_VERSION_KEY, 0)
         set(value) {
             prefs.edit().putInt(APP_WEB_EXTENSION_VERSION_KEY, value).apply()
-        }
-
-    // 0 - not shown, any other value - app version code where notification already shown (to show only once after update)
-    var notificationAboutEngineChangeShown: Int
-        get() = prefs.getInt(NOTIFICATION_ABOUT_ENGINE_CHANGE_SHOWN_KEY, 0)
-        set(value) {
-            prefs.edit().putInt(NOTIFICATION_ABOUT_ENGINE_CHANGE_SHOWN_KEY, value).apply()
         }
 
     var autoCheckUpdates: Boolean
