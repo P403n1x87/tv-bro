@@ -34,12 +34,21 @@ internal object TvBroAndroidModulePlugin {
                         minSdk = findVersion("android-minSdk")
                         targetSdk = findVersion("android-targetSdk")
                     }
+                    lint {
+                        //Partial locales are this repo's translation model (strings ship as they
+                        //get translated), so a not-yet-translated string is informational, not an
+                        //error — otherwise every new user-facing string would redden CI.
+                        disable += "MissingTranslation"
+                    }
                 }
                 AndroidModuleType.LIBRARY -> extensions.configure<LibraryExtension> {
                     compileSdk = findVersion("android-compileSdk")
                     defaultConfig {
                         minSdk = findVersion("android-minSdk")
                         consumerProguardFiles("consumer-rules.pro")
+                    }
+                    lint {
+                        disable += "MissingTranslation"
                     }
                     buildTypes {
                         release {
