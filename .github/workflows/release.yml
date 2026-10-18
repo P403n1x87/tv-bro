@@ -89,11 +89,13 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      #Lint compiles what it analyzes, so this doubles as a compile gate. One invocation: Gradle
-      #tasks must run serially (concurrent builds corrupt the Kotlin incremental state).
-      - name: Run Android lint
+      #Spotless (ktlint) first — cheapest, and it catches what Android lint doesn't. Then Android
+      #lint, which compiles what it analyzes, so the job doubles as a compile gate. One invocation:
+      #Gradle tasks must run serially (concurrent builds corrupt the Kotlin incremental state).
+      - name: Run formatting and Android lint
         run: |
-          ./gradlew :app:lintP403n1x87GeckoExcludedDebug \
+          ./gradlew spotlessCheck \
+                    :app:lintP403n1x87GeckoExcludedDebug \
                     :app:lintP403n1x87GeckoIncludedDebug \
                     :app:player:lintDebug \
                     :app:common:lintDebug

@@ -1,0 +1,18 @@
+#Formatter settings shared by editors and ktlint (Spotless reads this file directly), so what
+#`spotlessApply` writes and what `spotlessCheck` (CI + the pre-commit hook) enforces is one and
+#the same rule set.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{kt,kts}]
+indent_style = space
+indent_size = 4
+#This codebase predates ktlint and uses wildcard imports in 23 files (DAOs, `android.content.*`,
+#`java.util.*`, ...), and the rule has no autofix. Disabled only until a follow-up expands those
+#imports and deletes this line.
+ktlint_standard_no-wildcard-imports = disabled

@@ -58,6 +58,15 @@ the model/host seam polish. Work on a feature branch; **open a PR only when aske
   `jvmToolchain(17)` → both required). macOS: `JAVA_HOME="$HOME/java/jdk-21.0.12.1+1/Contents/Home"`.
   Android SDK at `$HOME/.android/sdk`; AVD `tvbro_tv_api36`.
 - Run Gradle tasks **serially** (concurrent builds corrupt the Kotlin incremental state).
+- Formatting: Spotless + ktlint (`ktlint_official` style; config in root `build.gradle.kts`, rules in
+  `.editorconfig`). `./gradlew spotlessApply` fixes; `spotlessCheck` gates CI's lint job and the
+  pre-commit hook. Git hooks are opt-in per clone — `git config core.hooksPath .githooks`
+  (`.githooks/pre-commit` = `spotlessCheck` when staged `.kt/.kts` change, seconds;
+  `.githooks/pre-push` = single-flavor Android lint, ~1m warm; both skippable `--no-verify`).
+  Gotcha: ktlint reports some `max-line-length`/`comment-wrapping` lints on *intermediate*
+  formatting passes of an unformatted file — if `spotlessApply` exits 1 on a file you touched,
+  `ktlint --format <file>` (ktlint 1.8 CLI) writes it anyway; afterwards the reports are stable
+  and any hit is a real violation.
 - Tests: `:app:player:testDebugUnitTest` (`:app:testDebugUnitTest`), `:app:testP403n1x87GeckoIncludedDebugUnitTest`
   (192: model/repository units + the Robolectric screen tests — `ActionBarTest`,
   `PanelControllerTest`, `PanelRowFocusDelegateTest`, `BackNavigationEventsAdapterTest`, over real
