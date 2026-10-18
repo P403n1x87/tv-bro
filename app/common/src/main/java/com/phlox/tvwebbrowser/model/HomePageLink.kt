@@ -2,7 +2,8 @@ package com.phlox.tvwebbrowser.model
 
 import org.json.JSONObject
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
+import java.util.Locale
 
 class HomePageLink(
     val title: String,

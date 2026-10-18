@@ -12,7 +12,3 @@ trim_trailing_whitespace = true
 [*.{kt,kts}]
 indent_style = space
 indent_size = 4
-#This codebase predates ktlint and uses wildcard imports in 23 files (DAOs, `android.content.*`,
-#`java.util.*`, ...), and the rule has no autofix. Disabled only until a follow-up expands those
-#imports and deletes this line.
-ktlint_standard_no-wildcard-imports = disabled

@@ -9,7 +9,7 @@ import com.phlox.tvwebbrowser.utils.activemodel.ActiveModel
 import com.phlox.tvwebbrowser.utils.sameDay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.util.*
+import java.util.Calendar
 
 /**
  * The screen side of the auto-update flow: it renders the dialogs and performs the platform
