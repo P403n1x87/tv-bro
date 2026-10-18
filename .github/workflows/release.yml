@@ -105,8 +105,11 @@ jobs:
   #The third gate: the instrumented smoke suite (MainScreenSmokeTest) — the flows a JVM test can
   #not reach: a full MainActivity launch (the ad-block native library and the download-service
   #binding's null ComponentName keep that out of Robolectric), a real page load through the
-  #configured engine, history back navigation and the bookmarks panel open/close. API 26, the same
-  #level the Robolectric screen tests pin. GitHub's Linux runners have KVM, but the device node is
+  #configured engine, history back navigation and the bookmarks panel open/close. It runs on the
+  #android-tv image (1080p), matching the product's real form factor and the local dev AVD — and
+  #deliberately NOT on an AOSP `default` phone image: those ship no Android System WebView
+  #provider, so the app's first launch dies on its "Can not link to WebView component" dialog
+  #and every test fails on missing UI. GitHub's Linux runners have KVM, but the device node is
   #group-restricted — the udev rule below makes /dev/kvm writable or the emulator never boots.
   instrumented:
     runs-on: ubuntu-latest
@@ -133,10 +136,29 @@ jobs:
       - name: Run instrumented smoke tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 26
+          api-level: 36
+          target: android-tv
+          profile: tv_1080p
           arch: x86_64
           disable-animations: true
           script: ./gradlew :app:connectedP403n1x87GeckoIncludedDebugAndroidTest
+
+      #A red run must be diagnosable from the artifacts alone: the logcat (a first-launch dialog
+      #or a FATAL EXCEPTION shows up there) plus the instrumentation reports.
+      - name: Capture logcat on failure
+        if: failure()
+        run: adb logcat -d > instrumented-logcat.txt || true
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instrumented-diagnostics
+          path: |
+            instrumented-logcat.txt
+            app/build/outputs/androidTest-results/**
+            app/build/reports/androidTests/**
+          if-no-files-found: ignore
 
   build:
     #No APK — and therefore no release, since the tag path publishes from this job — without

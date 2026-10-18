@@ -92,8 +92,10 @@ the model/host seam polish. Work on a feature branch; **open a PR only when aske
 - Version comes from git tags (`vX.Y.Z`), never hardcoded; `./gradlew` derives it.
 - CI `.github/workflows/release.yml`: `tests` (the three unit suites), `lint` (Android lint on
   both app flavors + player + common, zero-baseline; `MissingTranslation` is the one global
-  exemption, disabled in buildSrc) and `instrumented` (the UiAutomator smoke suite on an API 26
-  emulator, KVM-enable step included) run as separate jobs and `build` depends on all three
+  exemption, disabled in buildSrc) and `instrumented` (the UiAutomator smoke suite on an API 36
+  android-tv emulator — the AOSP `default` phone images ship no WebView provider, so the app's
+  first launch aborts on its WebView-error dialog — with a KVM-enable step and failure
+  logcat/artifact upload) run as separate jobs and `build` depends on all three
   (`needs: [tests, lint, instrumented]`), so neither an APK build nor a release happens on red
   tests, a new lint error or a broken device flow; runs on every PR that touches code or the build
   harness; a docs-only PR (`docs/**`, `*.md`, repo metadata) runs no CI at all; publish only from a
