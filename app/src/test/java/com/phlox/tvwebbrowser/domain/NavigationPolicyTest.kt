@@ -9,20 +9,26 @@ import org.junit.Test
  * that `MainActivity.WebEngineCallback.shouldOverrideUrlLoading` consults.
  */
 class NavigationPolicyTest {
-
     /** Stand-in for `Uri.parse(url).host`: host between "://" and the next "/" or ":". */
     private fun hostOf(url: String): String? =
-        url.substringAfter("://", "").substringBefore('/').substringBefore(':').ifEmpty { null }
+        url
+            .substringAfter("://", "")
+            .substringBefore('/')
+            .substringBefore(':')
+            .ifEmpty { null }
 
     private fun shouldBlock(
         requestedUrl: String,
         currentUrl: String? = "https://www.example.com/page",
         lastLoadingUrl: String? = null,
         blockAutomaticRedirects: Boolean = true,
-        adBlockEnabled: Boolean = true
+        adBlockEnabled: Boolean = true,
     ) = NavigationPolicy.shouldBlockAutomaticRedirect(
-        requestedUrl, currentUrl, lastLoadingUrl,
-        blockAutomaticRedirects, adBlockEnabled
+        requestedUrl,
+        currentUrl,
+        lastLoadingUrl,
+        blockAutomaticRedirects,
+        adBlockEnabled,
     ) { u -> hostOf(u) }
 
     // -- shouldLoadInEngine / isIntentScheme -----------------------------------------------
@@ -82,8 +88,8 @@ class NavigationPolicyTest {
         assertFalse(
             shouldBlock(
                 "https://tracker.other.net/landing",
-                blockAutomaticRedirects = false
-            )
+                blockAutomaticRedirects = false,
+            ),
         )
     }
 
@@ -99,16 +105,16 @@ class NavigationPolicyTest {
             shouldBlock(
                 requestedUrl = "https://tracker.other.net/landing",
                 currentUrl = "",
-                lastLoadingUrl = "https://www.example.com/page"
-            )
+                lastLoadingUrl = "https://www.example.com/page",
+            ),
         )
         // ... and without any known current url there is nothing to compare against
         assertFalse(
             shouldBlock(
                 requestedUrl = "https://tracker.other.net/landing",
                 currentUrl = "",
-                lastLoadingUrl = null
-            )
+                lastLoadingUrl = null,
+            ),
         )
     }
 

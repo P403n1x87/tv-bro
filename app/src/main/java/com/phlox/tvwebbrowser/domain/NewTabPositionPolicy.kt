@@ -9,12 +9,13 @@ package com.phlox.tvwebbrowser.domain
  * the overflow menu, an external intent) pass an explicit index instead.
  */
 object NewTabPositionPolicy {
-
     /**
      * The insertion index for a tab requested by the tab at [requestingTabIndex]: right after it, so
      * a link's "open in a new tab" lands next to the page it came from. With no selection
      * ([requestingTabIndex] == -1) the tab is appended.
      */
-    fun insertIndexAfter(requestingTabIndex: Int, tabCount: Int): Int =
-        if (requestingTabIndex == -1) tabCount else requestingTabIndex + 1
+    fun insertIndexAfter(
+        requestingTabIndex: Int,
+        tabCount: Int,
+    ): Int = if (requestingTabIndex == -1) tabCount else requestingTabIndex + 1
 }

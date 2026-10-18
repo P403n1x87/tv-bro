@@ -6,8 +6,9 @@ import com.phlox.tvwebbrowser.model.dao.HistoryDao
 /**
  * The single gateway to browsing history. See [FavoritesRepository] for the rationale.
  */
-class HistoryRepository(private val dao: HistoryDao) {
-
+class HistoryRepository(
+    private val dao: HistoryDao,
+) {
     suspend fun count(): Int = dao.count()
 
     suspend fun latest(limit: Int = 1): List<HistoryItem> = dao.last(limit)
@@ -31,5 +32,8 @@ class HistoryRepository(private val dao: HistoryDao) {
      */
     suspend fun deleteByUrl(url: String) = dao.deleteByUrl(url)
 
-    suspend fun updateTitle(id: Long, title: String) = dao.updateTitle(id, title)
+    suspend fun updateTitle(
+        id: Long,
+        title: String,
+    ) = dao.updateTitle(id, title)
 }

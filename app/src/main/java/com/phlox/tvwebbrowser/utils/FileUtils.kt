@@ -16,7 +16,11 @@ fun deleteDirectory(file: File): Boolean {
     return false
 }
 
-fun extractAssets(ctx: Context, assetsDir: String, destDir: File) {
+fun extractAssets(
+    ctx: Context,
+    assetsDir: String,
+    destDir: File,
+) {
     val assetManager = ctx.assets
     val files = assetManager.list(assetsDir)
     if (files != null) {
@@ -33,7 +37,11 @@ fun extractAssets(ctx: Context, assetsDir: String, destDir: File) {
     }
 }
 
-fun copyAssetFile(ctx: Context, assetPath: String, destFile: File) {
+fun copyAssetFile(
+    ctx: Context,
+    assetPath: String,
+    destFile: File,
+) {
     val assetManager = ctx.assets
     val `in` = assetManager.open(assetPath)
     val out = destFile.outputStream()

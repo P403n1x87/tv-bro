@@ -20,54 +20,95 @@ import java.io.InputStream
  * a fake host. [MainActivity] is the only implementation.
  */
 interface WebEngineCallbackHost {
-
     val activity: Activity
 
     /** Opens a tab at [index] (see [com.phlox.tvwebbrowser.domain.NewTabPositionPolicy]); the callback picks the index. */
-    fun openInNewTabAt(url: String, index: Int, navigateImmediately: Boolean): WebEngine?
+    fun openInNewTabAt(
+        url: String,
+        index: Int,
+        navigateImmediately: Boolean,
+    ): WebEngine?
 
     // -- page lifecycle repainting -----------------------------------------------------------
 
     fun showLoadingProgress(progress: Int)
+
     fun onWebViewUpdated(tab: WebTabState)
+
     fun updateAddressBoxIfCurrentTab(tab: WebTabState)
+
     fun onTabTitleUpdated(tab: WebTabState)
+
     fun onTabIconUpdated(tab: WebTabState)
+
     fun renderAndShowThumbnail(tab: WebTabState)
+
     fun onCertificateError()
 
     // -- platform operations -----------------------------------------------------------------
 
     fun requestPermissionsOnHost(permissions: Array<String>): Int
+
     fun showFileChooser(intent: Intent): Boolean
+
     fun downloadRequested(request: DownloadRequest)
+
     fun openInExternalAppRequested(url: String)
-    fun askUserAndOpenInExternalApp(url: String, intent: Intent)
+
+    fun askUserAndOpenInExternalApp(
+        url: String,
+        intent: Intent,
+    )
+
     fun copyToClipboard(url: String)
+
     fun shareUrl(url: String)
+
     fun initiateVoiceSearch()
+
     fun showBlockedDialogNotification(newTab: Boolean)
+
     fun onEditHomePageBookmarkSelected(favoriteId: Long)
 
     // -- tabs and window ---------------------------------------------------------------------
 
     fun createWebView(tab: WebTabState): View?
+
     fun changeTab(newTab: WebTabState)
+
     fun closeTab(tab: WebTabState?)
+
     fun onPrepareForFullscreen()
+
     fun onExitFullscreen()
 
     // -- cursor menu -------------------------------------------------------------------------
 
     fun showCursorMenu(
-        tab: WebTabState, callback: WebEngineWindowProviderCallback, cursorDrawer: CursorDrawerDelegate,
-        baseUri: String?, linkUri: String?, srcUri: String?, title: String?, altText: String?,
-        textContent: String?, x: Int, y: Int
+        tab: WebTabState,
+        callback: WebEngineWindowProviderCallback,
+        cursorDrawer: CursorDrawerDelegate,
+        baseUri: String?,
+        linkUri: String?,
+        srcUri: String?,
+        title: String?,
+        altText: String?,
+        textContent: String?,
+        x: Int,
+        y: Int,
     )
 
     fun suggestActionsForLink(
-        tab: WebTabState, callback: WebEngineWindowProviderCallback, baseUri: String?, linkUri: String?,
-        srcUri: String?, title: String?, altText: String?, textContent: String?, x: Int, y: Int
+        tab: WebTabState,
+        callback: WebEngineWindowProviderCallback,
+        baseUri: String?,
+        linkUri: String?,
+        srcUri: String?,
+        title: String?,
+        altText: String?,
+        textContent: String?,
+        x: Int,
+        y: Int,
     )
 }
 

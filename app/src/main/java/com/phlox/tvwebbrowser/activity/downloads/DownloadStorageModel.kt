@@ -23,30 +23,31 @@ import java.io.File
  * observable values are touched on the model's main dispatcher.
  */
 class DownloadStorageModel(
-  private val downloads: DownloadsRepository = Repositories.downloads,
-  private val downloadsDir: () -> File = {
-    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-  },
-  private val formatBytes: (Long) -> String = {
-    Formatter.formatShortFileSize(TVBro.instance, it)
-  },
-  private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-): ActiveModel() {
-  /** The directory downloads are written to; null until the first [refresh]. */
-  val location = ObservableValue<String?>(null)
+    private val downloads: DownloadsRepository = Repositories.downloads,
+    private val downloadsDir: () -> File = {
+        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+    },
+    private val formatBytes: (Long) -> String = {
+        Formatter.formatShortFileSize(TVBro.instance, it)
+    },
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+) : ActiveModel() {
+    /** The directory downloads are written to; null until the first [refresh]. */
+    val location = ObservableValue<String?>(null)
 
-  /** The destination's free space, formatted. */
-  val freeSpace = ObservableValue<String?>(null)
+    /** The destination's free space, formatted. */
+    val freeSpace = ObservableValue<String?>(null)
 
-  /** The total on-disk footprint of the logged downloads, formatted. */
-  val usedSpace = ObservableValue<String?>(null)
+    /** The total on-disk footprint of the logged downloads, formatted. */
+    val usedSpace = ObservableValue<String?>(null)
 
-  fun refresh() = modelScope.launch {
-    val dir = downloadsDir()
-    val free = withContext(ioDispatcher) { dir.freeSpace }
-    val used = DownloadStoragePolicy.usedBytes(downloads.all())
-    location.value = dir.absolutePath
-    freeSpace.value = formatBytes(free)
-    usedSpace.value = formatBytes(used)
-  }
+    fun refresh() =
+        modelScope.launch {
+            val dir = downloadsDir()
+            val free = withContext(ioDispatcher) { dir.freeSpace }
+            val used = DownloadStoragePolicy.usedBytes(downloads.all())
+            location.value = dir.absolutePath
+            freeSpace.value = formatBytes(free)
+            usedSpace.value = formatBytes(used)
+        }
 }

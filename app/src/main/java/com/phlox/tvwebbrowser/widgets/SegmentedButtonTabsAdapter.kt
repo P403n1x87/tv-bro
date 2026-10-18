@@ -5,20 +5,28 @@ import android.view.View
 import android.view.ViewGroup
 import com.fedir.segmentedbutton.SegmentedButton
 
-abstract class SegmentedButtonTabsAdapter(val segmentedButton: SegmentedButton, val contentLayout: ViewGroup) {
+abstract class SegmentedButtonTabsAdapter(
+    val segmentedButton: SegmentedButton,
+    val contentLayout: ViewGroup,
+) {
     var currentContentView: View? = null
-        private  set
+        private set
     private val contentViewsCache = SparseArray<View>()
     var callback: Callback? = null
 
     interface Callback {
-        fun onCheckedChanged(button: SegmentedButton, checkedButtonId: Int, byUser: Boolean)
+        fun onCheckedChanged(
+            button: SegmentedButton,
+            checkedButtonId: Int,
+            byUser: Boolean,
+        )
     }
 
-    private val segmentedButtonCheckedChangeListener = SegmentedButton.OnCheckedChangeListener { button, checkedButtonId, byUser ->
-        showTab(checkedButtonId)
-        callback?.onCheckedChanged(button, checkedButtonId, byUser)
-    }
+    private val segmentedButtonCheckedChangeListener =
+        SegmentedButton.OnCheckedChangeListener { button, checkedButtonId, byUser ->
+            showTab(checkedButtonId)
+            callback?.onCheckedChanged(button, checkedButtonId, byUser)
+        }
 
     init {
         segmentedButton.checkedChangeListener = segmentedButtonCheckedChangeListener

@@ -50,11 +50,12 @@ class SessionObservers(
         }
 
         settingsModel.theme.subscribe(activity.lifecycle, false) {
-            val mode = when (it) {
-                Config.Theme.BLACK -> AppCompatDelegate.MODE_NIGHT_YES
-                Config.Theme.WHITE -> AppCompatDelegate.MODE_NIGHT_NO
-                else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
-            }
+            val mode =
+                when (it) {
+                    Config.Theme.BLACK -> AppCompatDelegate.MODE_NIGHT_YES
+                    Config.Theme.WHITE -> AppCompatDelegate.MODE_NIGHT_NO
+                    else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+                }
             if (AppCompatDelegate.getDefaultNightMode() != mode) {
                 AppCompatDelegate.setDefaultNightMode(mode)
             }
@@ -91,7 +92,9 @@ class SessionObservers(
             Log.i(TAG, "homePageLinks updated")
             val currentUrl = tabsModel.currentTab.value?.url ?: return@subscribe
             if (HomePagePolicy.isHomePageUrl(currentUrl, Config.localHomePageUrl)) {
-                tabsModel.currentTab.value?.webEngine?.reload()
+                tabsModel.currentTab.value
+                    ?.webEngine
+                    ?.reload()
             }
         }
 

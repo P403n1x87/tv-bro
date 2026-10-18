@@ -15,7 +15,7 @@ sealed interface SettingsItem {
     /** Non-focusable dimmed group title. */
     data class Header(
         @param:StringRes val titleRes: Int,
-        val visible: () -> Boolean = { true }
+        val visible: () -> Boolean = { true },
     ) : SettingsItem {
         override fun isVisible() = visible()
     }
@@ -27,7 +27,7 @@ sealed interface SettingsItem {
         @param:StringRes val summaryRes: Int? = null,
         val isChecked: () -> Boolean,
         val onCheckedChange: (Boolean) -> Unit,
-        val visible: () -> Boolean = { true }
+        val visible: () -> Boolean = { true },
     ) : SettingsItem {
         override fun isVisible() = visible()
     }
@@ -41,7 +41,7 @@ sealed interface SettingsItem {
         val entries: () -> List<CharSequence>,
         val selectedIndex: () -> Int,
         val onSelected: (Int) -> Unit,
-        val visible: () -> Boolean = { true }
+        val visible: () -> Boolean = { true },
     ) : SettingsItem {
         override fun isVisible() = visible()
     }
@@ -54,7 +54,7 @@ sealed interface SettingsItem {
         val value: () -> CharSequence,
         val hint: () -> CharSequence,
         val onCommit: (String) -> Unit,
-        val visible: () -> Boolean = { true }
+        val visible: () -> Boolean = { true },
     ) : SettingsItem {
         override fun isVisible() = visible()
     }
@@ -66,7 +66,7 @@ sealed interface SettingsItem {
         @param:StringRes val summaryRes: Int? = null,
         val onClick: () -> Unit,
         val isInProgress: () -> Boolean = { false },
-        val visible: () -> Boolean = { true }
+        val visible: () -> Boolean = { true },
     ) : SettingsItem {
         override fun isVisible() = visible()
     }
@@ -79,7 +79,7 @@ sealed interface SettingsItem {
         val max: Int,
         val value: () -> Int,
         val valueText: (Int) -> CharSequence,
-        val onValueChange: (Int) -> Unit
+        val onValueChange: (Int) -> Unit,
     ) : SettingsItem
 
     /** Row showing a bound key and a chevron; OK opens the key-capture dialog. */
@@ -87,7 +87,7 @@ sealed interface SettingsItem {
         @param:DrawableRes val iconRes: Int,
         @param:StringRes val titleRes: Int,
         val value: () -> CharSequence,
-        val onClick: () -> Unit
+        val onClick: () -> Unit,
     ) : SettingsItem
 
     /** Non-focusable read-only row (e.g. "Last update"). */
@@ -95,7 +95,7 @@ sealed interface SettingsItem {
         @param:DrawableRes val iconRes: Int? = null,
         @param:StringRes val titleRes: Int,
         val value: () -> CharSequence,
-        val visible: () -> Boolean = { true }
+        val visible: () -> Boolean = { true },
     ) : SettingsItem {
         override fun isVisible() = visible()
     }

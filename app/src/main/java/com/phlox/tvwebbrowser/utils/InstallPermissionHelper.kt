@@ -45,9 +45,9 @@ object InstallPermissionHelper {
      */
     fun openUnknownSourcesSettings(
         activity: Activity,
-        requestCode: Int = REQUEST_CODE_UNKNOWN_APP_SOURCES
-    ): Boolean {
-        return try {
+        requestCode: Int = REQUEST_CODE_UNKNOWN_APP_SOURCES,
+    ): Boolean =
+        try {
             activity.startActivityForResult(unknownSourcesIntent(), requestCode)
             true
         } catch (e: Exception) {
@@ -55,15 +55,22 @@ object InstallPermissionHelper {
             Toast.makeText(activity, R.string.error, Toast.LENGTH_SHORT).show()
             false
         }
-    }
 
     /** Renders the "turn on unknown sources" dialog; [onConfirm] runs on OK. */
-    fun showEnableUnknownSourcesDialog(activity: Activity, onConfirm: () -> Unit) {
-        AlertDialog.Builder(activity)
+    fun showEnableUnknownSourcesDialog(
+        activity: Activity,
+        onConfirm: () -> Unit,
+    ) {
+        AlertDialog
+            .Builder(activity)
             .setTitle(R.string.app_name)
-            .setMessage(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                R.string.turn_on_unknown_sources_for_app else R.string.turn_on_unknown_sources)
-            .setPositiveButton(android.R.string.ok) { _, _ -> onConfirm() }
+            .setMessage(
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    R.string.turn_on_unknown_sources_for_app
+                } else {
+                    R.string.turn_on_unknown_sources
+                },
+            ).setPositiveButton(android.R.string.ok) { _, _ -> onConfirm() }
             .setNegativeButton(android.R.string.cancel) { _, _ -> }
             .show()
     }
@@ -76,19 +83,24 @@ object InstallPermissionHelper {
      * A Service cannot start an activity without `NEW_TASK`, so it is added when [context] is not an
      * Activity. Failures are reported here.
      */
-    fun launchInstaller(context: Context, filePath: String) {
-        val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            Uri.parse(filePath)
-        } else {
-            FileProvider.getUriForFile(context, context.packageName + ".provider", File(filePath))
-        }
-        val install = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
-            setDataAndType(uri, MimeTypeMap.getSingleton().getMimeTypeFromExtension("apk"))
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            if (context !is Activity) {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    fun launchInstaller(
+        context: Context,
+        filePath: String,
+    ) {
+        val uri =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                Uri.parse(filePath)
+            } else {
+                FileProvider.getUriForFile(context, context.packageName + ".provider", File(filePath))
             }
-        }
+        val install =
+            Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
+                setDataAndType(uri, MimeTypeMap.getSingleton().getMimeTypeFromExtension("apk"))
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                if (context !is Activity) {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+            }
         try {
             context.startActivity(install)
         } catch (e: Exception) {

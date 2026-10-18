@@ -36,22 +36,24 @@ class ShortcutMgr private constructor() {
 
     fun save(shortcut: Shortcut) {
         if (shortcut.keyCode == 0) {
-            prefs.edit()
-                    .remove(shortcut.prefsKey)
-                    .remove(shortcut.prefsKey + "_mod")
-                    .remove(shortcut.prefsKey + "_lp")
-                    .apply()
+            prefs
+                .edit()
+                .remove(shortcut.prefsKey)
+                .remove(shortcut.prefsKey + "_mod")
+                .remove(shortcut.prefsKey + "_lp")
+                .apply()
             shortcuts.remove(shortcut)
             return
         }
         if (!shortcuts.contains(shortcut)) {
             shortcuts.add(shortcut)
         }
-        prefs.edit()
-                .putInt(shortcut.prefsKey, shortcut.keyCode)
-                .putInt(shortcut.prefsKey + "_mod", shortcut.modifiers)
-                .putBoolean(shortcut.prefsKey + "_lp", shortcut.longPressFlag)
-                .apply()
+        prefs
+            .edit()
+            .putInt(shortcut.prefsKey, shortcut.keyCode)
+            .putInt(shortcut.prefsKey + "_mod", shortcut.modifiers)
+            .putBoolean(shortcut.prefsKey + "_lp", shortcut.longPressFlag)
+            .apply()
     }
 
     fun findForId(id: Int): Shortcut {
@@ -65,48 +67,66 @@ class ShortcutMgr private constructor() {
     }
 
     @UiThread
-    fun process(shortcut: Shortcut, mainActivity: MainActivity, webEngine: WebEngine?) {
+    fun process(
+        shortcut: Shortcut,
+        mainActivity: MainActivity,
+        webEngine: WebEngine?,
+    ) {
         when (shortcut) {
             Shortcut.NAVIGATE_BACK -> {
                 mainActivity.navigateBack()
             }
+
             Shortcut.NAVIGATE_HOME -> {
                 mainActivity.navigate(Config.HOME_URL_ALIAS)
             }
+
             Shortcut.REFRESH_PAGE -> {
                 mainActivity.refresh()
             }
+
             Shortcut.VOICE_SEARCH -> {
                 mainActivity.initiateVoiceSearch()
             }
+
             Shortcut.PLAY_PAUSE -> {
                 webEngine?.togglePlayback()
             }
+
             Shortcut.MEDIA_STOP -> {
                 webEngine?.stopPlayback()
             }
+
             Shortcut.MEDIA_REWIND -> {
                 webEngine?.rewind()
             }
+
             Shortcut.MEDIA_FAST_FORWARD -> {
                 webEngine?.fastForward()
             }
+
             Shortcut.TOGGLE_TABS_PANEL -> {
                 mainActivity.onToggleTabPanel()
             }
+
             Shortcut.SHOW_STREAMS -> {
                 mainActivity.onShowStreams()
             }
+
             Shortcut.SHOW_BOOKMARKS -> {
                 mainActivity.showFavorites()
             }
+
             Shortcut.CLOSE_TAB -> {
                 mainActivity.closeCurrentTab()
             }
         }
     }
 
-    private fun shortCutsForEvent(keyCode: Int, modifiers: Int): List<Shortcut> {
+    private fun shortCutsForEvent(
+        keyCode: Int,
+        modifiers: Int,
+    ): List<Shortcut> {
         val findings = ArrayList<Shortcut>()
         for (shortcut in shortcuts) {
             if (shortcut.keyCode == keyCode) {
@@ -118,7 +138,11 @@ class ShortcutMgr private constructor() {
         return findings
     }
 
-    private fun onKeyDown(event: KeyEvent, mainActivity: MainActivity, tab: WebTabState?): Boolean {
+    private fun onKeyDown(
+        event: KeyEvent,
+        mainActivity: MainActivity,
+        tab: WebTabState?,
+    ): Boolean {
         val shortcuts = shortCutsForEvent(event.keyCode, event.modifiers)
         if (shortcuts.isEmpty()) return false
         trackingShortcuts = shortcuts
@@ -131,7 +155,11 @@ class ShortcutMgr private constructor() {
         return true
     }
 
-    private fun onKeyUp(event: KeyEvent, mainActivity: MainActivity, tab: WebTabState?): Boolean {
+    private fun onKeyUp(
+        event: KeyEvent,
+        mainActivity: MainActivity,
+        tab: WebTabState?,
+    ): Boolean {
         val trackingShortcuts = trackingShortcuts ?: return false
         for (shortcut in trackingShortcuts) {
             if (shortcut.longPressFlag || event.modifiers != shortcut.modifiers) {
@@ -144,7 +172,11 @@ class ShortcutMgr private constructor() {
         return false
     }
 
-    private fun onKeyLongPress(event: KeyEvent, mainActivity: MainActivity, tab: WebTabState?): Boolean {
+    private fun onKeyLongPress(
+        event: KeyEvent,
+        mainActivity: MainActivity,
+        tab: WebTabState?,
+    ): Boolean {
         val trackingShortcuts = trackingShortcuts ?: return false
         for (shortcut in trackingShortcuts) {
             if (!shortcut.longPressFlag || event.modifiers != shortcut.modifiers) {
@@ -157,15 +189,22 @@ class ShortcutMgr private constructor() {
         return false
     }
 
-    fun handle(event: KeyEvent, mainActivity: MainActivity, value: WebTabState?): Boolean {
-        return when (event.action) {
+    fun handle(
+        event: KeyEvent,
+        mainActivity: MainActivity,
+        value: WebTabState?,
+    ): Boolean =
+        when (event.action) {
             KeyEvent.ACTION_DOWN -> onKeyDown(event, mainActivity, value)
             KeyEvent.ACTION_UP -> onKeyUp(event, mainActivity, value)
             else -> false
         }
-    }
 
-    fun tryHandleEmulatedSimpleKeyPress(keyCode: Int, mainActivity: MainActivity, tab: WebTabState?): Boolean {
+    fun tryHandleEmulatedSimpleKeyPress(
+        keyCode: Int,
+        mainActivity: MainActivity,
+        tab: WebTabState?,
+    ): Boolean {
         val shortcuts = shortCutsForEvent(keyCode, 0)
         if (shortcuts.isEmpty()) return false
         uiHandler.post { process(shortcuts.first(), mainActivity, tab?.webEngine) }

@@ -18,12 +18,13 @@ object PlaybackFailure {
  * whatever the remote sends.
  */
 object PlayerKeys {
-    val SETTINGS = intArrayOf(
-        KeyEvent.KEYCODE_SETTINGS,
-        KeyEvent.KEYCODE_MENU,
-        KeyEvent.KEYCODE_INFO,
-        KeyEvent.KEYCODE_CAPTIONS,
-        KeyEvent.KEYCODE_TV_MEDIA_CONTEXT_MENU,
-        KeyEvent.KEYCODE_BUTTON_Y
-    )
+    val SETTINGS =
+        intArrayOf(
+            KeyEvent.KEYCODE_SETTINGS,
+            KeyEvent.KEYCODE_MENU,
+            KeyEvent.KEYCODE_INFO,
+            KeyEvent.KEYCODE_CAPTIONS,
+            KeyEvent.KEYCODE_TV_MEDIA_CONTEXT_MENU,
+            KeyEvent.KEYCODE_BUTTON_Y,
+        )
 }

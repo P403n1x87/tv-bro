@@ -19,9 +19,9 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
-import org.robolectric.annotation.Config as RobolectricConfig
 import java.time.Duration
 import java.util.concurrent.Executor
+import org.robolectric.annotation.Config as RobolectricConfig
 
 /**
  * Tests for [DownloadsHistoryModel]'s paging over an in-memory database: the view appends every
@@ -30,7 +30,6 @@ import java.util.concurrent.Executor
 @RunWith(RobolectricTestRunner::class)
 @RobolectricConfig(sdk = [26], application = Application::class)
 class DownloadsHistoryModelTest {
-
     private lateinit var db: AppDatabase
     private lateinit var downloads: DownloadsRepository
     private lateinit var model: DownloadsHistoryModel
@@ -41,11 +40,13 @@ class DownloadsHistoryModelTest {
     fun setUp() {
         val app = RuntimeEnvironment.getApplication()
         AppContext.init(app, Config(app.getSharedPreferences("downloads_test", Context.MODE_PRIVATE)))
-        db = Room.inMemoryDatabaseBuilder(app, AppDatabase::class.java)
-            .allowMainThreadQueries()
-            .setQueryExecutor(directExecutor)
-            .setTransactionExecutor(directExecutor)
-            .build()
+        db =
+            Room
+                .inMemoryDatabaseBuilder(app, AppDatabase::class.java)
+                .allowMainThreadQueries()
+                .setQueryExecutor(directExecutor)
+                .setTransactionExecutor(directExecutor)
+                .build()
         downloads = DownloadsRepository(db.downloadDao())
         model = DownloadsHistoryModel(downloads)
     }
@@ -59,13 +60,18 @@ class DownloadsHistoryModelTest {
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(seconds))
     }
 
-    private fun insert(fileName: String, time: Long) = runBlocking {
-        downloads.add(Download().apply {
-            this.filename = fileName
-            this.filepath = "/tmp/$fileName"
-            this.url = "https://example.com/$fileName"
-            this.time = time
-        })
+    private fun insert(
+        fileName: String,
+        time: Long,
+    ) = runBlocking {
+        downloads.add(
+            Download().apply {
+                this.filename = fileName
+                this.filepath = "/tmp/$fileName"
+                this.url = "https://example.com/$fileName"
+                this.time = time
+            },
+        )
     }
 
     @Test

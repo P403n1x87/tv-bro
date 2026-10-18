@@ -26,13 +26,20 @@ interface DownloadHost {
 
     fun hasPermission(permission: String): Boolean
 
-    fun requestPermission(permission: String, requestCode: Int)
+    fun requestPermission(
+        permission: String,
+        requestCode: Int,
+    )
 
     /** Free bytes on the download destination; 0 when it cannot be read. */
     fun downloadFreeSpaceBytes(): Long
 
     /** Tells the user the download was refused because the destination is full. */
-    fun onDownloadNoSpace(fileName: String, neededBytes: Long, freeBytes: Long)
+    fun onDownloadNoSpace(
+        fileName: String,
+        neededBytes: Long,
+        freeBytes: Long,
+    )
 }
 
 /**
@@ -43,7 +50,7 @@ interface DownloadHost {
  */
 class DownloadCoordinator(
     private val host: DownloadHost,
-    private val callbacks: Callbacks
+    private val callbacks: Callbacks,
 ) {
     fun interface Callbacks {
         /** The request was handed over; the host brings its UI back. */
@@ -71,47 +78,66 @@ class DownloadCoordinator(
     }
 
     fun requestDownload(
-        url: String, referer: String, originalDownloadFileName: String, userAgent: String?,
+        url: String,
+        referer: String,
+        originalDownloadFileName: String,
+        userAgent: String?,
         mimeType: String? = null,
         operationAfterDownload: Download.OperationAfterDownload = Download.OperationAfterDownload.NOP,
-        base64BlobData: String? = null, stream: InputStream?, size: Long = 0L
+        base64BlobData: String? = null,
+        stream: InputStream?,
+        size: Long = 0L,
     ) {
-        pending = Download(
-            url, originalDownloadFileName, null, operationAfterDownload,
-            mimeType, referer, userAgent, base64BlobData, stream, size
-        )
+        pending =
+            Download(
+                url,
+                originalDownloadFileName,
+                null,
+                operationAfterDownload,
+                mimeType,
+                referer,
+                userAgent,
+                base64BlobData,
+                stream,
+                size,
+            )
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R &&
             !host.hasPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         ) {
             host.requestPermission(
                 Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                MY_PERMISSIONS_REQUEST_EXTERNAL_STORAGE_ACCESS
+                MY_PERMISSIONS_REQUEST_EXTERNAL_STORAGE_ACCESS,
             )
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             !host.hasPermission(Manifest.permission.POST_NOTIFICATIONS)
         ) {
             host.requestPermission(
                 Manifest.permission.POST_NOTIFICATIONS,
-                MY_PERMISSIONS_REQUEST_POST_NOTIFICATIONS_ACCESS
+                MY_PERMISSIONS_REQUEST_POST_NOTIFICATIONS_ACCESS,
             )
         } else {
             start()
         }
     }
 
-    fun onPermissionsResult(requestCode: Int, grantResults: IntArray): Boolean {
-        return when (requestCode) {
+    fun onPermissionsResult(
+        requestCode: Int,
+        grantResults: IntArray,
+    ): Boolean =
+        when (requestCode) {
             MY_PERMISSIONS_REQUEST_EXTERNAL_STORAGE_ACCESS,
-            MY_PERMISSIONS_REQUEST_POST_NOTIFICATIONS_ACCESS -> {
+            MY_PERMISSIONS_REQUEST_POST_NOTIFICATIONS_ACCESS,
+            -> {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     start()
                 }
                 true
             }
 
-            else -> false
+            else -> {
+                false
+            }
         }
-    }
 
     private fun start() {
         val download = pending ?: return
@@ -127,23 +153,27 @@ class DownloadCoordinator(
         callbacks.onDownloadStarted(download.filename)
     }
 
-    private val connection = object : ServiceConnection {
-        override fun onServiceConnected(name: ComponentName, binder: IBinder) {
-            val downloadBinder = binder as? DownloadService.Binder
-            if (downloadBinder == null) {
-                Log.e(TAG, "Download service connection failed")
-                //probably service still in another process due to incognito mode process switch
-                //so we will try to reconnect in a few seconds
-                uiHandler.postDelayed({
-                    host.bindDownloadService(this)
-                }, 1000)
-                return
+    private val connection =
+        object : ServiceConnection {
+            override fun onServiceConnected(
+                name: ComponentName,
+                binder: IBinder,
+            ) {
+                val downloadBinder = binder as? DownloadService.Binder
+                if (downloadBinder == null) {
+                    Log.e(TAG, "Download service connection failed")
+                    // probably service still in another process due to incognito mode process switch
+                    // so we will try to reconnect in a few seconds
+                    uiHandler.postDelayed({
+                        host.bindDownloadService(this)
+                    }, 1000)
+                    return
+                }
+                service = downloadBinder.service
             }
-            service = downloadBinder.service
-        }
 
-        override fun onServiceDisconnected(name: ComponentName) {
-            service = null
+            override fun onServiceDisconnected(name: ComponentName) {
+                service = null
+            }
         }
-    }
 }

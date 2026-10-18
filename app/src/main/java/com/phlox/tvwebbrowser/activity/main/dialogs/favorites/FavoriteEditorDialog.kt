@@ -7,7 +7,6 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.TextView
-
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.domain.UrlNormalizer
 
@@ -36,7 +35,10 @@ class FavoriteEditorDialog(
 
     fun interface Callback {
         /** The edited values, with the url already made absolute. */
-        fun onDone(title: String, url: String)
+        fun onDone(
+            title: String,
+            url: String,
+        )
     }
 
     init {

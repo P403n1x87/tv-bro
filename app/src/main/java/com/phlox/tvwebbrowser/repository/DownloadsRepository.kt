@@ -10,8 +10,9 @@ import com.phlox.tvwebbrowser.model.dao.DownloadDao
  * outside a coroutine — `DownloadTask.run()` and the download service's task listener, both on the
  * worker pool — bridge the call with `runBlocking`.
  */
-class DownloadsRepository(private val dao: DownloadDao) {
-
+class DownloadsRepository(
+    private val dao: DownloadDao,
+) {
     suspend fun all(): List<Download> = dao.getAll()
 
     suspend fun add(download: Download): Long = dao.insert(download)

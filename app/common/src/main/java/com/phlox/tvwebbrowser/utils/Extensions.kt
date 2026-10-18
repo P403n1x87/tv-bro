@@ -22,11 +22,10 @@ val View.activity: Activity?
         }
     }
 
-fun Calendar.sameDay(other: Calendar): Boolean {
-    return this.get(Calendar.YEAR) == other.get(Calendar.YEAR) &&
-            this.get(Calendar.MONTH) == other.get(Calendar.MONTH) &&
-            this.get(Calendar.DAY_OF_MONTH) == other.get(Calendar.DAY_OF_MONTH)
-}
+fun Calendar.sameDay(other: Calendar): Boolean =
+    this.get(Calendar.YEAR) == other.get(Calendar.YEAR) &&
+        this.get(Calendar.MONTH) == other.get(Calendar.MONTH) &&
+        this.get(Calendar.DAY_OF_MONTH) == other.get(Calendar.DAY_OF_MONTH)
 
 val ViewGroup.childs: ArrayList<View>
     get() {
@@ -37,6 +36,4 @@ val ViewGroup.childs: ArrayList<View>
         return result
     }
 
-fun Int.dip2px(context: Context): Float {
-    return (this * context.resources.displayMetrics.density)
-}
+fun Int.dip2px(context: Context): Float = (this * context.resources.displayMetrics.density)

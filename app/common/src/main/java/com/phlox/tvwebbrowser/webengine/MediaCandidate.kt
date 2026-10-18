@@ -7,7 +7,7 @@ package com.phlox.tvwebbrowser.webengine
  */
 data class MediaCandidate(
     val url: String,
-    val kind: Kind
+    val kind: Kind,
 ) {
     enum class Kind { HLS, DASH, PROGRESSIVE }
 }

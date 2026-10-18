@@ -3,19 +3,19 @@ package com.phlox.tvwebbrowser.activity.downloads
 import android.view.View
 import android.view.ViewGroup
 import android.widget.BaseAdapter
-
 import com.phlox.tvwebbrowser.model.Download
 import com.phlox.tvwebbrowser.utils.Utils
-
-import java.util.ArrayList
-
 import de.halfbit.pinnedsection.PinnedSectionListView
+import java.util.ArrayList
 
 /**
  * Created by PDT on 24.01.2017.
  */
 
-class DownloadListAdapter(private val downloadsActivity: DownloadsActivity) : BaseAdapter(), PinnedSectionListView.PinnedSectionListAdapter {
+class DownloadListAdapter(
+    private val downloadsActivity: DownloadsActivity,
+) : BaseAdapter(),
+    PinnedSectionListView.PinnedSectionListAdapter {
     private val downloads = ArrayList<Download>()
     private var lastHeaderDate: Long = -1
 
@@ -56,39 +56,32 @@ class DownloadListAdapter(private val downloadsActivity: DownloadsActivity) : Ba
         notifyDataSetChanged()
     }
 
-    override fun getCount(): Int {
-        return downloads.size
-    }
+    override fun getCount(): Int = downloads.size
 
-    override fun getItem(i: Int): Any {
-        return downloads[i]
-    }
+    override fun getItem(i: Int): Any = downloads[i]
 
-    override fun getItemId(i: Int): Long {
-        return i.toLong()
-    }
+    override fun getItemId(i: Int): Long = i.toLong()
 
-    override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-        val hiv = if (convertView != null) {
-            convertView as DownloadListItemView
-        } else {
-            DownloadListItemView(downloadsActivity, getItemViewType(position))
-        }
+    override fun getView(
+        position: Int,
+        convertView: View?,
+        parent: ViewGroup,
+    ): View {
+        val hiv =
+            if (convertView != null) {
+                convertView as DownloadListItemView
+            } else {
+                DownloadListItemView(downloadsActivity, getItemViewType(position))
+            }
         hiv.setDownload(downloads[position], isMultiselectMode)
         return hiv
     }
 
-    override fun getViewTypeCount(): Int {
-        return 2
-    }
+    override fun getViewTypeCount(): Int = 2
 
-    override fun getItemViewType(position: Int): Int {
-        return if (downloads[position].isDateHeader) VIEW_TYPE_HEADER else VIEW_TYPE_DOWNLOAD_ITEM
-    }
+    override fun getItemViewType(position: Int): Int = if (downloads[position].isDateHeader) VIEW_TYPE_HEADER else VIEW_TYPE_DOWNLOAD_ITEM
 
-    override fun isItemViewTypePinned(viewType: Int): Boolean {
-        return viewType == VIEW_TYPE_HEADER
-    }
+    override fun isItemViewTypePinned(viewType: Int): Boolean = viewType == VIEW_TYPE_HEADER
 
     /** Checks or clears every real download at once. */
     fun setAllSelected(selected: Boolean) {
@@ -123,7 +116,8 @@ class DownloadListAdapter(private val downloadsActivity: DownloadsActivity) : Ba
         var i = 0
         while (i < downloads.size) {
             if (downloads[i].isDateHeader &&
-                (i + 1 >= downloads.size || downloads[i + 1].isDateHeader)) {
+                (i + 1 >= downloads.size || downloads[i + 1].isDateHeader)
+            ) {
                 downloads.removeAt(i)
                 continue
             }

@@ -28,12 +28,24 @@ interface DownloadTask {
 
     interface Callback {
         fun onProgress(task: DownloadTask)
-        fun onError(task: DownloadTask, responseCode: Int, responseMessage: String)
+
+        fun onError(
+            task: DownloadTask,
+            responseCode: Int,
+            responseMessage: String,
+        )
+
         fun onDone(task: DownloadTask)
     }
 }
 
-class FileDownloadTask(override var downloadInfo: Download, private val userAgent: String?, val callback: DownloadTask.Callback, private val contentResolver: ContentResolver) : Runnable, DownloadTask {
+class FileDownloadTask(
+    override var downloadInfo: Download,
+    private val userAgent: String?,
+    val callback: DownloadTask.Callback,
+    private val contentResolver: ContentResolver,
+) : Runnable,
+    DownloadTask {
     companion object {
         val TAG = FileDownloadTask::class.java.simpleName
     }
@@ -62,16 +74,20 @@ class FileDownloadTask(override var downloadInfo: Download, private val userAgen
                     val cookie = CookieManager.getInstance().getCookie(url.toString())
                     if (cookie != null) setRequestProperty("cookie", cookie)
                     if (retries > 0) {
-                        //trust me, sometimes this helps! Don't ask me how...
+                        // trust me, sometimes this helps! Don't ask me how...
                         Thread.sleep(3000)
                     }
                     connect()
                 }
 
                 when (connection.responseCode) {
-                    HttpURLConnection.HTTP_OK -> break
+                    HttpURLConnection.HTTP_OK -> {
+                        break
+                    }
+
                     HttpURLConnection.HTTP_GATEWAY_TIMEOUT,
-                    HttpURLConnection.HTTP_UNAVAILABLE -> {
+                    HttpURLConnection.HTTP_UNAVAILABLE,
+                    -> {
                         retries++
                         if (retries >= MAX_CONNECT_RETRIES) {
                             downloadInfo.size = Download.BROKEN_MARK
@@ -79,6 +95,7 @@ class FileDownloadTask(override var downloadInfo: Download, private val userAgen
                             return
                         }
                     }
+
                     else -> {
                         downloadInfo.size = Download.BROKEN_MARK
                         callback.onError(this, connection.responseCode, connection.responseMessage)
@@ -94,7 +111,8 @@ class FileDownloadTask(override var downloadInfo: Download, private val userAgen
 
             if (connection.headerFields.containsKey("Content-Disposition")) {
                 val mime = connection.getHeaderField("Content-Type")
-                downloadInfo.filename = DownloadUtils.guessFileName(downloadInfo.url, connection.getHeaderField("Content-Disposition"), mime)
+                downloadInfo.filename =
+                    DownloadUtils.guessFileName(downloadInfo.url, connection.getHeaderField("Content-Disposition"), mime)
                 downloadInfo.filepath = File(File(downloadInfo.filepath).parentFile, downloadInfo.filename).absolutePath
             }
 
@@ -135,15 +153,20 @@ class FileDownloadTask(override var downloadInfo: Download, private val userAgen
     }
 }
 
-class BlobDownloadTask(override var downloadInfo: Download, val blobBase64Data: String, val callback: DownloadTask.Callback, private val contentResolver: ContentResolver) : Runnable, DownloadTask {
-
+class BlobDownloadTask(
+    override var downloadInfo: Download,
+    val blobBase64Data: String,
+    val callback: DownloadTask.Callback,
+    private val contentResolver: ContentResolver,
+) : Runnable,
+    DownloadTask {
     override fun run() {
         downloadInfo.id = runBlocking { Repositories.downloads.add(downloadInfo) }
 
         try {
             val blobAsBytes: ByteArray = Base64.decode(blobBase64Data.replaceFirst("data:${downloadInfo.mimeType};base64,", ""), 0)
             val output = prepareDownloadOutput(downloadInfo, contentResolver)
-            output.buffered().use{ it.write(blobAsBytes) }
+            output.buffered().use { it.write(blobAsBytes) }
             downloadInfo.size = blobAsBytes.size.toLong()
             downloadInfo.bytesReceived = downloadInfo.size
         } catch (e: Exception) {
@@ -157,7 +180,13 @@ class BlobDownloadTask(override var downloadInfo: Download, val blobBase64Data: 
     }
 }
 
-class StreamDownloadTask(override var downloadInfo: Download, val stream: InputStream, val callback: DownloadTask.Callback, private val contentResolver: ContentResolver) : Runnable, DownloadTask {
+class StreamDownloadTask(
+    override var downloadInfo: Download,
+    val stream: InputStream,
+    val callback: DownloadTask.Callback,
+    private val contentResolver: ContentResolver,
+) : Runnable,
+    DownloadTask {
     override fun run() {
         downloadInfo.id = runBlocking { Repositories.downloads.add(downloadInfo) }
 
@@ -198,7 +227,10 @@ class StreamDownloadTask(override var downloadInfo: Download, val stream: InputS
     }
 }
 
-private fun cancelDownloadIfNeeded(downloadInfo: Download, contentResolver: ContentResolver) {
+private fun cancelDownloadIfNeeded(
+    downloadInfo: Download,
+    contentResolver: ContentResolver,
+) {
     val filePath = downloadInfo.filepath
     if (filePath.isEmpty()) return
     if (downloadInfo.cancelled) {
@@ -211,27 +243,33 @@ private fun cancelDownloadIfNeeded(downloadInfo: Download, contentResolver: Cont
             File(filePath).delete()
         }
     } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-        val downloadDetails = ContentValues().apply {
-            put(MediaStore.Downloads.IS_PENDING, 0)
-        }
+        val downloadDetails =
+            ContentValues().apply {
+                put(MediaStore.Downloads.IS_PENDING, 0)
+            }
         contentResolver.update(Uri.parse(filePath), downloadDetails, null, null)
     }
 }
 
-private fun prepareDownloadOutput(downloadInfo: Download, contentResolver: ContentResolver): OutputStream {
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+private fun prepareDownloadOutput(
+    downloadInfo: Download,
+    contentResolver: ContentResolver,
+): OutputStream =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
         val downloadsCollection =
             MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-        val newDownloadDetails = ContentValues().apply {
-            if (downloadInfo.filename.isNotEmpty()) {
-                put(MediaStore.Downloads.DISPLAY_NAME, downloadInfo.filename)
+        val newDownloadDetails =
+            ContentValues().apply {
+                if (downloadInfo.filename.isNotEmpty()) {
+                    put(MediaStore.Downloads.DISPLAY_NAME, downloadInfo.filename)
+                }
+                put(MediaStore.Downloads.DOWNLOAD_URI, downloadInfo.url)
+                put(MediaStore.Downloads.REFERER_URI, downloadInfo.referer)
+                put(MediaStore.Downloads.IS_PENDING, 1)
             }
-            put(MediaStore.Downloads.DOWNLOAD_URI, downloadInfo.url)
-            put(MediaStore.Downloads.REFERER_URI, downloadInfo.referer)
-            put(MediaStore.Downloads.IS_PENDING, 1)
-        }
-        val downloadUri = contentResolver
-            .insert(downloadsCollection, newDownloadDetails)
+        val downloadUri =
+            contentResolver
+                .insert(downloadsCollection, newDownloadDetails)
         if (downloadUri == null) {
             throw IllegalStateException("Can not create file")
         }
@@ -242,4 +280,3 @@ private fun prepareDownloadOutput(downloadInfo: Download, contentResolver: Conte
     } else {
         FileOutputStream(downloadInfo.filepath)
     }
-}

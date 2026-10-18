@@ -8,8 +8,8 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config as RobolectricConfig
 import java.io.File
+import org.robolectric.annotation.Config as RobolectricConfig
 
 /**
  * Tests for [DefaultWebViewDataDirManager] on the filesystem path (below API 30), which is also what
@@ -19,7 +19,6 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 @RobolectricConfig(sdk = [26], application = Application::class)
 class DefaultWebViewDataDirManagerTest {
-
     @get:Rule
     val tmp = TemporaryFolder()
 

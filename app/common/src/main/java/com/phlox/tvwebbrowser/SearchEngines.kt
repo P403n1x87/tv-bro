@@ -17,15 +17,16 @@ object SearchEngines {
     val names = arrayOf("google", "bing", "yahoo", "ddg", "yandex", "startpage", "custom")
 
     /** URL templates with a `[query]` placeholder; parallel to [titles] (the last one is empty). */
-    val urls = listOf(
-        "https://www.google.com/search?q=[query]",
-        "https://www.bing.com/search?q=[query]",
-        "https://search.yahoo.com/search?p=[query]",
-        "https://duckduckgo.com/?q=[query]",
-        "https://yandex.com/search/?text=[query]",
-        "https://www.startpage.com/sp/search?query=[query]",
-        ""
-    )
+    val urls =
+        listOf(
+            "https://www.google.com/search?q=[query]",
+            "https://www.bing.com/search?q=[query]",
+            "https://search.yahoo.com/search?p=[query]",
+            "https://duckduckgo.com/?q=[query]",
+            "https://yandex.com/search/?text=[query]",
+            "https://www.startpage.com/sp/search?query=[query]",
+            "",
+        )
 
     /**
      * Index of the entry [url] selects: the index of the matching template, or the last (custom)

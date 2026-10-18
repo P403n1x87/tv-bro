@@ -19,7 +19,6 @@ import org.robolectric.annotation.Config as RobolectricConfig
 @RunWith(RobolectricTestRunner::class)
 @RobolectricConfig(sdk = [26], application = Application::class)
 class SettingsModelTest {
-
     private lateinit var config: Config
     private lateinit var model: SettingsModel
 

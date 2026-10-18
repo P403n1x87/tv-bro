@@ -14,9 +14,9 @@ import com.phlox.tvwebbrowser.webengine.WebEngineFactory
  * "About" settings category. Renders app info, links and update controls as native TV-settings rows.
  */
 class VersionSettingsView(
-    context: Context, private val deps: SettingsDeps
+    context: Context,
+    private val deps: SettingsDeps,
 ) : SettingsPageView(context) {
-
     companion object {
         private const val URL_PROJECT = "https://github.com/${BuildConfig.UPDATE_REPO}"
         private const val URL_UPSTREAM = "https://github.com/truefedex/tv-bro"
@@ -44,129 +44,132 @@ class VersionSettingsView(
         ensureUpdateInfo()
     }
 
-    private fun buildItems(): List<SettingsItem> = mutableListOf<SettingsItem>().apply {
-        add(SettingsItem.Header(R.string.settings_section_about_app))
-        add(
-            SettingsItem.Info(
-                iconRes = R.drawable.ic_settings_tv_24dp,
-                titleRes = R.string.app_name_short,
-                value = { context.getString(R.string.web_browser_optimized_for_tvs) }
-            )
-        )
-        add(
-            SettingsItem.Info(
-                iconRes = R.drawable.ic_settings_info_24dp,
-                titleRes = R.string.settings_version,
-                value = { BuildConfig.VERSION_NAME }
-            )
-        )
-        add(
-            SettingsItem.Info(
-                iconRes = R.drawable.ic_settings_build_24dp,
-                titleRes = R.string.settings_build_flavor,
-                value = {
-                    context.getString(
-                        R.string.settings_build_flavor_value_s,
-                        BuildConfig.FLAVOR_appstore,
-                        BuildConfig.FLAVOR_webengine
-                    )
-                }
-            )
-        )
-        add(
-            SettingsItem.Info(
-                iconRes = R.drawable.ic_settings_devices_24dp,
-                titleRes = R.string.settings_engine_version,
-                value = { WebEngineFactory.getWebEngineVersionString() }
-            )
-        )
-
-        if (BuildConfig.BUILT_IN_AUTO_UPDATE) {
-            add(SettingsItem.Header(R.string.settings_section_updates))
+    private fun buildItems(): List<SettingsItem> =
+        mutableListOf<SettingsItem>().apply {
+            add(SettingsItem.Header(R.string.settings_section_about_app))
             add(
-                SettingsItem.Toggle(
-                    iconRes = R.drawable.ic_refresh_grey_900_24dp,
-                    titleRes = R.string.auto_check_for_updates,
-                    isChecked = { autoUpdateModel.needAutoCheckUpdates },
-                    onCheckedChange = { enabled ->
-                        autoUpdateModel.saveAutoCheckUpdates(enabled)
-                        if (enabled) ensureUpdateInfo()
-                        else post { rebuild() }
-                        callback?.onUpdateStateChanged()
-                    }
-                )
+                SettingsItem.Info(
+                    iconRes = R.drawable.ic_settings_tv_24dp,
+                    titleRes = R.string.app_name_short,
+                    value = { context.getString(R.string.web_browser_optimized_for_tvs) },
+                ),
             )
             add(
                 SettingsItem.Info(
-                    iconRes = R.drawable.ic_settings_download_24dp,
-                    titleRes = R.string.settings_new_version,
+                    iconRes = R.drawable.ic_settings_info_24dp,
+                    titleRes = R.string.settings_version,
+                    value = { BuildConfig.VERSION_NAME },
+                ),
+            )
+            add(
+                SettingsItem.Info(
+                    iconRes = R.drawable.ic_settings_build_24dp,
+                    titleRes = R.string.settings_build_flavor,
                     value = {
-                        autoUpdateModel.updateChecker.versionCheckResult?.latestVersionName ?: ""
+                        context.getString(
+                            R.string.settings_build_flavor_value_s,
+                            BuildConfig.FLAVOR_appstore,
+                            BuildConfig.FLAVOR_webengine,
+                        )
                     },
-                    visible = { hasUpdate() }
+                ),
+            )
+            add(
+                SettingsItem.Info(
+                    iconRes = R.drawable.ic_settings_devices_24dp,
+                    titleRes = R.string.settings_engine_version,
+                    value = { WebEngineFactory.getWebEngineVersionString() },
+                ),
+            )
+
+            if (BuildConfig.BUILT_IN_AUTO_UPDATE) {
+                add(SettingsItem.Header(R.string.settings_section_updates))
+                add(
+                    SettingsItem.Toggle(
+                        iconRes = R.drawable.ic_refresh_grey_900_24dp,
+                        titleRes = R.string.auto_check_for_updates,
+                        isChecked = { autoUpdateModel.needAutoCheckUpdates },
+                        onCheckedChange = { enabled ->
+                            autoUpdateModel.saveAutoCheckUpdates(enabled)
+                            if (enabled) {
+                                ensureUpdateInfo()
+                            } else {
+                                post { rebuild() }
+                            }
+                            callback?.onUpdateStateChanged()
+                        },
+                    ),
                 )
+                add(
+                    SettingsItem.Info(
+                        iconRes = R.drawable.ic_settings_download_24dp,
+                        titleRes = R.string.settings_new_version,
+                        value = {
+                            autoUpdateModel.updateChecker.versionCheckResult?.latestVersionName ?: ""
+                        },
+                        visible = { hasUpdate() },
+                    ),
+                )
+                add(
+                    SettingsItem.Action(
+                        iconRes = R.drawable.ic_settings_download_24dp,
+                        titleRes = R.string.settings_install_update,
+                        onClick = {
+                            callback?.onNeedToCloseSettings()
+                            autoUpdateModel.showUpdateDialogIfNeeded(activity as MainActivity, true)
+                        },
+                        visible = { hasUpdate() },
+                    ),
+                )
+            }
+
+            add(SettingsItem.Header(R.string.settings_section_links))
+            add(
+                SettingsItem.Action(
+                    iconRes = R.drawable.ic_settings_code_24dp,
+                    titleRes = R.string.settings_github,
+                    onClick = { loadUrl(URL_PROJECT) },
+                ),
+            )
+            add(
+                // Original upstream project (this is a fork); keeps the original author credited.
+                SettingsItem.Action(
+                    iconRes = R.drawable.ic_settings_code_24dp,
+                    titleRes = R.string.settings_upstream_project,
+                    onClick = { loadUrl(URL_UPSTREAM) },
+                ),
             )
             add(
                 SettingsItem.Action(
-                    iconRes = R.drawable.ic_settings_download_24dp,
-                    titleRes = R.string.settings_install_update,
-                    onClick = {
-                        callback?.onNeedToCloseSettings()
-                        autoUpdateModel.showUpdateDialogIfNeeded(activity as MainActivity, true)
-                    },
-                    visible = { hasUpdate() }
-                )
+                    iconRes = R.drawable.ic_settings_favorite_24dp,
+                    titleRes = R.string.settings_support_author,
+                    onClick = { loadUrl(URL_SUPPORT_AUTHOR) },
+                ),
+            )
+            add(
+                SettingsItem.Action(
+                    iconRes = R.drawable.ic_settings_description_24dp,
+                    titleRes = R.string.settings_license,
+                    onClick = { loadUrl(URL_LICENSE) },
+                ),
+            )
+            add(
+                SettingsItem.Action(
+                    iconRes = R.drawable.ic_settings_shield_24dp,
+                    titleRes = R.string.settings_privacy,
+                    onClick = { loadUrl(URL_PRIVACY_POLICY) },
+                ),
+            )
+            add(
+                SettingsItem.Action(
+                    iconRes = R.drawable.ic_settings_flag_24dp,
+                    titleRes = R.string.settings_icon_story,
+                    onClick = { loadUrl(URL_ICON_STORY) },
+                ),
             )
         }
 
-        add(SettingsItem.Header(R.string.settings_section_links))
-        add(
-            SettingsItem.Action(
-                iconRes = R.drawable.ic_settings_code_24dp,
-                titleRes = R.string.settings_github,
-                onClick = { loadUrl(URL_PROJECT) }
-            )
-        )
-        add(
-            // Original upstream project (this is a fork); keeps the original author credited.
-            SettingsItem.Action(
-                iconRes = R.drawable.ic_settings_code_24dp,
-                titleRes = R.string.settings_upstream_project,
-                onClick = { loadUrl(URL_UPSTREAM) }
-            )
-        )
-        add(
-            SettingsItem.Action(
-                iconRes = R.drawable.ic_settings_favorite_24dp,
-                titleRes = R.string.settings_support_author,
-                onClick = { loadUrl(URL_SUPPORT_AUTHOR) }
-            )
-        )
-        add(
-            SettingsItem.Action(
-                iconRes = R.drawable.ic_settings_description_24dp,
-                titleRes = R.string.settings_license,
-                onClick = { loadUrl(URL_LICENSE) }
-            )
-        )
-        add(
-            SettingsItem.Action(
-                iconRes = R.drawable.ic_settings_shield_24dp,
-                titleRes = R.string.settings_privacy,
-                onClick = { loadUrl(URL_PRIVACY_POLICY) }
-            )
-        )
-        add(
-            SettingsItem.Action(
-                iconRes = R.drawable.ic_settings_flag_24dp,
-                titleRes = R.string.settings_icon_story,
-                onClick = { loadUrl(URL_ICON_STORY) }
-            )
-        )
-    }
-
-    private fun hasUpdate(): Boolean =
-        autoUpdateModel.needAutoCheckUpdates && autoUpdateModel.updateChecker.hasUpdate()
+    private fun hasUpdate(): Boolean = autoUpdateModel.needAutoCheckUpdates && autoUpdateModel.updateChecker.hasUpdate()
 
     private fun ensureUpdateInfo() {
         if (!BuildConfig.BUILT_IN_AUTO_UPDATE) return
@@ -179,8 +182,12 @@ class VersionSettingsView(
 
     private fun loadUrl(url: String) {
         callback?.onNeedToCloseSettings()
-        val activityClass = if (settingsModel.incognitoMode)
-            IncognitoModeMainActivity::class.java else MainActivity::class.java
+        val activityClass =
+            if (settingsModel.incognitoMode) {
+                IncognitoModeMainActivity::class.java
+            } else {
+                MainActivity::class.java
+            }
         val intent = Intent(activity, activityClass)
         intent.data = url.toUri()
         activity?.startActivity(intent)

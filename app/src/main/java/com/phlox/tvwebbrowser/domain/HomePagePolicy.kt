@@ -14,7 +14,10 @@ import com.phlox.tvwebbrowser.Config
  */
 object HomePagePolicy {
     /** True if [url] points at the built-in home page (remote, alias or loopback). */
-    fun isHomePageUrl(url: String?, localHomePageUrl: String?): Boolean {
+    fun isHomePageUrl(
+        url: String?,
+        localHomePageUrl: String?,
+    ): Boolean {
         if (url == null) return false
         if (url == Config.HOME_PAGE_URL || url == Config.HOME_URL_ALIAS) return true
         val local = localHomePageUrl ?: return false
@@ -22,8 +25,7 @@ object HomePagePolicy {
     }
 
     /** True when the built-in (remote) home page — not a user-chosen one — is the active mode. */
-    fun usesBuiltInHomePage(mode: Config.HomePageMode): Boolean =
-        mode == Config.HomePageMode.HOME_PAGE
+    fun usesBuiltInHomePage(mode: Config.HomePageMode): Boolean = mode == Config.HomePageMode.HOME_PAGE
 
     /** What loading the `about:home` alias does under [mode]. */
     sealed interface HomeAliasTarget {
@@ -31,7 +33,9 @@ object HomePagePolicy {
         object Blank : HomeAliasTarget
 
         /** Load [url]: the built-in home page, or the configured custom/search-engine URL. */
-        data class Load(val url: String) : HomeAliasTarget
+        data class Load(
+            val url: String,
+        ) : HomeAliasTarget
     }
 
     /**
@@ -41,13 +45,21 @@ object HomePagePolicy {
      */
     fun homeAliasTarget(
         mode: Config.HomePageMode,
-        configuredHomePage: String
-    ): HomeAliasTarget = when (mode) {
-        Config.HomePageMode.BLANK -> HomeAliasTarget.Blank
-        Config.HomePageMode.HOME_PAGE -> HomeAliasTarget.Load(Config.HOME_PAGE_URL)
-        Config.HomePageMode.CUSTOM, Config.HomePageMode.SEARCH_ENGINE ->
-            HomeAliasTarget.Load(configuredHomePage)
-    }
+        configuredHomePage: String,
+    ): HomeAliasTarget =
+        when (mode) {
+            Config.HomePageMode.BLANK -> {
+                HomeAliasTarget.Blank
+            }
+
+            Config.HomePageMode.HOME_PAGE -> {
+                HomeAliasTarget.Load(Config.HOME_PAGE_URL)
+            }
+
+            Config.HomePageMode.CUSTOM, Config.HomePageMode.SEARCH_ENGINE -> {
+                HomeAliasTarget.Load(configuredHomePage)
+            }
+        }
 
     /**
      * The URL the settings store as the home page for [mode]: the search engine's origin for
@@ -58,12 +70,13 @@ object HomePagePolicy {
     fun homePageUrlFor(
         mode: Config.HomePageMode,
         customHomePageUrl: String?,
-        searchEngineUrl: String
-    ): String = when (mode) {
-        Config.HomePageMode.SEARCH_ENGINE -> searchEngineHomePage(searchEngineUrl)
-        Config.HomePageMode.HOME_PAGE, Config.HomePageMode.BLANK -> Config.HOME_URL_ALIAS
-        Config.HomePageMode.CUSTOM -> customHomePageUrl ?: Config.HOME_URL_ALIAS
-    }
+        searchEngineUrl: String,
+    ): String =
+        when (mode) {
+            Config.HomePageMode.SEARCH_ENGINE -> searchEngineHomePage(searchEngineUrl)
+            Config.HomePageMode.HOME_PAGE, Config.HomePageMode.BLANK -> Config.HOME_URL_ALIAS
+            Config.HomePageMode.CUSTOM -> customHomePageUrl ?: Config.HOME_URL_ALIAS
+        }
 
     /**
      * The home page a search engine URL implies: its scheme+host origin (so the stored home page

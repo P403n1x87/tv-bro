@@ -10,8 +10,10 @@ import org.junit.Test
  * Unit tests for [DownloadStoragePolicy], the byte accounting behind the downloads header.
  */
 class DownloadStoragePolicyTest {
-
-    private fun download(size: Long, bytesReceived: Long): Download {
+    private fun download(
+        size: Long,
+        bytesReceived: Long,
+    ): Download {
         val download = Download()
         download.size = size
         download.bytesReceived = bytesReceived
@@ -42,11 +44,12 @@ class DownloadStoragePolicyTest {
 
     @Test
     fun theTotalSumsEveryRow() {
-        val rows = listOf(
-            download(size = 500, bytesReceived = 500),
-            download(size = 500, bytesReceived = 200),
-            download(size = Download.BROKEN_MARK, bytesReceived = 120),
-        )
+        val rows =
+            listOf(
+                download(size = 500, bytesReceived = 500),
+                download(size = 500, bytesReceived = 200),
+                download(size = Download.BROKEN_MARK, bytesReceived = 120),
+            )
         assertEquals(820, DownloadStoragePolicy.usedBytes(rows))
     }
 

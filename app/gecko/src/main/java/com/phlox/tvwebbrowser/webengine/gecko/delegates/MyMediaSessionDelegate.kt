@@ -18,27 +18,42 @@ class MyMediaSessionDelegate : MediaSession.Delegate {
     var paused = true
         private set
 
-    override fun onActivated(session: GeckoSession, mediaSession: MediaSession) {
+    override fun onActivated(
+        session: GeckoSession,
+        mediaSession: MediaSession,
+    ) {
         Log.i(TAG, "media-activated")
         this.mediaSession = mediaSession
     }
 
-    override fun onDeactivated(session: GeckoSession, mediaSession: MediaSession) {
+    override fun onDeactivated(
+        session: GeckoSession,
+        mediaSession: MediaSession,
+    ) {
         Log.i(TAG, "media-deactivated")
         if (this.mediaSession === mediaSession) this.mediaSession = null
     }
 
-    override fun onPlay(session: GeckoSession, mediaSession: MediaSession) {
+    override fun onPlay(
+        session: GeckoSession,
+        mediaSession: MediaSession,
+    ) {
         Log.i(TAG, "media-playing")
         paused = false
     }
 
-    override fun onPause(session: GeckoSession, mediaSession: MediaSession) {
+    override fun onPause(
+        session: GeckoSession,
+        mediaSession: MediaSession,
+    ) {
         Log.i(TAG, "media-paused")
         paused = true
     }
 
-    override fun onStop(session: GeckoSession, mediaSession: MediaSession) {
+    override fun onStop(
+        session: GeckoSession,
+        mediaSession: MediaSession,
+    ) {
         Log.i(TAG, "media-stopped")
         paused = true
     }

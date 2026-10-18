@@ -20,7 +20,6 @@ import org.robolectric.annotation.Config as RobolectricConfig
 @RunWith(RobolectricTestRunner::class)
 @RobolectricConfig(sdk = [26], application = Application::class)
 class DownloadCoordinatorTest {
-
     private lateinit var host: FakeDownloadHost
     private var startedFileName: String? = null
 
@@ -39,7 +38,7 @@ class DownloadCoordinatorTest {
         assertEquals(Manifest.permission.WRITE_EXTERNAL_STORAGE, host.requested.single().first)
         assertEquals(
             DownloadCoordinator.MY_PERMISSIONS_REQUEST_EXTERNAL_STORAGE_ACCESS,
-            host.requested.single().second
+            host.requested.single().second,
         )
         assertNull("the download waits for the permission", startedFileName)
     }
@@ -49,8 +48,11 @@ class DownloadCoordinatorTest {
         host.granted += Manifest.permission.WRITE_EXTERNAL_STORAGE
 
         coordinator().requestDownload(
-            url = "https://example.com/file.apk", referer = "", originalDownloadFileName = "file.apk",
-            userAgent = null, stream = null
+            url = "https://example.com/file.apk",
+            referer = "",
+            originalDownloadFileName = "file.apk",
+            userAgent = null,
+            stream = null,
         )
 
         assertTrue(host.requested.isEmpty())
@@ -62,10 +64,11 @@ class DownloadCoordinatorTest {
         val coordinator = coordinator()
         coordinator.requestDownload("https://example.com/a.apk", "", "a.apk", null, stream = null)
 
-        val handled = coordinator.onPermissionsResult(
-            DownloadCoordinator.MY_PERMISSIONS_REQUEST_EXTERNAL_STORAGE_ACCESS,
-            intArrayOf(PackageManager.PERMISSION_GRANTED),
-        )
+        val handled =
+            coordinator.onPermissionsResult(
+                DownloadCoordinator.MY_PERMISSIONS_REQUEST_EXTERNAL_STORAGE_ACCESS,
+                intArrayOf(PackageManager.PERMISSION_GRANTED),
+            )
 
         assertTrue(handled)
         assertEquals("a.apk", startedFileName)
@@ -76,10 +79,11 @@ class DownloadCoordinatorTest {
         val coordinator = coordinator()
         coordinator.requestDownload("https://example.com/a.apk", "", "a.apk", null, stream = null)
 
-        val handled = coordinator.onPermissionsResult(
-            DownloadCoordinator.MY_PERMISSIONS_REQUEST_EXTERNAL_STORAGE_ACCESS,
-            intArrayOf(PackageManager.PERMISSION_DENIED),
-        )
+        val handled =
+            coordinator.onPermissionsResult(
+                DownloadCoordinator.MY_PERMISSIONS_REQUEST_EXTERNAL_STORAGE_ACCESS,
+                intArrayOf(PackageManager.PERMISSION_DENIED),
+            )
 
         assertTrue(handled)
         assertNull(startedFileName)
@@ -96,9 +100,12 @@ class DownloadCoordinatorTest {
         host.freeSpace = 100
 
         coordinator().requestDownload(
-            url = "https://example.com/big.iso", referer = "",
-            originalDownloadFileName = "big.iso", userAgent = null,
-            stream = null, size = 1000
+            url = "https://example.com/big.iso",
+            referer = "",
+            originalDownloadFileName = "big.iso",
+            userAgent = null,
+            stream = null,
+            size = 1000,
         )
 
         assertNull("the download must not start", startedFileName)
@@ -112,9 +119,12 @@ class DownloadCoordinatorTest {
         host.freeSpace = 1000
 
         coordinator().requestDownload(
-            url = "https://example.com/ok.iso", referer = "",
-            originalDownloadFileName = "ok.iso", userAgent = null,
-            stream = null, size = 1000
+            url = "https://example.com/ok.iso",
+            referer = "",
+            originalDownloadFileName = "ok.iso",
+            userAgent = null,
+            stream = null,
+            size = 1000,
         )
 
         assertEquals("ok.iso", startedFileName)

@@ -34,7 +34,9 @@ import android.widget.Toast
  * Referer, Cookie and User-Agent are passed as request headers, which the
  * platform applies to the stream including its segments.
  */
-class SystemPlayerActivity : Activity(), SurfaceHolder.Callback {
+class SystemPlayerActivity :
+    Activity(),
+    SurfaceHolder.Callback {
     companion object {
         const val EXTRA_URL = "url"
         const val EXTRA_REFERER = "referer"
@@ -62,12 +64,13 @@ class SystemPlayerActivity : Activity(), SurfaceHolder.Callback {
 
     private val uiHandler = Handler(Looper.getMainLooper())
     private val hideControls = Runnable { controls?.visibility = View.GONE }
-    private val updateProgress = object : Runnable {
-        override fun run() {
-            refreshProgress()
-            uiHandler.postDelayed(this, PROGRESS_INTERVAL)
+    private val updateProgress =
+        object : Runnable {
+            override fun run() {
+                refreshProgress()
+                uiHandler.postDelayed(this, PROGRESS_INTERVAL)
+            }
         }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -81,34 +84,57 @@ class SystemPlayerActivity : Activity(), SurfaceHolder.Callback {
         val root = FrameLayout(this)
         val surface = SurfaceView(this)
         surfaceView = surface
-        root.addView(surface, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT,
-            Gravity.CENTER))
+        root.addView(
+            surface,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                Gravity.CENTER,
+            ),
+        )
 
-        val subs = TextView(this).apply {
-            setTextColor(Color.WHITE)
-            setShadowLayer(6f, 0f, 2f, Color.BLACK)
-            textSize = 20f
-            gravity = Gravity.CENTER
-        }
-        root.addView(subs, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT,
-            Gravity.BOTTOM).also { it.bottomMargin = 120 })
+        val subs =
+            TextView(this).apply {
+                setTextColor(Color.WHITE)
+                setShadowLayer(6f, 0f, 2f, Color.BLACK)
+                textSize = 20f
+                gravity = Gravity.CENTER
+            }
+        root.addView(
+            subs,
+            FrameLayout
+                .LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    Gravity.BOTTOM,
+                ).also { it.bottomMargin = 120 },
+        )
         subtitleView = subs
 
-        val text = TextView(this).apply {
-            setTextColor(Color.WHITE)
-            textSize = 18f
-            setText(R.string.loading)
-        }
-        root.addView(text, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
-            Gravity.CENTER))
+        val text =
+            TextView(this).apply {
+                setTextColor(Color.WHITE)
+                textSize = 18f
+                setText(R.string.loading)
+            }
+        root.addView(
+            text,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.CENTER,
+            ),
+        )
         status = text
 
-        root.addView(buildControls(), FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT,
-            Gravity.BOTTOM))
+        root.addView(
+            buildControls(),
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM,
+            ),
+        )
 
         setContentView(root)
         surface.holder.addCallback(this)
@@ -120,68 +146,98 @@ class SystemPlayerActivity : Activity(), SurfaceHolder.Callback {
      * line.
      */
     private fun buildControls(): View {
-        val scrim = GradientDrawable(
-            GradientDrawable.Orientation.TOP_BOTTOM,
-            intArrayOf(0x00000000, 0xE6000000.toInt())
+        val scrim =
+            GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(0x00000000, 0xE6000000.toInt()),
+            )
+        val bar =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                background = scrim
+                setPadding(dp(40), dp(44), dp(40), dp(24))
+                visibility = View.GONE
+            }
+
+        val p =
+            ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+                max = 1000
+                progressDrawable = progressDrawable()
+            }
+        bar.addView(
+            p,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(5)),
         )
-        val bar = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = scrim
-            setPadding(dp(40), dp(44), dp(40), dp(24))
-            visibility = View.GONE
-        }
 
-        val p = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
-            max = 1000
-            progressDrawable = progressDrawable()
-        }
-        bar.addView(p, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, dp(5)))
-
-        //A FrameLayout keeps the transport controls on the left and the options
-        //on the right without nested weights, which stretched the bar before.
+        // A FrameLayout keeps the transport controls on the left and the options
+        // on the right without nested weights, which stretched the bar before.
         val row = FrameLayout(this)
 
-        val left = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
+        val left =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
         left.addView(makeButton("\u25C0\u25C0") { seekBy(-SEEK_STEP) })
         playPauseButton = makeButton("\u275A\u275A") { togglePlayPause() }
         left.addView(playPauseButton)
         left.addView(makeButton("\u25B6\u25B6") { seekBy(SEEK_STEP) })
 
-        val time = TextView(this).apply {
-            setTextColor(Color.WHITE)
-            textSize = 15f
-        }
-        left.addView(time, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT).also { it.leftMargin = dp(8) })
-        row.addView(left, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            Gravity.START or Gravity.CENTER_VERTICAL))
+        val time =
+            TextView(this).apply {
+                setTextColor(Color.WHITE)
+                textSize = 15f
+            }
+        left.addView(
+            time,
+            LinearLayout
+                .LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).also { it.leftMargin = dp(8) },
+        )
+        row.addView(
+            left,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.START or Gravity.CENTER_VERTICAL,
+            ),
+        )
 
-        val right = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        right.addView(makeButton("CC") {
-            showTrackChooser(MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_TIMEDTEXT)
-        })
-        right.addView(makeButton("\u266A") {
-            showTrackChooser(MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_AUDIO)
-        })
+        val right =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+        right.addView(
+            makeButton("CC") {
+                showTrackChooser(MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_TIMEDTEXT)
+            },
+        )
+        right.addView(
+            makeButton("\u266A") {
+                showTrackChooser(MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_AUDIO)
+            },
+        )
         right.addView(makeButton("\u26F6") { cycleScale() })
-        row.addView(right, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            Gravity.END or Gravity.CENTER_VERTICAL))
+        row.addView(
+            right,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.END or Gravity.CENTER_VERTICAL,
+            ),
+        )
 
-        bar.addView(row, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT).also { it.topMargin = dp(12) })
+        bar.addView(
+            row,
+            LinearLayout
+                .LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).also { it.topMargin = dp(12) },
+        )
 
         controls = bar
         progress = p
@@ -194,36 +250,49 @@ class SystemPlayerActivity : Activity(), SurfaceHolder.Callback {
 
     /** Thin rounded track, filled with the accent colour. */
     private fun progressDrawable(): LayerDrawable {
-        val track = GradientDrawable().apply {
-            cornerRadius = dp(3).toFloat()
-            setColor(0x40FFFFFF)
-        }
-        val fill = GradientDrawable().apply {
-            cornerRadius = dp(3).toFloat()
-            setColor(ACCENT)
-        }
-        val layers = LayerDrawable(arrayOf(track,
-            ClipDrawable(fill, Gravity.START, ClipDrawable.HORIZONTAL)))
+        val track =
+            GradientDrawable().apply {
+                cornerRadius = dp(3).toFloat()
+                setColor(0x40FFFFFF)
+            }
+        val fill =
+            GradientDrawable().apply {
+                cornerRadius = dp(3).toFloat()
+                setColor(ACCENT)
+            }
+        val layers =
+            LayerDrawable(
+                arrayOf(
+                    track,
+                    ClipDrawable(fill, Gravity.START, ClipDrawable.HORIZONTAL),
+                ),
+            )
         layers.setId(0, android.R.id.background)
         layers.setId(1, android.R.id.progress)
         return layers
     }
 
     /** Plain focusable chips instead of the dated default button chrome. */
-    private fun makeButton(label: String, onClick: () -> Unit): TextView {
-        val normal = GradientDrawable().apply {
-            cornerRadius = dp(10).toFloat()
-            setColor(0x33FFFFFF)
-        }
-        val focused = GradientDrawable().apply {
-            cornerRadius = dp(10).toFloat()
-            setColor(ACCENT)
-        }
-        val states = StateListDrawable().apply {
-            addState(intArrayOf(android.R.attr.state_focused), focused)
-            addState(intArrayOf(android.R.attr.state_pressed), focused)
-            addState(intArrayOf(), normal)
-        }
+    private fun makeButton(
+        label: String,
+        onClick: () -> Unit,
+    ): TextView {
+        val normal =
+            GradientDrawable().apply {
+                cornerRadius = dp(10).toFloat()
+                setColor(0x33FFFFFF)
+            }
+        val focused =
+            GradientDrawable().apply {
+                cornerRadius = dp(10).toFloat()
+                setColor(ACCENT)
+            }
+        val states =
+            StateListDrawable().apply {
+                addState(intArrayOf(android.R.attr.state_focused), focused)
+                addState(intArrayOf(android.R.attr.state_pressed), focused)
+                addState(intArrayOf(), normal)
+            }
         return TextView(this).apply {
             text = label
             setTextColor(Color.WHITE)
@@ -234,9 +303,12 @@ class SystemPlayerActivity : Activity(), SurfaceHolder.Callback {
             background = states
             minWidth = dp(58)
             setPadding(dp(14), dp(10), dp(14), dp(10))
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT).also { it.rightMargin = dp(8) }
+            layoutParams =
+                LinearLayout
+                    .LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                    ).also { it.rightMargin = dp(8) }
             setOnClickListener {
                 onClick()
                 scheduleHide()
@@ -305,8 +377,11 @@ class SystemPlayerActivity : Activity(), SurfaceHolder.Callback {
         val h = total / 3600
         val m = (total % 3600) / 60
         val s = total % 60
-        return if (h > 0) String.format("%d:%02d:%02d", h, m, s)
-        else String.format("%d:%02d", m, s)
+        return if (h > 0) {
+            String.format("%d:%02d:%02d", h, m, s)
+        } else {
+            String.format("%d:%02d", m, s)
+        }
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
@@ -347,18 +422,38 @@ class SystemPlayerActivity : Activity(), SurfaceHolder.Callback {
     }
 
     /** MediaPlayer only reports numeric codes, so name the common ones. */
-    private fun describeError(what: Int, extra: Int): String = when {
-        what == MediaPlayer.MEDIA_ERROR_UNSUPPORTED || extra == MediaPlayer.MEDIA_ERROR_UNSUPPORTED ->
-            "unsupported"
-        what == MediaPlayer.MEDIA_ERROR_IO || extra == MediaPlayer.MEDIA_ERROR_IO -> "network"
-        what == MediaPlayer.MEDIA_ERROR_MALFORMED || extra == MediaPlayer.MEDIA_ERROR_MALFORMED ->
-            "malformed"
-        what == MediaPlayer.MEDIA_ERROR_TIMED_OUT || extra == MediaPlayer.MEDIA_ERROR_TIMED_OUT ->
-            "timeout"
-        else -> "$what/$extra"
-    }
+    private fun describeError(
+        what: Int,
+        extra: Int,
+    ): String =
+        when {
+            what == MediaPlayer.MEDIA_ERROR_UNSUPPORTED || extra == MediaPlayer.MEDIA_ERROR_UNSUPPORTED -> {
+                "unsupported"
+            }
 
-    override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
+            what == MediaPlayer.MEDIA_ERROR_IO || extra == MediaPlayer.MEDIA_ERROR_IO -> {
+                "network"
+            }
+
+            what == MediaPlayer.MEDIA_ERROR_MALFORMED || extra == MediaPlayer.MEDIA_ERROR_MALFORMED -> {
+                "malformed"
+            }
+
+            what == MediaPlayer.MEDIA_ERROR_TIMED_OUT || extra == MediaPlayer.MEDIA_ERROR_TIMED_OUT -> {
+                "timeout"
+            }
+
+            else -> {
+                "$what/$extra"
+            }
+        }
+
+    override fun surfaceChanged(
+        holder: SurfaceHolder,
+        format: Int,
+        width: Int,
+        height: Int,
+    ) {}
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {}
 
@@ -377,32 +472,39 @@ class SystemPlayerActivity : Activity(), SurfaceHolder.Callback {
      */
     private fun showSettings() {
         if (player == null || !prepared) return
-        val labels = arrayOf(
-            getString(R.string.player_subtitles),
-            getString(R.string.player_audio_track),
-            getString(R.string.player_video_scale)
-        )
-        AlertDialog.Builder(this)
+        val labels =
+            arrayOf(
+                getString(R.string.player_subtitles),
+                getString(R.string.player_audio_track),
+                getString(R.string.player_video_scale),
+            )
+        AlertDialog
+            .Builder(this)
             .setItems(labels) { _, which ->
                 when (which) {
                     0 -> showTrackChooser(MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_TIMEDTEXT)
                     1 -> showTrackChooser(MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_AUDIO)
                     2 -> cycleScale()
                 }
-            }
-            .setNegativeButton(android.R.string.cancel, null)
+            }.setNegativeButton(android.R.string.cancel, null)
             .show()
     }
 
     private fun showTrackChooser(trackType: Int) {
         val mp = player ?: return
-        val tracks = try { mp.trackInfo } catch (e: Exception) { null }
+        val tracks =
+            try {
+                mp.trackInfo
+            } catch (e: Exception) {
+                null
+            }
         val indices = ArrayList<Int>()
         val labels = ArrayList<String>()
         val subtitles = trackType == MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_TIMEDTEXT
         if (subtitles) labels.add(getString(R.string.player_track_off))
         tracks?.forEachIndexed { i, info ->
-            val matches = info.trackType == trackType ||
+            val matches =
+                info.trackType == trackType ||
                     (subtitles && info.trackType == MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_SUBTITLE)
             if (matches) {
                 indices.add(i)
@@ -414,12 +516,16 @@ class SystemPlayerActivity : Activity(), SurfaceHolder.Callback {
             return
         }
         val title = if (subtitles) R.string.player_subtitles else R.string.player_audio_track
-        AlertDialog.Builder(this)
+        AlertDialog
+            .Builder(this)
             .setTitle(title)
             .setItems(labels.toTypedArray()) { _, which ->
                 if (subtitles && which == 0) {
                     subtitleView?.text = ""
-                    try { mp.deselectTrack(selectedSubtitle) } catch (e: Exception) {}
+                    try {
+                        mp.deselectTrack(selectedSubtitle)
+                    } catch (e: Exception) {
+                    }
                     selectedSubtitle = -1
                     return@setItems
                 }
@@ -430,19 +536,19 @@ class SystemPlayerActivity : Activity(), SurfaceHolder.Callback {
                 } catch (e: Exception) {
                     Toast.makeText(this, R.string.player_no_tracks, Toast.LENGTH_SHORT).show()
                 }
-            }
-            .setNegativeButton(android.R.string.cancel, null)
+            }.setNegativeButton(android.R.string.cancel, null)
             .show()
     }
 
     private fun cycleScale() {
         scaleMode = (scaleMode + 1) % 3
         applyScale()
-        val name = when (scaleMode) {
-            1 -> R.string.player_scale_zoom
-            2 -> R.string.player_scale_fill
-            else -> R.string.player_scale_fit
-        }
+        val name =
+            when (scaleMode) {
+                1 -> R.string.player_scale_zoom
+                2 -> R.string.player_scale_fill
+                else -> R.string.player_scale_fit
+            }
         Toast.makeText(this, name, Toast.LENGTH_SHORT).show()
     }
 
@@ -460,17 +566,30 @@ class SystemPlayerActivity : Activity(), SurfaceHolder.Callback {
         val screenRatio = cw.toFloat() / ch
         val lp = surface.layoutParams as FrameLayout.LayoutParams
         when (scaleMode) {
-            0 -> if (videoRatio > screenRatio) {
-                lp.width = cw; lp.height = (cw / videoRatio).toInt()
-            } else {
-                lp.height = ch; lp.width = (ch * videoRatio).toInt()
+            0 -> {
+                if (videoRatio > screenRatio) {
+                    lp.width = cw
+                    lp.height = (cw / videoRatio).toInt()
+                } else {
+                    lp.height = ch
+                    lp.width = (ch * videoRatio).toInt()
+                }
             }
-            1 -> if (videoRatio > screenRatio) {
-                lp.height = ch; lp.width = (ch * videoRatio).toInt()
-            } else {
-                lp.width = cw; lp.height = (cw / videoRatio).toInt()
+
+            1 -> {
+                if (videoRatio > screenRatio) {
+                    lp.height = ch
+                    lp.width = (ch * videoRatio).toInt()
+                } else {
+                    lp.width = cw
+                    lp.height = (cw / videoRatio).toInt()
+                }
             }
-            else -> { lp.width = cw; lp.height = ch }
+
+            else -> {
+                lp.width = cw
+                lp.height = ch
+            }
         }
         lp.gravity = Gravity.CENTER
         surface.layoutParams = lp
@@ -485,15 +604,16 @@ class SystemPlayerActivity : Activity(), SurfaceHolder.Callback {
         val mp = player
         if (mp == null || !prepared) return super.dispatchKeyEvent(event)
 
-        //The dedicated play/pause key works no matter where the focus is
+        // The dedicated play/pause key works no matter where the focus is
         if (event.keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE ||
             event.keyCode == KeyEvent.KEYCODE_MEDIA_PLAY ||
-            event.keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE) {
+            event.keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE
+        ) {
             togglePlayPause()
             return true
         }
 
-        //While a button is focused the arrows belong to it, not to seeking
+        // While a button is focused the arrows belong to it, not to seeking
         val onButtons = controls?.visibility == View.VISIBLE && controls?.findFocus() != null
         if (onButtons) {
             if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
@@ -506,24 +626,29 @@ class SystemPlayerActivity : Activity(), SurfaceHolder.Callback {
 
         when (event.keyCode) {
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
-            KeyEvent.KEYCODE_NUMPAD_ENTER -> {
+            KeyEvent.KEYCODE_NUMPAD_ENTER,
+            -> {
                 togglePlayPause()
                 return true
             }
+
             KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_MEDIA_REWIND -> {
                 seekBy(-SEEK_STEP)
                 showControls()
                 return true
             }
+
             KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
                 seekBy(SEEK_STEP)
                 showControls()
                 return true
             }
+
             KeyEvent.KEYCODE_DPAD_UP -> {
                 showControls(focusButtons = true)
                 return true
             }
+
             KeyEvent.KEYCODE_DPAD_DOWN -> {
                 showControls()
                 return true

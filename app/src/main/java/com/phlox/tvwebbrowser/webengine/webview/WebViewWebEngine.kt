@@ -17,33 +17,31 @@ import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.domain.UserAgentPolicy
 import com.phlox.tvwebbrowser.model.WebTabState
 import com.phlox.tvwebbrowser.utils.Utils
+import com.phlox.tvwebbrowser.webengine.MediaCandidate
 import com.phlox.tvwebbrowser.webengine.WebEngine
 import com.phlox.tvwebbrowser.webengine.WebEngineFactory
-import com.phlox.tvwebbrowser.webengine.MediaCandidate
 import com.phlox.tvwebbrowser.webengine.WebEngineProvider
 import com.phlox.tvwebbrowser.webengine.WebEngineProviderCallback
 import com.phlox.tvwebbrowser.webengine.WebEngineWindowProviderCallback
 import com.phlox.tvwebbrowser.widgets.cursor.CursorDrawerDelegate
 import com.phlox.tvwebbrowser.widgets.cursor.CursorLayout
 
-
 class WebViewWebEngine(
     val tab: WebTabState,
     private val appContext: Context,
     private val config: Config,
-) : WebEngine, CursorDrawerDelegate.Callback {
+) : WebEngine,
+    CursorDrawerDelegate.Callback {
     private var webView: WebViewEx? = null
     internal var callback: WebEngineWindowProviderCallback? = null
     private var viewParent: CursorLayout? = null
     private var fullScreenView: View? = null
-    private val permissionsRequests = HashMap<Int, Boolean>()//request code, isGeolocationPermissionRequest
+    private val permissionsRequests = HashMap<Int, Boolean>() // request code, isGeolocationPermissionRequest
     private val jsInterface = AndroidJSInterface(this, appContext, config)
 
     override fun getWebEngineName(): String = "WebView"
 
-    override fun isSameSession(internalRepresentation: Any): Boolean {
-        return internalRepresentation == webView
-    }
+    override fun isSameSession(internalRepresentation: Any): Boolean = internalRepresentation == webView
 
     override val url: String?
         get() = webView?.url
@@ -63,12 +61,17 @@ class WebViewWebEngine(
      * that reads a `null` field — still carries the stock default, so the marker is stripped from
      * whatever is currently set instead.
      */
-    private fun applyUserAgent(view: WebView, userAgent: String?) {
-        val base = userAgent
-            ?: if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                UserAgentPolicy.withoutInAppMarker(WebSettings.getDefaultUserAgent(appContext))
-            else
-                UserAgentPolicy.withoutInAppMarker(view.settings.userAgentString)
+    private fun applyUserAgent(
+        view: WebView,
+        userAgent: String?,
+    ) {
+        val base =
+            userAgent
+                ?: if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    UserAgentPolicy.withoutInAppMarker(WebSettings.getDefaultUserAgent(appContext))
+                } else {
+                    UserAgentPolicy.withoutInAppMarker(view.settings.userAgentString)
+                }
         view.settings.userAgentString = base
     }
 
@@ -86,32 +89,25 @@ class WebViewWebEngine(
         }
     }
 
-    override fun stateFromBytes(bytes: ByteArray): Any? =
-        Utils.bytesToBundle(bytes)
+    override fun stateFromBytes(bytes: ByteArray): Any? = Utils.bytesToBundle(bytes)
 
     override fun loadUrl(url: String) {
         webView?.loadUrl(url)
     }
 
-    override fun canGoForward(): Boolean {
-        return webView?.canGoForward() ?: false
-    }
+    override fun canGoForward(): Boolean = webView?.canGoForward() ?: false
 
     override fun goForward() {
         webView?.goForward()
     }
 
-    override fun canZoomIn(): Boolean {
-        return webView?.canZoomIn() ?: false
-    }
+    override fun canZoomIn(): Boolean = webView?.canZoomIn() ?: false
 
     override fun zoomIn() {
         webView?.zoomIn()
     }
 
-    override fun canZoomOut(): Boolean {
-        return webView?.canZoomOut() ?: false
-    }
+    override fun canZoomOut(): Boolean = webView?.canZoomOut() ?: false
 
     override fun zoomOut() {
         webView?.zoomOut()
@@ -129,9 +125,7 @@ class WebViewWebEngine(
         webView?.setNetworkAvailable(connected)
     }
 
-    override fun getView(): View? {
-        return webView
-    }
+    override fun getView(): View? = webView
 
     @Throws(Exception::class)
     override fun getOrCreateView(activityContext: Context): View {
@@ -143,9 +137,7 @@ class WebViewWebEngine(
         return webView!!
     }
 
-    override fun canGoBack(): Boolean {
-        return webView?.canGoBack() ?: false
-    }
+    override fun canGoBack(): Boolean = webView?.canGoBack() ?: false
 
     override fun goBack() {
         webView?.goBack()
@@ -155,7 +147,10 @@ class WebViewWebEngine(
         webView?.reload()
     }
 
-    override fun onFilePicked(resultCode: Int, data: Intent?) {
+    override fun onFilePicked(
+        resultCode: Int,
+        data: Intent?,
+    ) {
         if (resultCode != Activity.RESULT_OK || data == null) {
             return
         }
@@ -204,11 +199,12 @@ class WebViewWebEngine(
         webView?.prefetchMediaMetadata()
     }
 
-    override suspend fun renderThumbnail(bitmap: Bitmap?): Bitmap? {
-        return webView?.renderThumbnail(bitmap)
-    }
+    override suspend fun renderThumbnail(bitmap: Bitmap?): Bitmap? = webView?.renderThumbnail(bitmap)
 
-    override fun onAttachToWindow(callback: WebEngineWindowProviderCallback, parent: ViewGroup) {
+    override fun onAttachToWindow(
+        callback: WebEngineWindowProviderCallback,
+        parent: ViewGroup,
+    ) {
         this.callback = callback
         if (webView == null) {
             throw IllegalStateException("WebView is null")
@@ -224,7 +220,10 @@ class WebViewWebEngine(
         onResume()
     }
 
-    override fun onDetachFromWindow(completely: Boolean, destroyTab: Boolean) {
+    override fun onDetachFromWindow(
+        completely: Boolean,
+        destroyTab: Boolean,
+    ) {
         onPause()
         (webView?.parent as? ViewGroup)?.removeView(webView)
         callback = null
@@ -240,7 +239,11 @@ class WebViewWebEngine(
         }
     }
 
-    override fun onPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray): Boolean {
+    override fun onPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray,
+    ): Boolean {
         val isGeolocationPermissionRequest = permissionsRequests[requestCode] ?: return false
         permissionsRequests.remove(requestCode)
         if (grantResults.isEmpty()) return true
@@ -248,21 +251,24 @@ class WebViewWebEngine(
         return true
     }
 
-    override fun onLongPress(x: Int, y: Int) {
+    override fun onLongPress(
+        x: Int,
+        y: Int,
+    ) {
         webView?.let {
             it.evaluateJavascript(Scripts.LONG_PRESS_SCRIPT) { href ->
                 val linkUrl = if (href == "null") null else href
                 webViewCallback.onContextMenu(
                     it.currentOriginalUrl.toString(),
-                    linkUrl, x, y
+                    linkUrl,
+                    x,
+                    y,
                 )
             }
         }
     }
 
-    override fun isVirtualCursorMode(): Boolean {
-        return viewParent?.cursorEnabled ?: true
-    }
+    override fun isVirtualCursorMode(): Boolean = viewParent?.cursorEnabled ?: true
 
     override fun setVirtualCursorMode(enabled: Boolean) {
         viewParent?.cursorEnabled = enabled
@@ -272,177 +278,195 @@ class WebViewWebEngine(
         webView?.setVirtualCursorMode(enabled)
     }
 
-    override fun getCursorDrawerDelegate(): CursorDrawerDelegate? {
-        return viewParent?.cursorDrawerDelegate
-    }
+    override fun getCursorDrawerDelegate(): CursorDrawerDelegate? = viewParent?.cursorDrawerDelegate
 
-    private val webViewCallback = object : WebViewEx.Callback {
-        override fun getActivity(): Activity? {
-            return callback?.getActivity()
-        }
+    private val webViewCallback =
+        object : WebViewEx.Callback {
+            override fun getActivity(): Activity? = callback?.getActivity()
 
-        override fun onOpenInNewTabRequested(url: String) {
-            callback?.onOpenInNewTabRequested(url, true)
-        }
-
-        override fun onDownloadRequested(url: String) {
-            callback?.onDownloadRequested(url)
-        }
-
-        override fun onThumbnailError() {
-            //nop for now
-        }
-
-        override fun onShowCustomView(view: View) {
-            callback?.onPrepareForFullscreen()
-            webView?.visibility = View.GONE
-            viewParent?.apply {
-                addView(view)
+            override fun onOpenInNewTabRequested(url: String) {
+                callback?.onOpenInNewTabRequested(url, true)
             }
-            fullScreenView = view
-        }
 
-        override fun onHideCustomView() {
-            if (fullScreenView != null) {
-                viewParent?.removeView(fullScreenView)
-                fullScreenView = null
+            override fun onDownloadRequested(url: String) {
+                callback?.onDownloadRequested(url)
             }
-            webView?.visibility = View.VISIBLE
-            callback?.onExitFullscreen()
-        }
 
-        override fun onProgressChanged(newProgress: Int) {
-            callback?.onProgressChanged(newProgress)
-        }
+            override fun onThumbnailError() {
+                // nop for now
+            }
 
-        override fun onReceivedTitle(title: String) {
-            callback?.onReceivedTitle(title)
-        }
+            override fun onShowCustomView(view: View) {
+                callback?.onPrepareForFullscreen()
+                webView?.visibility = View.GONE
+                viewParent?.apply {
+                    addView(view)
+                }
+                fullScreenView = view
+            }
 
-        override fun requestPermissions(array: Array<String>, geo: Boolean) {
-            val requestCode = callback?.requestPermissions(array) ?: return
-            permissionsRequests[requestCode] = geo
-        }
+            override fun onHideCustomView() {
+                if (fullScreenView != null) {
+                    viewParent?.removeView(fullScreenView)
+                    fullScreenView = null
+                }
+                webView?.visibility = View.VISIBLE
+                callback?.onExitFullscreen()
+            }
 
-        override fun onShowFileChooser(intent: Intent): Boolean {
-            return callback?.onShowFileChooser(intent) ?: false
-        }
+            override fun onProgressChanged(newProgress: Int) {
+                callback?.onProgressChanged(newProgress)
+            }
 
-        override fun onReceivedIcon(icon: Bitmap) {
-            callback?.onReceivedIcon(icon)
-        }
+            override fun onReceivedTitle(title: String) {
+                callback?.onReceivedTitle(title)
+            }
 
-        override fun shouldOverrideUrlLoading(url: String, isAutomaticRedirect: Boolean): Boolean {
-            return callback?.shouldOverrideUrlLoading(url, isAutomaticRedirect) ?: false
-        }
+            override fun requestPermissions(
+                array: Array<String>,
+                geo: Boolean,
+            ) {
+                val requestCode = callback?.requestPermissions(array) ?: return
+                permissionsRequests[requestCode] = geo
+            }
 
-        override fun onPageStarted(url: String?) {
-            callback?.onPageStarted(url)
-        }
+            override fun onShowFileChooser(intent: Intent): Boolean = callback?.onShowFileChooser(intent) ?: false
 
-        override fun onPageFinished(url: String?) {
-            callback?.onPageFinished(url)
-        }
+            override fun onReceivedIcon(icon: Bitmap) {
+                callback?.onReceivedIcon(icon)
+            }
 
-        override fun onPageCertificateError(url: String?) {
-            callback?.onPageCertificateError(url)
-        }
+            override fun shouldOverrideUrlLoading(
+                url: String,
+                isAutomaticRedirect: Boolean,
+            ): Boolean = callback?.shouldOverrideUrlLoading(url, isAutomaticRedirect) ?: false
 
-        override fun isAd(request: WebResourceRequest, baseUri: Uri): Boolean {
-            return callback?.isAd(request.url, request.requestHeaders["Accept"], baseUri) ?: false
-        }
+            override fun onPageStarted(url: String?) {
+                callback?.onPageStarted(url)
+            }
 
-        override fun isAdBlockingEnabled(): Boolean {
-            return callback?.isAdBlockingEnabled() ?: false
-        }
+            override fun onPageFinished(url: String?) {
+                callback?.onPageFinished(url)
+            }
 
-        override fun isDialogsBlockingEnabled(): Boolean {
-            return callback?.isDialogsBlockingEnabled() ?: false
-        }
+            override fun onPageCertificateError(url: String?) {
+                callback?.onPageCertificateError(url)
+            }
 
-        override fun onBlockedAd(url: Uri) {
-            callback?.onBlockedAd(url.toString())
-        }
+            override fun isAd(
+                request: WebResourceRequest,
+                baseUri: Uri,
+            ): Boolean = callback?.isAd(request.url, request.requestHeaders["Accept"], baseUri) ?: false
 
-        override fun onBlockedDialog(newTab: Boolean) {
-            callback?.onBlockedDialog(newTab)
-        }
+            override fun isAdBlockingEnabled(): Boolean = callback?.isAdBlockingEnabled() ?: false
 
-        override fun onCreateWindow(dialog: Boolean, userGesture: Boolean): WebViewEx? {
-            return callback?.onCreateWindow(dialog, userGesture) as? WebViewEx
-        }
+            override fun isDialogsBlockingEnabled(): Boolean = callback?.isDialogsBlockingEnabled() ?: false
 
-        override fun closeWindow(window: WebView) {
-            callback?.closeWindow(window)
-        }
+            override fun onBlockedAd(url: Uri) {
+                callback?.onBlockedAd(url.toString())
+            }
 
-        override fun onDownloadStart(url: String, userAgent: String, contentDisposition: String, mimetype: String?, contentLength: Long) {
-            callback?.onDownloadRequested(url, userAgent, contentDisposition, mimetype, contentLength)
-        }
+            override fun onBlockedDialog(newTab: Boolean) {
+                callback?.onBlockedDialog(newTab)
+            }
 
-        override fun onScaleChanged(oldScale: Float, newScale: Float) {
-            callback?.onScaleChanged(oldScale, newScale)
-        }
+            override fun onCreateWindow(
+                dialog: Boolean,
+                userGesture: Boolean,
+            ): WebViewEx? = callback?.onCreateWindow(dialog, userGesture) as? WebViewEx
 
-        override fun onCopyTextToClipboardRequested(url: String) {
-            callback?.onCopyTextToClipboardRequested(url)
-        }
+            override fun closeWindow(window: WebView) {
+                callback?.closeWindow(window)
+            }
 
-        override fun onShareUrlRequested(url: String) {
-            callback?.onShareUrlRequested(url)
-        }
+            override fun onDownloadStart(
+                url: String,
+                userAgent: String,
+                contentDisposition: String,
+                mimetype: String?,
+                contentLength: Long,
+            ) {
+                callback?.onDownloadRequested(url, userAgent, contentDisposition, mimetype, contentLength)
+            }
 
-        override fun onOpenInExternalAppRequested(url: String) {
-            callback?.onOpenInExternalAppRequested(url)
-        }
+            override fun onScaleChanged(
+                oldScale: Float,
+                newScale: Float,
+            ) {
+                callback?.onScaleChanged(oldScale, newScale)
+            }
 
-        override fun onVisited(url: String) {
-            callback?.onVisited(url)
-        }
+            override fun onCopyTextToClipboardRequested(url: String) {
+                callback?.onCopyTextToClipboardRequested(url)
+            }
 
-        override fun onContextMenu(baseUrl:String?, href: String?, x: Int, y: Int) {
-            callback?.onContextMenu(
-                viewParent!!.cursorDrawerDelegate,
-                baseUri = baseUrl,
-                linkUri = href,
-                srcUri = null,
-                title = null,
-                altText = null,
-                textContent = null,
-                x = x,
-                y = y
-            )
+            override fun onShareUrlRequested(url: String) {
+                callback?.onShareUrlRequested(url)
+            }
+
+            override fun onOpenInExternalAppRequested(url: String) {
+                callback?.onOpenInExternalAppRequested(url)
+            }
+
+            override fun onVisited(url: String) {
+                callback?.onVisited(url)
+            }
+
+            override fun onContextMenu(
+                baseUrl: String?,
+                href: String?,
+                x: Int,
+                y: Int,
+            ) {
+                callback?.onContextMenu(
+                    viewParent!!.cursorDrawerDelegate,
+                    baseUri = baseUrl,
+                    linkUri = href,
+                    srcUri = null,
+                    title = null,
+                    altText = null,
+                    textContent = null,
+                    x = x,
+                    y = y,
+                )
+            }
         }
-    }
 
     companion object {
         init {
-            WebEngineFactory.registerProvider(WebEngineProvider("WebView", object : WebEngineProviderCallback {
-                private var appContext: Context? = null
-                private var config: Config? = null
+            WebEngineFactory.registerProvider(
+                WebEngineProvider(
+                    "WebView",
+                    object : WebEngineProviderCallback {
+                        private var appContext: Context? = null
+                        private var config: Config? = null
 
-                override suspend fun initialize(context: Context, config: Config, webViewContainer: CursorLayout) {
-                    appContext = context.applicationContext ?: context
-                    this.config = config
-                }
+                        override suspend fun initialize(
+                            context: Context,
+                            config: Config,
+                            webViewContainer: CursorLayout,
+                        ) {
+                            appContext = context.applicationContext ?: context
+                            this.config = config
+                        }
 
-                override fun createWebEngine(tab: WebTabState): WebEngine {
-                    return WebViewWebEngine(tab, appContext!!, config!!)
-                }
+                        override fun createWebEngine(tab: WebTabState): WebEngine = WebViewWebEngine(tab, appContext!!, config!!)
 
-                override suspend fun clearCache(ctx: Context) {
-                    WebView(ctx).clearCache(true)
-                }
+                        override suspend fun clearCache(ctx: Context) {
+                            WebView(ctx).clearCache(true)
+                        }
 
-                override fun onThemeSettingUpdated(value: Config.Theme) {
-                    //nop
-                }
+                        override fun onThemeSettingUpdated(value: Config.Theme) {
+                            // nop
+                        }
 
-                override fun getWebEngineVersionString(): String {
-                    val webViewPackage = appContext?.let { WebViewCompat.getCurrentWebViewPackage(it) }
-                    return (webViewPackage?.packageName ?: "unknown") + ":" + (webViewPackage?.versionName ?: "unknown")
-                }
-            }))
+                        override fun getWebEngineVersionString(): String {
+                            val webViewPackage = appContext?.let { WebViewCompat.getCurrentWebViewPackage(it) }
+                            return (webViewPackage?.packageName ?: "unknown") + ":" + (webViewPackage?.versionName ?: "unknown")
+                        }
+                    },
+                ),
+            )
         }
     }
 }

@@ -33,36 +33,42 @@ class DownloadService : Service() {
     private var notificationBuilder: NotificationCompat.Builder? = null
     private lateinit var notificationManager: NotificationManager
 
-    internal var downloadTasksListener: DownloadTask.Callback = object : DownloadTask.Callback {
-        val MIN_NOTIFY_TIMEOUT = 100
-        private var lastNotifyTime = System.currentTimeMillis()
-        override fun onProgress(task: DownloadTask) {
-            val now = System.currentTimeMillis()
-            if (now - lastNotifyTime > MIN_NOTIFY_TIMEOUT) {
-                lastNotifyTime = now
+    internal var downloadTasksListener: DownloadTask.Callback =
+        object : DownloadTask.Callback {
+            val MIN_NOTIFY_TIMEOUT = 100
+            private var lastNotifyTime = System.currentTimeMillis()
+
+            override fun onProgress(task: DownloadTask) {
+                val now = System.currentTimeMillis()
+                if (now - lastNotifyTime > MIN_NOTIFY_TIMEOUT) {
+                    lastNotifyTime = now
+                    handler.post {
+                        model.notifyListenersAboutDownloadProgress(task)
+                        notificationManager.notify(DOWNLOAD_NOTIFICATION_ID, updateNotification())
+                    }
+                }
+            }
+
+            override fun onError(
+                task: DownloadTask,
+                responseCode: Int,
+                responseMessage: String,
+            ) {
+                runBlocking { Repositories.downloads.update(task.downloadInfo) }
+                handler.post {
+                    model.notifyListenersAboutError(task, responseCode, responseMessage)
+                    onTaskEnded(task)
+                }
+            }
+
+            override fun onDone(task: DownloadTask) {
+                runBlocking { Repositories.downloads.update(task.downloadInfo) }
                 handler.post {
                     model.notifyListenersAboutDownloadProgress(task)
-                    notificationManager.notify(DOWNLOAD_NOTIFICATION_ID, updateNotification())
+                    onTaskEnded(task)
                 }
             }
         }
-
-        override fun onError(task: DownloadTask, responseCode: Int, responseMessage: String) {
-            runBlocking { Repositories.downloads.update(task.downloadInfo) }
-            handler.post {
-                model.notifyListenersAboutError(task, responseCode, responseMessage)
-                onTaskEnded(task)
-            }
-        }
-
-        override fun onDone(task: DownloadTask) {
-            runBlocking { Repositories.downloads.update(task.downloadInfo) }
-            handler.post {
-                model.notifyListenersAboutDownloadProgress(task)
-                onTaskEnded(task)
-            }
-        }
-    }
 
     override fun onCreate() {
         super.onCreate()
@@ -75,9 +81,11 @@ class DownloadService : Service() {
         super.onDestroy()
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        return START_STICKY
-    }
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int,
+    ): Int = START_STICKY
 
     private fun updateNotification(): Notification {
         var title = ""
@@ -94,21 +102,25 @@ class DownloadService : Service() {
             }
         }
         title.trim(',')
-        val description = if (hasUnknownSizedFiles) {
-            Formatter.formatShortFileSize(this, downloaded)
-        } else {
-            Formatter.formatShortFileSize(this, downloaded) + " of " +
+        val description =
+            if (hasUnknownSizedFiles) {
+                Formatter.formatShortFileSize(this, downloaded)
+            } else {
+                Formatter.formatShortFileSize(this, downloaded) + " of " +
                     Formatter.formatShortFileSize(this, total)
-        }
+            }
         if (notificationBuilder == null) {
-            notificationBuilder = NotificationCompat.Builder(this, TVBro.CHANNEL_ID_DOWNLOADS)
+            notificationBuilder =
+                NotificationCompat
+                    .Builder(this, TVBro.CHANNEL_ID_DOWNLOADS)
                     .setOngoing(true)
                     .setOnlyAlertOnce(true)
                     .setSmallIcon(R.drawable.ic_launcher)
         }
-        notificationBuilder!!.setContentTitle(title)
-                .setContentText(description)
-                .setSmallIcon(R.drawable.ic_launcher)
+        notificationBuilder!!
+            .setContentTitle(title)
+            .setContentText(description)
+            .setSmallIcon(R.drawable.ic_launcher)
         if (hasUnknownSizedFiles || total == 0L) {
             notificationBuilder!!.setProgress(0, 0, true)
         } else {
@@ -117,9 +129,7 @@ class DownloadService : Service() {
         return notificationBuilder!!.build()
     }
 
-    override fun onBind(intent: Intent): IBinder {
-        return Binder(this)
-    }
+    override fun onBind(intent: Intent): IBinder = Binder(this)
 
     private fun onTaskEnded(task: DownloadTask) {
         when (task.downloadInfo.operationAfterDownload) {
@@ -128,6 +138,7 @@ class DownloadService : Service() {
                     InstallPermissionHelper.launchInstaller(this, task.downloadInfo.filepath)
                 }
             }
+
             Download.OperationAfterDownload.NOP -> {
             }
         }
@@ -150,7 +161,10 @@ class DownloadService : Service() {
             }
             var fileName = download.filename
             var i = 0
-            while (File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath + File.separator + fileName).exists()) {
+            while (File(
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath + File.separator + fileName,
+                ).exists()
+            ) {
                 i++
                 if (hasExt) {
                     fileName = prefix + "_(" + i + ")." + ext
@@ -167,7 +181,8 @@ class DownloadService : Service() {
             val downloadsDir =
                 Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
             if (!downloadsDir.exists() && !downloadsDir.mkdirs()) {
-                Toast.makeText(this, R.string.can_not_create_downloads, Toast.LENGTH_SHORT)
+                Toast
+                    .makeText(this, R.string.can_not_create_downloads, Toast.LENGTH_SHORT)
                     .show()
                 return
             }
@@ -176,13 +191,14 @@ class DownloadService : Service() {
 
         download.time = Date().time
         Log.d(TAG, "Start to downloading url: ${download.url}")
-        val downloadTask = if (download.base64BlobData != null) {
-            BlobDownloadTask(download, download.base64BlobData!!, downloadTasksListener, contentResolver)
-        } else if (download.stream != null) {
-            StreamDownloadTask(download, download.stream!!, downloadTasksListener, contentResolver)
-        } else {
-            FileDownloadTask(download, download.userAgentString, downloadTasksListener, contentResolver)
-        }
+        val downloadTask =
+            if (download.base64BlobData != null) {
+                BlobDownloadTask(download, download.base64BlobData!!, downloadTasksListener, contentResolver)
+            } else if (download.stream != null) {
+                StreamDownloadTask(download, download.stream!!, downloadTasksListener, contentResolver)
+            } else {
+                FileDownloadTask(download, download.userAgentString, downloadTasksListener, contentResolver)
+            }
         model.activeDownloads.add(downloadTask)
         executor.execute(downloadTask)
 
@@ -190,7 +206,9 @@ class DownloadService : Service() {
         startForeground(DOWNLOAD_NOTIFICATION_ID, updateNotification())
     }
 
-    class Binder(val service: DownloadService) : android.os.Binder()
+    class Binder(
+        val service: DownloadService,
+    ) : android.os.Binder()
 
     companion object {
         val TAG: String = DownloadService::class.java.simpleName

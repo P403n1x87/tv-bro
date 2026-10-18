@@ -12,7 +12,11 @@ import kotlin.reflect.KProperty
 
 interface Subscribable<O> {
     val observers: ArrayList<O>
-    fun subscribe(observer: O, notifyOnSubscribe: Boolean = true) {
+
+    fun subscribe(
+        observer: O,
+        notifyOnSubscribe: Boolean = true,
+    ) {
         if (!observers.contains(observer)) {
             observers.add(observer)
             if (notifyOnSubscribe) {
@@ -21,42 +25,64 @@ interface Subscribable<O> {
         }
     }
 
-    fun subscribe(lifecycleOwner: LifecycleOwner, observer: O) {
+    fun subscribe(
+        lifecycleOwner: LifecycleOwner,
+        observer: O,
+    ) {
         subscribe(lifecycleOwner.lifecycle, true, observer)
     }
 
-    fun subscribe(lifecycleOwner: LifecycleOwner, notifyOnSubscribe: Boolean = true, observer: O) {
+    fun subscribe(
+        lifecycleOwner: LifecycleOwner,
+        notifyOnSubscribe: Boolean = true,
+        observer: O,
+    ) {
         subscribe(lifecycleOwner.lifecycle, notifyOnSubscribe, observer)
     }
 
-    fun subscribe(lifecycle: Lifecycle, observer: O) {
+    fun subscribe(
+        lifecycle: Lifecycle,
+        observer: O,
+    ) {
         subscribe(lifecycle, true, observer)
     }
 
-    fun subscribe(lifecycle: Lifecycle, notifyOnSubscribe: Boolean = true, observer: O) {
+    fun subscribe(
+        lifecycle: Lifecycle,
+        notifyOnSubscribe: Boolean = true,
+        observer: O,
+    ) {
         /*if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
             subscribe(observer, notifyOnSubscribe)
         }*/
 
-        lifecycle.addObserver(object : LifecycleEventObserver {
-            override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {
-                when (source.lifecycle.currentState) {
-                    Lifecycle.State.INITIALIZED, Lifecycle.State.CREATED -> {
-                        unsubscribe(observer)
-                    }
-                    Lifecycle.State.RESUMED -> {
-                        subscribe(observer, notifyOnSubscribe)
-                    }
-                    Lifecycle.State.STARTED -> {
-                        unsubscribe(observer)
-                    }
-                    Lifecycle.State.DESTROYED -> {
-                        lifecycle.removeObserver(this)
-                        unsubscribe(observer)
+        lifecycle.addObserver(
+            object : LifecycleEventObserver {
+                override fun onStateChanged(
+                    source: LifecycleOwner,
+                    event: Lifecycle.Event,
+                ) {
+                    when (source.lifecycle.currentState) {
+                        Lifecycle.State.INITIALIZED, Lifecycle.State.CREATED -> {
+                            unsubscribe(observer)
+                        }
+
+                        Lifecycle.State.RESUMED -> {
+                            subscribe(observer, notifyOnSubscribe)
+                        }
+
+                        Lifecycle.State.STARTED -> {
+                            unsubscribe(observer)
+                        }
+
+                        Lifecycle.State.DESTROYED -> {
+                            lifecycle.removeObserver(this)
+                            unsubscribe(observer)
+                        }
                     }
                 }
-            }
-        })
+            },
+        )
     }
 
     fun unsubscribe(observer: O) {
@@ -74,7 +100,9 @@ interface Subscribable<O> {
 
 typealias ValueObserver<T> = (value: T) -> Unit
 
-open class ObservableValue<T>(default: T) : Subscribable<ValueObserver<T>> {
+open class ObservableValue<T>(
+    default: T,
+) : Subscribable<ValueObserver<T>> {
     open var value: T = default
         set(value) {
             field = value
@@ -84,7 +112,7 @@ open class ObservableValue<T>(default: T) : Subscribable<ValueObserver<T>> {
     override val observers = ArrayList<ValueObserver<T>>()
 
     override fun notifyObservers() {
-        //observers can be removed during iteration
+        // observers can be removed during iteration
         for (i in observers.size - 1 downTo 0) {
             observers[i](value)
         }
@@ -94,8 +122,18 @@ open class ObservableValue<T>(default: T) : Subscribable<ValueObserver<T>> {
         observer(value)
     }
 
-    operator fun getValue(thisRef: Any, prop: KProperty<*>): T = this.value
-    operator fun setValue(thisRef: Any, prop: KProperty<*>, value: T) {this.value = value}
+    operator fun getValue(
+        thisRef: Any,
+        prop: KProperty<*>,
+    ): T = this.value
+
+    operator fun setValue(
+        thisRef: Any,
+        prop: KProperty<*>,
+        value: T,
+    ) {
+        this.value = value
+    }
 }
 
 /*fun <T>makeObservable(property: KMutableProperty<T>): ObservableValue<T> {
@@ -112,9 +150,9 @@ open class ObservableValue<T>(default: T) : Subscribable<ValueObserver<T>> {
 
 typealias EventObserver = () -> Unit
 
-class EventSource: Subscribable<EventObserver> {
+class EventSource : Subscribable<EventObserver> {
     override val observers = ArrayList<EventObserver>()
-    
+
     var wasEmitted: Boolean = false
 
     fun emit() {
@@ -137,10 +175,10 @@ class EventSource: Subscribable<EventObserver> {
 
 typealias ParameterizedEventObserver<T> = (T) -> Unit
 
-class ParameterizedEventSource<T>: Subscribable<ParameterizedEventObserver<T>> {
+class ParameterizedEventSource<T> : Subscribable<ParameterizedEventObserver<T>> {
     override val observers = ArrayList<ParameterizedEventObserver<T>>()
     var lastEvent: T? = null
-    
+
     fun emit(event: T) {
         lastEvent = event
         notifyObservers()

@@ -8,16 +8,20 @@ import com.phlox.tvwebbrowser.model.Download
  * reading the filesystem stays with the caller.
  */
 object DownloadStoragePolicy {
-
     /** The bytes a download currently occupies: its final size when complete, else what arrived. */
     fun bytesOnDisk(download: Download): Long =
-        if (download.size > 0) minOf(download.size, download.bytesReceived)
-        else download.bytesReceived
+        if (download.size > 0) {
+            minOf(download.size, download.bytesReceived)
+        } else {
+            download.bytesReceived
+        }
 
     /** Total footprint of [downloads], for the "Using X of Y" summary. */
     fun usedBytes(downloads: List<Download>): Long = downloads.sumOf(::bytesOnDisk)
 
     /** True when a file of [neededBytes] still fits in [freeBytes]. */
-    fun canFit(freeBytes: Long, neededBytes: Long): Boolean =
-        freeBytes > 0 && neededBytes <= freeBytes
+    fun canFit(
+        freeBytes: Long,
+        neededBytes: Long,
+    ): Boolean = freeBytes > 0 && neededBytes <= freeBytes
 }

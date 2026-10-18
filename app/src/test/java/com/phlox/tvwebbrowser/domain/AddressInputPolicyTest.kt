@@ -10,14 +10,15 @@ import org.junit.Test
  * the policy and not about the SDK's web-url regex.
  */
 class AddressInputPolicyTest {
-
     private val searchUrl = "https://duckduckgo.com/?q=[query]"
 
     /** Stand-in for the platform web-url pattern: `host.tld` plus anything after it. */
     private val looksLikeWebUrl: (String) -> Boolean = { it.matches(Regex("[\\w-]+(\\.[\\w-]+)+.*")) }
 
-    private fun resolve(input: String, looksLike: (String) -> Boolean = looksLikeWebUrl) =
-        AddressInputPolicy.resolveUrl(input, searchUrl, looksLike)
+    private fun resolve(
+        input: String,
+        looksLike: (String) -> Boolean = looksLikeWebUrl,
+    ) = AddressInputPolicy.resolveUrl(input, searchUrl, looksLike)
 
     @Test
     fun schemelessHostGetsHttps() {
@@ -63,7 +64,10 @@ class AddressInputPolicyTest {
         var asked: String? = null
         assertEquals(
             "https://asked.example",
-            resolve("asked.example") { asked = it; true }
+            resolve("asked.example") {
+                asked = it
+                true
+            },
         )
         assertEquals("asked.example", asked)
     }

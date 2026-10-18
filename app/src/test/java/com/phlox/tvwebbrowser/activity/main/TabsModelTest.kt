@@ -21,9 +21,9 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
-import org.robolectric.annotation.Config as RobolectricConfig
 import java.time.Duration
 import java.util.concurrent.Executor
+import org.robolectric.annotation.Config as RobolectricConfig
 
 /**
  * Tests for [TabsModel]'s state intents, over an in-memory database so the model can be built with
@@ -36,7 +36,6 @@ import java.util.concurrent.Executor
 @RunWith(RobolectricTestRunner::class)
 @RobolectricConfig(sdk = [26], application = Application::class)
 class TabsModelTest {
-
     private lateinit var app: Application
     private lateinit var config: Config
     private lateinit var db: AppDatabase
@@ -49,20 +48,23 @@ class TabsModelTest {
     fun setUp() {
         app = RuntimeEnvironment.getApplication()
         config = Config(app.getSharedPreferences("tabs_test", Context.MODE_PRIVATE))
-        db = Room.inMemoryDatabaseBuilder(app, AppDatabase::class.java)
-            .allowMainThreadQueries()
-            .setQueryExecutor(directExecutor)
-            .setTransactionExecutor(directExecutor)
-            .build()
+        db =
+            Room
+                .inMemoryDatabaseBuilder(app, AppDatabase::class.java)
+                .allowMainThreadQueries()
+                .setQueryExecutor(directExecutor)
+                .setTransactionExecutor(directExecutor)
+                .build()
         tabsRepository = TabsRepository(db.tabsDao())
-        model = TabsModel(
-            tabsRepository,
-            HostsRepository(db.hostsDao()),
-            config,
-            filesDir = { app.filesDir },
-            cacheDir = { app.cacheDir },
-            networkAvailable = { true },
-        )
+        model =
+            TabsModel(
+                tabsRepository,
+                HostsRepository(db.hostsDao()),
+                config,
+                filesDir = { app.filesDir },
+                cacheDir = { app.cacheDir },
+                networkAvailable = { true },
+            )
     }
 
     @After
@@ -111,7 +113,7 @@ class TabsModelTest {
 
         assertEquals(
             listOf("https://first.example/", "https://second.example/"),
-            model.tabsStates.map { it.url }
+            model.tabsStates.map { it.url },
         )
         assertTrue(model.loaded)
     }

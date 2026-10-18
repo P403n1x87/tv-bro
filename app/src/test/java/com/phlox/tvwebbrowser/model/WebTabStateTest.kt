@@ -9,9 +9,9 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config as RobolectricConfig
 import java.io.File
 import java.io.FileOutputStream
+import org.robolectric.annotation.Config as RobolectricConfig
 
 /**
  * The tab state's file helpers take the directories they operate on; they must never fall back to a
@@ -21,7 +21,6 @@ import java.io.FileOutputStream
 @RunWith(RobolectricTestRunner::class)
 @RobolectricConfig(sdk = [26])
 class WebTabStateTest {
-
     @get:Rule
     val temp = TemporaryFolder()
 
@@ -34,11 +33,12 @@ class WebTabStateTest {
         stateFile.writeText("state")
         thumbnailFile.writeText("thumb")
 
-        val tab = WebTabState(
-            url = "https://example/",
-            thumbnailHash = "thumb1",
-            wvStateFileName = "state1",
-        )
+        val tab =
+            WebTabState(
+                url = "https://example/",
+                thumbnailHash = "thumb1",
+                wvStateFileName = "state1",
+            )
 
         tab.removeFiles(filesDir, cacheDir)
 
@@ -54,7 +54,8 @@ class WebTabStateTest {
         val thumbnailsDir = File(cacheDir, WebTabState.TAB_THUMBNAILS_DIR).apply { mkdirs() }
         // A decodable PNG, produced through the framework under Robolectric.
         FileOutputStream(File(thumbnailsDir, "thumb1.png")).use { out ->
-            Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+            Bitmap
+                .createBitmap(2, 2, Bitmap.Config.ARGB_8888)
                 .compress(Bitmap.CompressFormat.PNG, 100, out)
         }
 

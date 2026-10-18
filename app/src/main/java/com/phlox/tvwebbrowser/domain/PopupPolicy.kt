@@ -11,7 +11,6 @@ import com.phlox.tvwebbrowser.model.HostConfig
  * [HostConfig.DEFAULT_BLOCK_POPUPS_VALUE], matching the behaviour the callback had inline.
  */
 object PopupPolicy {
-
     /**
      * Whether a new window request must be blocked for the given per-host popup level.
      *
@@ -19,12 +18,15 @@ object PopupPolicy {
      * @param userGesture whether a user gesture (tap/key press) preceded the request.
      * @param popupBlockLevel the per-host level, or null to use the default level.
      */
-    fun shouldBlockNewWindow(dialog: Boolean, userGesture: Boolean, popupBlockLevel: Int?): Boolean {
-        return when (popupBlockLevel ?: HostConfig.DEFAULT_BLOCK_POPUPS_VALUE) {
+    fun shouldBlockNewWindow(
+        dialog: Boolean,
+        userGesture: Boolean,
+        popupBlockLevel: Int?,
+    ): Boolean =
+        when (popupBlockLevel ?: HostConfig.DEFAULT_BLOCK_POPUPS_VALUE) {
             HostConfig.POPUP_BLOCK_NONE -> false
             HostConfig.POPUP_BLOCK_DIALOGS -> dialog
             HostConfig.POPUP_BLOCK_NEW_AUTO_OPENED_TABS -> dialog || !userGesture
             else -> true
         }
-    }
 }

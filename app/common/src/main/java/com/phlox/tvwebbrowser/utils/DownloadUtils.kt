@@ -24,22 +24,23 @@ package com.phlox.tvwebbrowser.utils
 
 import android.net.Uri
 import android.webkit.MimeTypeMap
-
 import java.io.ByteArrayOutputStream
 import java.io.UnsupportedEncodingException
 import java.util.Locale
 import java.util.regex.Pattern
 
 object DownloadUtils {
-
     /**
      * Format as defined in RFC 2616 and RFC 5987 / RFC 6266.
      * Both attachment and inline disposition types are supported.
      */
-    private val CONTENT_DISPOSITION_PATTERN = Pattern.compile("(?:attachment|inline)\\s*;\\s*filename\\s*=\\s*" +
-            "(\"((?:\\\\.|[^\"\\\\])*)\"|[^;]*)\\s*" +
-            "(?:;\\s*filename\\*\\s*=\\s*(utf-8|iso-8859-1)'[^']*'(\\S*))?",
-            Pattern.CASE_INSENSITIVE)
+    private val CONTENT_DISPOSITION_PATTERN =
+        Pattern.compile(
+            "(?:attachment|inline)\\s*;\\s*filename\\s*=\\s*" +
+                "(\"((?:\\\\.|[^\"\\\\])*)\"|[^;]*)\\s*" +
+                "(?:;\\s*filename\\*\\s*=\\s*(utf-8|iso-8859-1)'[^']*'(\\S*))?",
+            Pattern.CASE_INSENSITIVE,
+        )
 
     /**
      * Definition as per RFC 5987, section 3.2.1. (value-chars)
@@ -52,9 +53,11 @@ object DownloadUtils {
      * This method is largely identical to [android.webkit.URLUtil.guessFileName]
      * which unfortunately does not implement RfC 5987.
      */
-    fun guessFileName(url: String,
-                      contentDisposition: String?,
-                      mimeType: String?): String {
+    fun guessFileName(
+        url: String,
+        contentDisposition: String?,
+        mimeType: String?,
+    ): String {
         var filename: String? = null
         var extension: String? = null
 
@@ -118,8 +121,8 @@ object DownloadUtils {
                 // Compare the last segment of the extension against the mime type.
                 // If there's a mismatch, discard the entire extension.
                 val lastDotIndex = filename.lastIndexOf('.')
-                val typeFromExt = MimeTypeMap.getSingleton().getMimeTypeFromExtension(
-                        filename.substring(lastDotIndex + 1))
+                val typeFromExt =
+                    MimeTypeMap.getSingleton().getMimeTypeFromExtension(filename.substring(lastDotIndex + 1))
                 if (typeFromExt != null && !typeFromExt.equals(mimeType, ignoreCase = true)) {
                     extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType)
                     if (extension != null) {
@@ -165,7 +168,10 @@ object DownloadUtils {
     }
 
     @Throws(UnsupportedEncodingException::class)
-    private fun decodeHeaderField(field: String, encoding: String): String {
+    private fun decodeHeaderField(
+        field: String,
+        encoding: String,
+    ): String {
         val m = ENCODED_SYMBOL_PATTERN.matcher(field)
         val stream = ByteArrayOutputStream()
 
@@ -181,5 +187,4 @@ object DownloadUtils {
 
         return stream.toString(encoding)
     }
-
 }

@@ -18,7 +18,11 @@ import java.util.Date
  * Created by PDT on 24.01.2017.
  */
 
-class DownloadListItemView(private val downloadsActivity: DownloadsActivity, private val viewType: Int) : FrameLayout(downloadsActivity), ActiveDownloadsModel.Listener {
+class DownloadListItemView(
+    private val downloadsActivity: DownloadsActivity,
+    private val viewType: Int,
+) : FrameLayout(downloadsActivity),
+    ActiveDownloadsModel.Listener {
     private var tvDate: TextView? = null
     private var tvTitle: TextView? = null
     private var tvSubtitle: TextView? = null
@@ -27,13 +31,17 @@ class DownloadListItemView(private val downloadsActivity: DownloadsActivity, pri
     private var cbSelection: CheckBox? = null
     var download: Download? = null
 
-    fun setDownload(download: Download, multiselectMode: Boolean) {
+    fun setDownload(
+        download: Download,
+        multiselectMode: Boolean,
+    ) {
         this.download = download
         when (viewType) {
             DownloadListAdapter.VIEW_TYPE_HEADER -> {
                 val df = SimpleDateFormat.getDateInstance()
                 tvDate!!.text = df.format(Date(download.time))
             }
+
             DownloadListAdapter.VIEW_TYPE_DOWNLOAD_ITEM -> {
                 tvTitle!!.text = download.filename
                 cbSelection!!.visibility = if (multiselectMode) View.VISIBLE else View.GONE
@@ -51,14 +59,18 @@ class DownloadListItemView(private val downloadsActivity: DownloadsActivity, pri
 
     init {
         LayoutInflater.from(downloadsActivity).inflate(
-                if (viewType == DownloadListAdapter.VIEW_TYPE_HEADER)
-                    R.layout.view_history_header_item
-                else
-                    R.layout.view_download_item, this)
+            if (viewType == DownloadListAdapter.VIEW_TYPE_HEADER) {
+                R.layout.view_history_header_item
+            } else {
+                R.layout.view_download_item
+            },
+            this,
+        )
         when (viewType) {
             DownloadListAdapter.VIEW_TYPE_HEADER -> {
                 tvDate = findViewById(R.id.tvDate)
             }
+
             DownloadListAdapter.VIEW_TYPE_DOWNLOAD_ITEM -> {
                 tvTitle = findViewById(R.id.tvTitle)
                 tvSubtitle = findViewById(R.id.tvSubtitle)
@@ -91,11 +103,11 @@ class DownloadListItemView(private val downloadsActivity: DownloadsActivity, pri
             progressBar2!!.visibility = View.GONE
         } else {
             sizeLabel = Formatter.formatShortFileSize(context, download.bytesReceived) + " / " +
-                    Formatter.formatShortFileSize(context, download.size)
+                Formatter.formatShortFileSize(context, download.size)
             progressBar!!.visibility = View.VISIBLE
             progressBar2!!.visibility = View.GONE
             if (download.bytesReceived > download.size) {
-                download.size = 0L//wrong value from server - ignore it for future updates
+                download.size = 0L // wrong value from server - ignore it for future updates
             } else {
                 progressBar!!.progress = (download.bytesReceived * 100 / download.size).toInt()
             }
@@ -120,7 +132,11 @@ class DownloadListItemView(private val downloadsActivity: DownloadsActivity, pri
         }
     }
 
-    override fun onDownloadError(downloadInfo: Download, responseCode: Int, responseMessage: String) {
+    override fun onDownloadError(
+        downloadInfo: Download,
+        responseCode: Int,
+        responseMessage: String,
+    ) {
         if (downloadInfo.id == this.download?.id) {
             updateUI(downloadInfo)
         }

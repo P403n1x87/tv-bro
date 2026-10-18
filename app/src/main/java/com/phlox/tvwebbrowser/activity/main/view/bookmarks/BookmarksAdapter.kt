@@ -7,19 +7,21 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
 import com.phlox.tvwebbrowser.Config
-import com.phlox.tvwebbrowser.domain.HomePagePolicy
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.databinding.ViewBookmarkItemBinding
+import com.phlox.tvwebbrowser.domain.HomePagePolicy
 import com.phlox.tvwebbrowser.model.FavoriteItem
 import com.phlox.tvwebbrowser.singleton.FaviconsPool
 import com.phlox.tvwebbrowser.utils.activity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-class BookmarksAdapter(private val listener: Listener) : RecyclerView.Adapter<BookmarksAdapter.BookmarkViewHolder>() {
-
+class BookmarksAdapter(
+    private val listener: Listener,
+) : RecyclerView.Adapter<BookmarksAdapter.BookmarkViewHolder>() {
     interface Listener {
         fun onBookmarkClick(item: FavoriteItem)
+
         fun onBookmarkLongClick(item: FavoriteItem)
     }
 
@@ -31,19 +33,29 @@ class BookmarksAdapter(private val listener: Listener) : RecyclerView.Adapter<Bo
         notifyDataSetChanged()
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): BookmarkViewHolder {
-        val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.view_bookmark_item, parent, false)
+    override fun onCreateViewHolder(
+        parent: ViewGroup,
+        viewType: Int,
+    ): BookmarkViewHolder {
+        val view =
+            LayoutInflater
+                .from(parent.context)
+                .inflate(R.layout.view_bookmark_item, parent, false)
         return BookmarkViewHolder(view)
     }
 
-    override fun onBindViewHolder(holder: BookmarkViewHolder, position: Int) {
+    override fun onBindViewHolder(
+        holder: BookmarkViewHolder,
+        position: Int,
+    ) {
         holder.bind(items[position])
     }
 
     override fun getItemCount(): Int = items.size
 
-    inner class BookmarkViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+    inner class BookmarkViewHolder(
+        itemView: View,
+    ) : RecyclerView.ViewHolder(itemView) {
         private val vb = ViewBookmarkItemBinding.bind(itemView)
 
         fun bind(item: FavoriteItem) {
@@ -56,7 +68,7 @@ class BookmarksAdapter(private val listener: Listener) : RecyclerView.Adapter<Bo
                 val scope = (itemView.activity as AppCompatActivity).lifecycleScope
                 scope.launch(Dispatchers.Main) {
                     val favicon = FaviconsPool.get(url)
-                    if (url != item.url) return@launch //url was changed while loading favicon
+                    if (url != item.url) return@launch // url was changed while loading favicon
                     if (!itemView.isAttachedToWindow) return@launch
                     favicon?.let {
                         vb.ivFavicon.setImageBitmap(it)

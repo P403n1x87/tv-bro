@@ -10,7 +10,6 @@ import org.junit.Test
  * Unit tests for [HomePagePolicy], the built-in-home-page check used across the views.
  */
 class HomePagePolicyTest {
-
     private val loopback = "http://127.0.0.1:12345/appcontent/home/"
 
     @Test
@@ -66,9 +65,18 @@ class HomePagePolicyTest {
     @Test
     fun homeAliasTargetIsBlankOrLoadsTheConfiguredOrBuiltInUrl() {
         assertEquals(HomePagePolicy.HomeAliasTarget.Blank, HomePagePolicy.homeAliasTarget(Config.HomePageMode.BLANK, "x"))
-        assertEquals(HomePagePolicy.HomeAliasTarget.Load(Config.HOME_PAGE_URL), HomePagePolicy.homeAliasTarget(Config.HomePageMode.HOME_PAGE, "x"))
+        assertEquals(
+            HomePagePolicy.HomeAliasTarget.Load(Config.HOME_PAGE_URL),
+            HomePagePolicy.homeAliasTarget(Config.HomePageMode.HOME_PAGE, "x"),
+        )
         val configured = "https://example.com/"
-        assertEquals(HomePagePolicy.HomeAliasTarget.Load(configured), HomePagePolicy.homeAliasTarget(Config.HomePageMode.CUSTOM, configured))
-        assertEquals(HomePagePolicy.HomeAliasTarget.Load(configured), HomePagePolicy.homeAliasTarget(Config.HomePageMode.SEARCH_ENGINE, configured))
+        assertEquals(
+            HomePagePolicy.HomeAliasTarget.Load(configured),
+            HomePagePolicy.homeAliasTarget(Config.HomePageMode.CUSTOM, configured),
+        )
+        assertEquals(
+            HomePagePolicy.HomeAliasTarget.Load(configured),
+            HomePagePolicy.homeAliasTarget(Config.HomePageMode.SEARCH_ENGINE, configured),
+        )
     }
 }

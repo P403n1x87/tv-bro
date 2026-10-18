@@ -5,10 +5,8 @@ import android.view.LayoutInflater
 import android.widget.CheckBox
 import android.widget.FrameLayout
 import android.widget.TextView
-
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.model.HistoryItem
-
 import java.text.SimpleDateFormat
 import java.util.Date
 
@@ -16,7 +14,10 @@ import java.util.Date
  * Created by fedex on 29.12.16.
  */
 
-class HistoryItemView(context: Context, private val viewType: Int) : FrameLayout(context) {
+class HistoryItemView(
+    context: Context,
+    private val viewType: Int,
+) : FrameLayout(context) {
     private var tvDate: TextView? = null
     private var tvTitle: TextView? = null
     private var tvURL: TextView? = null
@@ -26,12 +27,18 @@ class HistoryItemView(context: Context, private val viewType: Int) : FrameLayout
 
     init {
         LayoutInflater.from(context).inflate(
-                if (viewType == HistoryAdapter.VIEW_TYPE_HEADER)
-                    R.layout.view_history_header_item
-                else
-                    R.layout.view_history_item, this)
+            if (viewType == HistoryAdapter.VIEW_TYPE_HEADER) {
+                R.layout.view_history_header_item
+            } else {
+                R.layout.view_history_item
+            },
+            this,
+        )
         when (viewType) {
-            HistoryAdapter.VIEW_TYPE_HEADER -> tvDate = findViewById(R.id.tvDate)
+            HistoryAdapter.VIEW_TYPE_HEADER -> {
+                tvDate = findViewById(R.id.tvDate)
+            }
+
             HistoryAdapter.VIEW_TYPE_HISTORY_ITEM -> {
                 tvTitle = findViewById(R.id.tvTitle)
                 tvURL = findViewById(R.id.tvURL)
@@ -41,13 +48,17 @@ class HistoryItemView(context: Context, private val viewType: Int) : FrameLayout
         }
     }
 
-    fun setHistoryItem(historyItem: HistoryItem, multiselectMode: Boolean) {
+    fun setHistoryItem(
+        historyItem: HistoryItem,
+        multiselectMode: Boolean,
+    ) {
         this.historyItem = historyItem
         when (viewType) {
             HistoryAdapter.VIEW_TYPE_HEADER -> {
                 val df = SimpleDateFormat.getDateInstance()
                 tvDate!!.text = df.format(Date(historyItem.time))
             }
+
             HistoryAdapter.VIEW_TYPE_HISTORY_ITEM -> {
                 tvTitle!!.text = historyItem.title
                 tvURL!!.text = historyItem.url

@@ -25,25 +25,29 @@ object FaviconsPool {
 
     interface DatabaseDelegate {
         suspend fun findByHostName(host: String): HostConfig? = null
+
         suspend fun update(hostConfig: HostConfig) {}
+
         suspend fun insert(newHostConfig: HostConfig) {}
     }
 
-    private val cache: LruCache<String, Bitmap> = object : LruCache<String, Bitmap>(10 * 1024 * 1024) {
-        override fun sizeOf(key: String, value: Bitmap): Int {
-            return value.byteCount
+    private val cache: LruCache<String, Bitmap> =
+        object : LruCache<String, Bitmap>(10 * 1024 * 1024) {
+            override fun sizeOf(
+                key: String,
+                value: Bitmap,
+            ): Int = value.byteCount
         }
-    }
 
     suspend fun get(urlOrHost: String): Bitmap? {
         Log.d(TAG, "get: $urlOrHost")
         if (!urlOrHost.startsWith("http://", true) && !urlOrHost.startsWith("https://", true)) {
-            //host passed?
+            // host passed?
             if (urlOrHost.contains("://")) {
-                //not http or https
+                // not http or https
                 return null
             }
-            //try https first
+            // try https first
             val httpsResult = get("https://$urlOrHost")
             if (httpsResult != null) {
                 return httpsResult
@@ -63,17 +67,18 @@ object FaviconsPool {
                     val faviconFileName = hostConfig.favicon
                     if (faviconFileName != null) {
                         Log.d(TAG, "get: favicon found in db for $host")
-                        val bitmap = withContext(Dispatchers.IO) {
-                            val favIconsDir =
-                                File(favIconsDir())
-                            if (!favIconsDir.exists() && !favIconsDir.mkdir()) return@withContext null
-                            val faviconFile = File(favIconsDir, faviconFileName)
-                            if (faviconFile.exists()) {
-                                BitmapFactory.decodeFile(faviconFile.absolutePath)
-                            } else {
-                                null
+                        val bitmap =
+                            withContext(Dispatchers.IO) {
+                                val favIconsDir =
+                                    File(favIconsDir())
+                                if (!favIconsDir.exists() && !favIconsDir.mkdir()) return@withContext null
+                                val faviconFile = File(favIconsDir, faviconFileName)
+                                if (faviconFile.exists()) {
+                                    BitmapFactory.decodeFile(faviconFile.absolutePath)
+                                } else {
+                                    null
+                                }
                             }
-                        }
                         if (bitmap != null) {
                             Log.d(TAG, "get: favicon loaded from file for $host")
                             cache.put(host, bitmap)
@@ -84,21 +89,23 @@ object FaviconsPool {
                     Log.d(TAG, "get: favicon not found in db for $host")
                 }
 
-                val favicons = try {
-                    withContext(Dispatchers.IO) { faviconExtractor.extractFavIconsFromURL(urlObj) }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                    ArrayList()
-                }
+                val favicons =
+                    try {
+                        withContext(Dispatchers.IO) { faviconExtractor.extractFavIconsFromURL(urlObj) }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        ArrayList()
+                    }
                 Log.d(TAG, "get: favicons found: ${favicons.size}")
                 while (favicons.isNotEmpty()) {
                     val icon = chooseNearestSizeIcon(favicons, FAVICON_PREFERRED_SIDE_SIZE, FAVICON_PREFERRED_SIDE_SIZE)!!
-                    val bitmap = try {
-                        downloadIcon(icon)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        null
-                    }
+                    val bitmap =
+                        try {
+                            downloadIcon(icon)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                            null
+                        }
                     if (bitmap != null) {
                         Log.d(TAG, "get: favicon downloaded for $host")
                         cache.put(host, bitmap)
@@ -109,21 +116,25 @@ object FaviconsPool {
                     }
                     favicons.remove(icon)
                 }
-                //try to get favicon from webview
+                // try to get favicon from webview
                 withContext(Dispatchers.Main) {
                     WebView(AppContext.get()).apply {
-                        webChromeClient = object : WebChromeClient() {
-                            override fun onReceivedIcon(view: WebView?, icon: Bitmap?) {
-                                super.onReceivedIcon(view, icon)
-                                if (icon != null) {
-                                    Log.d(TAG, "get: favicon received from webview for $host")
-                                    cache.put(host, icon)
-                                    runBlocking {
-                                        saveFavicon(host, icon, hostConfig)
+                        webChromeClient =
+                            object : WebChromeClient() {
+                                override fun onReceivedIcon(
+                                    view: WebView?,
+                                    icon: Bitmap?,
+                                ) {
+                                    super.onReceivedIcon(view, icon)
+                                    if (icon != null) {
+                                        Log.d(TAG, "get: favicon received from webview for $host")
+                                        cache.put(host, icon)
+                                        runBlocking {
+                                            saveFavicon(host, icon, hostConfig)
+                                        }
                                     }
                                 }
                             }
-                        }
                         loadUrl(urlOrHost)
                     }
                 }
@@ -138,11 +149,13 @@ object FaviconsPool {
         cache.evictAll()
     }
 
-    fun favIconsDir(): String {
-        return AppContext.get().cacheDir.absolutePath + File.separator + FAVICONS_DIR
-    }
+    fun favIconsDir(): String = AppContext.get().cacheDir.absolutePath + File.separator + FAVICONS_DIR
 
-    private suspend fun saveFavicon(host: String, bitmap: Bitmap, hostConfig: HostConfig?) = withContext(Dispatchers.IO) {
+    private suspend fun saveFavicon(
+        host: String,
+        bitmap: Bitmap,
+        hostConfig: HostConfig?,
+    ) = withContext(Dispatchers.IO) {
         val favIconsDir = File(favIconsDir())
         if (!favIconsDir.exists() && !favIconsDir.mkdir()) return@withContext
         val faviconFileName = host.hashCode().toString() + ".png"
@@ -164,27 +177,32 @@ object FaviconsPool {
         }
     }
 
-    private suspend fun downloadIcon(iconInfo: FaviconExtractor.IconInfo): Bitmap? = withContext(Dispatchers.IO) {
-        val url = URL(iconInfo.src)
-        val connection = url.openConnection()
-        connection.connect()
-        val input = connection.getInputStream()
-        val options = BitmapFactory.Options()
-        options.inJustDecodeBounds = true
-        BitmapFactory.decodeStream(input, null, options)
-        input.close()
-        val width = options.outWidth
-        val height = options.outHeight
-        val scale = Math.max(width / 512, height / 512)
-        options.inJustDecodeBounds = false
-        options.inSampleSize = scale
-        val input2 = url.openConnection().getInputStream()
-        val bitmap = BitmapFactory.decodeStream(input2, null, options)
-        input2.close()
-        return@withContext bitmap
-    }
+    private suspend fun downloadIcon(iconInfo: FaviconExtractor.IconInfo): Bitmap? =
+        withContext(Dispatchers.IO) {
+            val url = URL(iconInfo.src)
+            val connection = url.openConnection()
+            connection.connect()
+            val input = connection.getInputStream()
+            val options = BitmapFactory.Options()
+            options.inJustDecodeBounds = true
+            BitmapFactory.decodeStream(input, null, options)
+            input.close()
+            val width = options.outWidth
+            val height = options.outHeight
+            val scale = Math.max(width / 512, height / 512)
+            options.inJustDecodeBounds = false
+            options.inSampleSize = scale
+            val input2 = url.openConnection().getInputStream()
+            val bitmap = BitmapFactory.decodeStream(input2, null, options)
+            input2.close()
+            return@withContext bitmap
+        }
 
-    private fun chooseNearestSizeIcon(icons: List<FaviconExtractor.IconInfo>, w: Int, h: Int): FaviconExtractor.IconInfo? {
+    private fun chooseNearestSizeIcon(
+        icons: List<FaviconExtractor.IconInfo>,
+        w: Int,
+        h: Int,
+    ): FaviconExtractor.IconInfo? {
         var nearestIcon: FaviconExtractor.IconInfo? = null
         var nearestDiff = Int.MAX_VALUE
         for (icon in icons) {

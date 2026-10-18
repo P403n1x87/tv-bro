@@ -9,7 +9,6 @@ import org.junit.Test
  * Unit tests for [WebEnginePolicy], the engine-identity check used by the views.
  */
 class WebEnginePolicyTest {
-
     @Test
     fun theGeckoConstantMapsToGecko() {
         assertTrue(WebEnginePolicy.isGecko(Config.ENGINE_GECKO_VIEW))

@@ -9,7 +9,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.regex.Pattern
 
-
 class FaviconExtractor {
     companion object {
         const val DEFAULT_ICON_SRC = "/favicon.ico"
@@ -24,15 +23,16 @@ class FaviconExtractor {
     private val tagsPattern: Pattern = Pattern.compile("<(?!!)(?!/)\\s*([a-zA-Z\\d]+)((?s:.)*?)>")
     private val attributePattern: Pattern = Pattern.compile("(\\S+)=\\s*['\"]?([^>\"'\\s]+)['\"]?")
 
-    class IconInfo (
+    class IconInfo(
         var src: String,
         var type: String? = null,
         var rel: String? = null,
         sizes: String? = null,
-        baseURL: URL? = null
+        baseURL: URL? = null,
     ) {
         var width: Int = 0
         var height: Int = 0
+
         init {
             if (sizes != null) {
                 try {
@@ -40,7 +40,7 @@ class FaviconExtractor {
                     width = Integer.parseUnsignedInt(sizesArr[0])
                     height = Integer.parseUnsignedInt(sizesArr[1])
                 } catch (e: Exception) {
-                    //it is ok, just leave default values of w and h
+                    // it is ok, just leave default values of w and h
                 }
             }
             if (baseURL != null) {
@@ -54,8 +54,8 @@ class FaviconExtractor {
             }
         }
 
-        private fun guessIconType(iconExtension: String): String? {
-            return if (iconExtension.equals("png", true)) {
+        private fun guessIconType(iconExtension: String): String? =
+            if (iconExtension.equals("png", true)) {
                 "image/png"
             } else if (iconExtension.equals("jpg", true)) {
                 "image/jpeg"
@@ -65,8 +65,9 @@ class FaviconExtractor {
                 "image/gif"
             } else if (iconExtension.equals("svg", true)) {
                 "image/svg+xml"
-            } else null
-        }
+            } else {
+                null
+            }
     }
 
     /**
@@ -77,55 +78,66 @@ class FaviconExtractor {
      * @throws java.io.IOException
      */
     fun extractFavIconsFromURL(url: URL): ArrayList<IconInfo> {
-        val connection = url.openConnection().apply {
-            connectTimeout = NETWORK_TIMEOUT_MS
-            readTimeout = NETWORK_TIMEOUT_MS
-        }
-        val (result, manifestHref) = try {
-            val type = connection.contentType?.substringBefore(';')?.trim()?.lowercase()
-            // Direct media URLs are also passed here. Never download a movie looking for HTML icons.
-            if (type != null && type !in setOf("text/html", "application/xhtml+xml")) {
-                return arrayListOf(IconInfo(DEFAULT_ICON_SRC, DEFAULT_ICON_TYPE, null, DEFAULT_ICON_SIZE_STRING, url))
+        val connection =
+            url.openConnection().apply {
+                connectTimeout = NETWORK_TIMEOUT_MS
+                readTimeout = NETWORK_TIMEOUT_MS
             }
-            connection.inputStream.bufferedReader().use { extractFavIconsFromHTML(url, it) }
-        } finally {
-            (connection as? HttpURLConnection)?.disconnect()
-        }
+        val (result, manifestHref) =
+            try {
+                val type =
+                    connection.contentType
+                        ?.substringBefore(';')
+                        ?.trim()
+                        ?.lowercase()
+                // Direct media URLs are also passed here. Never download a movie looking for HTML icons.
+                if (type != null && type !in setOf("text/html", "application/xhtml+xml")) {
+                    return arrayListOf(IconInfo(DEFAULT_ICON_SRC, DEFAULT_ICON_TYPE, null, DEFAULT_ICON_SIZE_STRING, url))
+                }
+                connection.inputStream.bufferedReader().use { extractFavIconsFromHTML(url, it) }
+            } finally {
+                (connection as? HttpURLConnection)?.disconnect()
+            }
         if (manifestHref != null) {
             val manifestURL = URL(url, manifestHref)
             try {
-                val manifestConnection = manifestURL.openConnection().apply {
-                    connectTimeout = NETWORK_TIMEOUT_MS
-                    readTimeout = NETWORK_TIMEOUT_MS
-                }
-                val manifestIcons = try {
-                    manifestConnection.inputStream.bufferedReader().use {
-                        extractFavIconsFromWebManifest(manifestURL, StringReader(readMetadata(it, false)))
+                val manifestConnection =
+                    manifestURL.openConnection().apply {
+                        connectTimeout = NETWORK_TIMEOUT_MS
+                        readTimeout = NETWORK_TIMEOUT_MS
                     }
-                } finally {
-                    (manifestConnection as? HttpURLConnection)?.disconnect()
-                }
+                val manifestIcons =
+                    try {
+                        manifestConnection.inputStream.bufferedReader().use {
+                            extractFavIconsFromWebManifest(manifestURL, StringReader(readMetadata(it, false)))
+                        }
+                    } finally {
+                        (manifestConnection as? HttpURLConnection)?.disconnect()
+                    }
                 result.addAll(manifestIcons)
             } catch (e: Exception) {
-                //shit happens, but I don't think it's too important here
+                // shit happens, but I don't think it's too important here
                 e.printStackTrace()
             }
         }
         if (result.isEmpty()) {
             result.add(
                 IconInfo(
-                "/favicon.ico",
-                DEFAULT_ICON_TYPE,
-                null,
-                DEFAULT_ICON_SIZE_STRING,
-                url
-            )
+                    "/favicon.ico",
+                    DEFAULT_ICON_TYPE,
+                    null,
+                    DEFAULT_ICON_SIZE_STRING,
+                    url,
+                ),
             )
         }
         return result
     }
 
-    fun extractFavIconsFromWebManifest(manifestURL: URL?, manifest: Reader): ArrayList<IconInfo> {
+    fun extractFavIconsFromWebManifest(
+        manifestURL: URL?,
+        manifest: Reader,
+    ): ArrayList<IconInfo> {
         val iconInfos = ArrayList<IconInfo>()
         val jsonReader = JsonReader(manifest)
         jsonReader.isLenient = true
@@ -145,13 +157,18 @@ class FaviconExtractor {
                                 "src" -> {
                                     src = jsonReader.nextString()
                                 }
+
                                 "sizes" -> {
                                     sizes = jsonReader.nextString()
                                 }
+
                                 "type" -> {
                                     type = jsonReader.nextString()
                                 }
-                                else -> jsonReader.skipValue()
+
+                                else -> {
+                                    jsonReader.skipValue()
+                                }
                             }
                         }
                         jsonReader.endObject()
@@ -175,25 +192,29 @@ class FaviconExtractor {
      *
      * @throws java.io.IOException
      */
-    fun extractFavIconsFromHTML(baseURL: URL?, html: BufferedReader): Pair<ArrayList<IconInfo>, String?> {
+    fun extractFavIconsFromHTML(
+        baseURL: URL?,
+        html: BufferedReader,
+    ): Pair<ArrayList<IconInfo>, String?> {
         val iconInfos = ArrayList<IconInfo>()
         var manifestHref: String? = null
 
-        val headerPartOfHTML = try {
-            readMetadata(html, true)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return Pair(iconInfos, null)
-        }
+        val headerPartOfHTML =
+            try {
+                readMetadata(html, true)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                return Pair(iconInfos, null)
+            }
 
         val matcher = tagsPattern.matcher(headerPartOfHTML)
         while (matcher.find()) {
             val tagName = matcher.group(1) ?: continue
-            //println("tag name: $tagName")
+            // println("tag name: $tagName")
             when (tagName) {
                 "link" -> {
                     val attributes = matcher.group(2) ?: continue
-                    //println("     rest of the tag: $attributes")
+                    // println("     rest of the tag: $attributes")
                     val attributeMatcher = attributePattern.matcher(attributes)
                     var rel: String? = null
                     var href: String? = null
@@ -202,7 +223,7 @@ class FaviconExtractor {
                     while (attributeMatcher.find()) {
                         val attributeName = attributeMatcher.group(1) ?: continue
                         val attributeValue = attributeMatcher.group(2) ?: continue
-                        //println("         attribute name: $attributeName    value: $attributeValue")
+                        // println("         attribute name: $attributeName    value: $attributeValue")
                         when (attributeName) {
                             "rel" -> rel = attributeValue
                             "href" -> href = attributeValue
@@ -217,7 +238,8 @@ class FaviconExtractor {
                         rel.equals("apple-touch-icon", true) ||
                         rel.equals("shortcut icon", true) ||
                         rel.equals("shortcut", true) ||
-                        rel.equals("fluid-icon", true)) {
+                        rel.equals("fluid-icon", true)
+                    ) {
                         if (sizes == null && rel.equals("apple-touch-icon", true)) {
                             sizes = "180x180"
                         }
@@ -226,17 +248,20 @@ class FaviconExtractor {
                         manifestHref = href
                     }
                 }
+
                 "body" -> {
                     break
                 }
             }
         }
 
-
         return Pair(iconInfos, manifestHref)
     }
 
-    private fun readMetadata(reader: Reader, stopAtBody: Boolean): String {
+    private fun readMetadata(
+        reader: Reader,
+        stopAtBody: Boolean,
+    ): String {
         val result = StringBuilder()
         val buffer = CharArray(4096)
         while (result.length < MAX_METADATA_CHARS) {

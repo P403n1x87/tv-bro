@@ -24,13 +24,20 @@ class FakeDownloadHost : DownloadHost {
 
     override fun hasPermission(permission: String): Boolean = permission in granted
 
-    override fun requestPermission(permission: String, requestCode: Int) {
+    override fun requestPermission(
+        permission: String,
+        requestCode: Int,
+    ) {
         requested += permission to requestCode
     }
 
     override fun downloadFreeSpaceBytes(): Long = freeSpace
 
-    override fun onDownloadNoSpace(fileName: String, neededBytes: Long, freeBytes: Long) {
+    override fun onDownloadNoSpace(
+        fileName: String,
+        neededBytes: Long,
+        freeBytes: Long,
+    ) {
         noSpaceWarnings += Triple(fileName, neededBytes, freeBytes)
     }
 }

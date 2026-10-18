@@ -3,8 +3,8 @@ package com.phlox.tvwebbrowser.activity.history
 import com.phlox.tvwebbrowser.model.HistoryItem
 import com.phlox.tvwebbrowser.repository.HistoryRepository
 import com.phlox.tvwebbrowser.repository.Repositories
-import com.phlox.tvwebbrowser.utils.observable.ObservableValue
 import com.phlox.tvwebbrowser.utils.activemodel.ActiveModel
+import com.phlox.tvwebbrowser.utils.observable.ObservableValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -17,25 +17,27 @@ import kotlinx.coroutines.launch
  */
 class HistoryModel(
     private val history: HistoryRepository = Repositories.history,
-): ActiveModel() {
+) : ActiveModel() {
     val lastLoadedItems = ObservableValue<List<HistoryItem>>(ArrayList())
     private var loading = false
     var searchQuery = ""
 
     /** Loads the window at [offset] — or, with a [searchQuery] set, the matches for it. */
-    fun loadItems(offset: Long = 0) = modelScope.launch(Dispatchers.Main) {
-        if (loading) {
-            return@launch
-        }
-        loading = true
+    fun loadItems(offset: Long = 0) =
+        modelScope.launch(Dispatchers.Main) {
+            if (loading) {
+                return@launch
+            }
+            loading = true
 
-        lastLoadedItems.value = if ("" == searchQuery) {
-            history.page(offset)
-        } else {
-            history.search(searchQuery)
+            lastLoadedItems.value =
+                if ("" == searchQuery) {
+                    history.page(offset)
+                } else {
+                    history.search(searchQuery)
+                }
+            loading = false
         }
-        loading = false
-    }
 
     /** Removes a single stored visit. The view asks the model rather than touching Room. */
     suspend fun delete(item: HistoryItem) = history.delete(item)

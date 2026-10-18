@@ -4,12 +4,23 @@ import java.net.URI
 
 /** Bounded text inspection, not XML execution and not a rewrite of the site's response. */
 object ManifestInspector {
-    data class Info(val children: Set<String>, val protectedContent: Boolean, val metadata: MediaMetadata = MediaMetadata())
-    fun inspect(url: String, text: String, kind: MediaRequestCatalog.Kind): Info {
+    data class Info(
+        val children: Set<String>,
+        val protectedContent: Boolean,
+        val metadata: MediaMetadata = MediaMetadata(),
+    )
+
+    fun inspect(
+        url: String,
+        text: String,
+        kind: MediaRequestCatalog.Kind,
+    ): Info {
         if (kind == MediaRequestCatalog.Kind.DASH) {
-            return Info(emptySet(),
+            return Info(
+                emptySet(),
                 Regex("<(?:[\\w-]+:)?ContentProtection\\b", RegexOption.IGNORE_CASE).containsMatchIn(text),
-                dashMetadata(text))
+                dashMetadata(text),
+            )
         }
         if (kind != MediaRequestCatalog.Kind.HLS || !text.trimStart().startsWith("#EXTM3U")) return Info(emptySet(), false)
         val children = mutableSetOf<String>()
@@ -45,7 +56,8 @@ object ManifestInspector {
             if (line.startsWith("#EXT-X-MEDIA:") || line.startsWith("#EXT-X-I-FRAME-STREAM-INF:")) {
                 val attributes = attributes(line.substringAfter(':'))
                 if (line.startsWith("#EXT-X-MEDIA:") &&
-                    (attributes["TYPE"].equals("AUDIO", true) || attributes["TYPE"].equals("SUBTITLES", true))) {
+                    (attributes["TYPE"].equals("AUDIO", true) || attributes["TYPE"].equals("SUBTITLES", true))
+                ) {
                     attributes["LANGUAGE"]?.takeIf { it.isNotBlank() }?.let(languages::add)
                 }
                 Regex("(?:^|,)URI=\"([^\"]+)\"").find(line.substringAfter(':'))?.groupValues?.get(1)?.let { child ->
@@ -86,15 +98,26 @@ object ManifestInspector {
                 if (current == null || it > current) height = it
             }
         }
-        val languages = Regex("\\blang=\"([^\"]+)\"").findAll(text).map { it.groupValues[1] }.distinct().toList()
-        val durationMs = Regex("mediaPresentationDuration=\"([^\"]+)\"").find(text)?.groupValues?.get(1)?.let(::parseIsoDurationMs)
+        val languages =
+            Regex("\\blang=\"([^\"]+)\"")
+                .findAll(text)
+                .map { it.groupValues[1] }
+                .distinct()
+                .toList()
+        val durationMs =
+            Regex("mediaPresentationDuration=\"([^\"]+)\"")
+                .find(text)
+                ?.groupValues
+                ?.get(1)
+                ?.let(::parseIsoDurationMs)
         val bandwidth = Regex("\\bbandwidth=\"(\\d+)\"").findAll(text).mapNotNull { it.groupValues[1].toLongOrNull() }.maxOrNull()
         return MediaMetadata(width, height, languages, durationMs, bandwidth)
     }
 
     private fun parseIsoDurationMs(value: String): Long? {
-        val match = Regex("^P(?:(\\d+)D)?(?:T(?:(\\d+)H)?(?:(\\d+)M)?(?:(\\d+(?:\\.\\d+)?)S)?)?$").find(value.trim())
-            ?: return null
+        val match =
+            Regex("^P(?:(\\d+)D)?(?:T(?:(\\d+)H)?(?:(\\d+)M)?(?:(\\d+(?:\\.\\d+)?)S)?)?$").find(value.trim())
+                ?: return null
         val days = match.groupValues[1].toLongOrNull() ?: 0
         val hours = match.groupValues[2].toLongOrNull() ?: 0
         val minutes = match.groupValues[3].toLongOrNull() ?: 0

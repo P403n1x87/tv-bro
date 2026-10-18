@@ -45,41 +45,42 @@ class SessionStartup(
         private val TAG = SessionStartup::class.java.simpleName
     }
 
-    fun load(intent: Intent) = activity.lifecycleScope.launch(Dispatchers.Main) {
-        Log.d(TAG, "load")
-        WebEngineFactory.initialize(activity, config, vb.flWebViewContainer)
+    fun load(intent: Intent) =
+        activity.lifecycleScope.launch(Dispatchers.Main) {
+            Log.d(TAG, "load")
+            WebEngineFactory.initialize(activity, config, vb.flWebViewContainer)
 
-        vb.progressBarGeneric.visibility = View.VISIBLE
-        vb.progressBarGeneric.requestFocus()
-        viewModel.loadState().join()
-        if (settingsModel.restoreTabsOnStartup) {
-            tabsModel.loadState().join()
-        } else {
-            tabsModel.discardSavedState().join()
+            vb.progressBarGeneric.visibility = View.VISIBLE
+            vb.progressBarGeneric.requestFocus()
+            viewModel.loadState().join()
+            if (settingsModel.restoreTabsOnStartup) {
+                tabsModel.loadState().join()
+            } else {
+                tabsModel.discardSavedState().join()
+            }
+
+            if (!isActive) {
+                return@launch
+            }
+
+            vb.progressBarGeneric.visibility = View.GONE
+
+            // `tabsStates` is retained across activity re-creation (theme toggle), in which case the
+            // observer does not fire again, so the counter is set here too.
+            vb.vActionBar.setTabsCounter(tabsModel.tabsStates.size)
+
+            if (intent.data == null) {
+                restoreSavedTabOrOpenHome()
+            } else {
+                handleIntent(intent)
+            }
+
+            val currentTab = tabsModel.currentTab.value
+            if (currentTab == null || currentTab.url == settingsModel.homePage) {
+                toolbarController.showMenuOverlay()
+            }
+            onLoaded()
         }
-
-        if (!isActive) {
-            return@launch
-        }
-
-        vb.progressBarGeneric.visibility = View.GONE
-
-        // `tabsStates` is retained across activity re-creation (theme toggle), in which case the
-        // observer does not fire again, so the counter is set here too.
-        vb.vActionBar.setTabsCounter(tabsModel.tabsStates.size)
-
-        if (intent.data == null) {
-            restoreSavedTabOrOpenHome()
-        } else {
-            handleIntent(intent)
-        }
-
-        val currentTab = tabsModel.currentTab.value
-        if (currentTab == null || currentTab.url == settingsModel.homePage) {
-            toolbarController.showMenuOverlay()
-        }
-        onLoaded()
-    }
 
     /**
      * The launch without a deep link: switch to the tab that was selected when the app went away,
@@ -98,7 +99,7 @@ class SessionStartup(
                 return
             }
         }
-        //this may happen in some error states
+        // this may happen in some error states
         changeTab(tabsModel.tabsStates[0])
     }
 }

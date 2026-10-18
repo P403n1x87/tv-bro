@@ -12,54 +12,106 @@ interface WebEngine {
     var userAgentString: String?
 
     fun getWebEngineName(): String
-    fun saveState(): Any?//Bundle or any Object convertible to string
+
+    fun saveState(): Any? // Bundle or any Object convertible to string
+
     fun restoreState(savedInstanceState: Any)
+
     fun stateFromBytes(bytes: ByteArray): Any?
+
     fun loadUrl(url: String)
+
     fun canGoForward(): Boolean
+
     fun goForward()
+
     fun canZoomIn(): Boolean
+
     fun zoomIn()
+
     fun canZoomOut(): Boolean
+
     fun zoomOut()
+
     fun zoomBy(zoomBy: Float)
+
     fun evaluateJavascript(script: String)
+
     fun setNetworkAvailable(connected: Boolean)
+
     fun getView(): View?
+
     @Throws(Exception::class)
     fun getOrCreateView(activityContext: Context): View
+
     fun canGoBack(): Boolean
+
     fun goBack()
+
     fun reload()
-    fun onFilePicked(resultCode: Int, data: Intent?)
+
+    fun onFilePicked(
+        resultCode: Int,
+        data: Intent?,
+    )
+
     fun onResume()
+
     fun onPause()
+
     fun onUpdateAdblockSetting(newState: Boolean)
+
     fun hideFullscreenView()
+
     fun togglePlayback()
+
     suspend fun renderThumbnail(bitmap: Bitmap?): Bitmap?
+
     /**
      * At this point of time web view should be already created but not attached to window
      */
-    fun onAttachToWindow(callback: WebEngineWindowProviderCallback, parent: ViewGroup)
-    fun onDetachFromWindow(completely: Boolean, destroyTab: Boolean)
+    fun onAttachToWindow(
+        callback: WebEngineWindowProviderCallback,
+        parent: ViewGroup,
+    )
+
+    fun onDetachFromWindow(
+        completely: Boolean,
+        destroyTab: Boolean,
+    )
+
     fun trimMemory()
-    fun onPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray): Boolean
+
+    fun onPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray,
+    ): Boolean
+
     fun isSameSession(internalRepresentation: Any): Boolean
+
     fun stopPlayback()
+
     fun rewind()
+
     fun fastForward()
+
     /** Streams observed on the current page, most likely real one first. */
     fun mediaCandidates(): List<MediaCandidate>
+
     /** Plays an observed stream in the built-in native player, bypassing page controls. */
     fun playMediaCandidate(candidate: MediaCandidate)
+
     /**
      * Best-effort, background-only warm-up of the metadata cache for the current page's
      * streams. Called when the stream list opens so rows can fill in resolution/language
      * after the list is already visible. Must not block; engines may ignore it.
      */
     fun prefetchMediaMetadata() {}
+
     fun setVirtualCursorMode(enabled: Boolean)
+
     fun isVirtualCursorMode(): Boolean
+
     fun getCursorDrawerDelegate(): CursorDrawerDelegate?
 }

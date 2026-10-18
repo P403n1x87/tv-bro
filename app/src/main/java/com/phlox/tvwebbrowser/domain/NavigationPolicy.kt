@@ -10,7 +10,6 @@ package com.phlox.tvwebbrowser.domain
  * resolution, logging, user prompts) and asks this object what to do.
  */
 object NavigationPolicy {
-
     /**
      * Non-http schemes the engine loads itself: handing them to an external app would be
      * meaningless, since `javascript:`/`data:`/`about:`/`blob:` are document-local URLs.
@@ -27,7 +26,10 @@ object NavigationPolicy {
      * @param isNetworkUrl whether the url is a plain network url (`URLUtil.isNetworkUrl`), i.e.
      *   an http(s) address the engine knows how to fetch.
      */
-    fun shouldLoadInEngine(scheme: String?, isNetworkUrl: Boolean): Boolean {
+    fun shouldLoadInEngine(
+        scheme: String?,
+        isNetworkUrl: Boolean,
+    ): Boolean {
         if (scheme.isNullOrEmpty()) return false
         return isNetworkUrl || scheme.lowercase() in ENGINE_ONLY_SCHEMES
     }
@@ -48,7 +50,7 @@ object NavigationPolicy {
         lastLoadingUrl: String?,
         blockAutomaticRedirects: Boolean,
         adBlockEnabled: Boolean,
-        hostOf: (String) -> String?
+        hostOf: (String) -> String?,
     ): Boolean {
         if (!blockAutomaticRedirects || !adBlockEnabled) return false
         val current = currentUrl?.takeIf { it.isNotBlank() } ?: lastLoadingUrl ?: return false

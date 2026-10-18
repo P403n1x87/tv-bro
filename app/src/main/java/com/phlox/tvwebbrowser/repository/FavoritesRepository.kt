@@ -12,13 +12,13 @@ import com.phlox.tvwebbrowser.model.dao.FavoritesDao
  *
  * Every method is `suspend` because the DAO is; callers run them from a coroutine scope.
  */
-class FavoritesRepository(private val dao: FavoritesDao) {
-
+class FavoritesRepository(
+    private val dao: FavoritesDao,
+) {
     /** All top-level bookmarks (the set the bookmarks panel and home page render). */
     suspend fun allBookmarks(): List<FavoriteItem> = dao.getAllBookmarks()
 
-    suspend fun all(homePageBookmarks: Boolean = false): List<FavoriteItem> =
-        dao.getAll(homePageBookmarks)
+    suspend fun all(homePageBookmarks: Boolean = false): List<FavoriteItem> = dao.getAll(homePageBookmarks)
 
     suspend fun homePageBookmarks(): List<FavoriteItem> = dao.getHomePageBookmarks()
 

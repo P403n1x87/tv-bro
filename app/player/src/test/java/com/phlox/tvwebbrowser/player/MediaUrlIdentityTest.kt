@@ -46,7 +46,8 @@ class MediaUrlIdentityTest {
     @Test fun keepsDistinctNamedManifestsApart() {
         assertNotEquals(
             MediaUrlIdentity.key("https://cdn.example/live/a.m3u8?_=1"),
-            MediaUrlIdentity.key("https://cdn.example/live/b.m3u8?_=1"))
+            MediaUrlIdentity.key("https://cdn.example/live/b.m3u8?_=1"),
+        )
     }
 
     @Test fun queryWithoutResourceParamKeptVerbatim() {

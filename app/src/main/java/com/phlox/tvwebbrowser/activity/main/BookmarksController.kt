@@ -3,11 +3,11 @@ package com.phlox.tvwebbrowser.activity.main
 import android.app.Activity
 import android.app.AlertDialog
 import com.phlox.tvwebbrowser.Config
-import com.phlox.tvwebbrowser.domain.HomePagePolicy
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.activity.main.dialogs.favorites.FavoriteEditorDialog
 import com.phlox.tvwebbrowser.activity.main.view.bookmarks.BookmarksPanelView
 import com.phlox.tvwebbrowser.databinding.ActivityMainBinding
+import com.phlox.tvwebbrowser.domain.HomePagePolicy
 import com.phlox.tvwebbrowser.model.FavoriteItem
 import com.phlox.tvwebbrowser.model.WebTabState
 import kotlinx.coroutines.CoroutineScope
@@ -36,39 +36,40 @@ class BookmarksController(
 ) {
     val isPanelVisible: Boolean get() = panelController.isBookmarksPanelVisible
 
-    val listener = object : BookmarksPanelView.Listener {
-        override fun onToggleThisPageBookmark() {
-            toggleCurrentPage()
-        }
+    val listener =
+        object : BookmarksPanelView.Listener {
+            override fun onToggleThisPageBookmark() {
+                toggleCurrentPage()
+            }
 
-        override fun onBookmarkSelected(item: FavoriteItem) {
-            item.url?.let(navigate)
-            hide()
-        }
+            override fun onBookmarkSelected(item: FavoriteItem) {
+                item.url?.let(navigate)
+                hide()
+            }
 
-        override fun onEditBookmark(item: FavoriteItem) {
-            FavoriteEditorDialog(
-                activity,
-                initialTitle = item.title,
-                initialUrl = item.url,
-                newBookmark = item.id == 0L,
-            ) { title, url ->
+            override fun onEditBookmark(item: FavoriteItem) {
+                FavoriteEditorDialog(
+                    activity,
+                    initialTitle = item.title,
+                    initialUrl = item.url,
+                    newBookmark = item.id == 0L,
+                ) { title, url ->
+                    scope.launch(Dispatchers.Main) {
+                        viewModel.onHomePageLinkEdited(item, title, url).join()
+                        load()
+                        updateState()
+                    }
+                }.show()
+            }
+
+            override fun onDeleteBookmark(item: FavoriteItem) {
                 scope.launch(Dispatchers.Main) {
-                    viewModel.onHomePageLinkEdited(item, title, url).join()
+                    viewModel.deleteBookmark(item.id).join()
                     load()
                     updateState()
                 }
-            }.show()
-        }
-
-        override fun onDeleteBookmark(item: FavoriteItem) {
-            scope.launch(Dispatchers.Main) {
-                viewModel.deleteBookmark(item.id).join()
-                load()
-                updateState()
             }
         }
-    }
 
     /** The view model's bookmarks changed: render them into the panel. */
     fun renderBookmarks(bookmarks: List<FavoriteItem>) {
@@ -114,11 +115,15 @@ class BookmarksController(
     fun editBookmarkById(favoriteId: Long) {
         scope.launch {
             val favoriteItem = viewModel.getBookmarkById(favoriteId) ?: return@launch
-            AlertDialog.Builder(activity)
+            AlertDialog
+                .Builder(activity)
                 .setTitle(R.string.bookmarks)
                 .setItems(arrayOf(activity.getString(R.string.edit), activity.getString(R.string.delete))) { _, which ->
                     when (which) {
-                        0 -> editFavorite(favoriteItem)
+                        0 -> {
+                            editFavorite(favoriteItem)
+                        }
+
                         1 -> {
                             val bookmark = viewModel.homePageLinks.firstOrNull { it.favoriteId == favoriteId }
                             if (bookmark != null) {
@@ -128,8 +133,7 @@ class BookmarksController(
                             }
                         }
                     }
-                }
-                .show()
+                }.show()
         }
     }
 

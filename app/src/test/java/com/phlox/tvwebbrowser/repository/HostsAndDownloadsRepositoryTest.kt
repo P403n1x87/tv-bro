@@ -23,7 +23,6 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [26], application = Application::class)
 class HostsAndDownloadsRepositoryTest {
-
     private lateinit var db: AppDatabase
     private lateinit var hosts: HostsRepository
     private lateinit var downloads: DownloadsRepository
@@ -46,7 +45,11 @@ class HostsAndDownloadsRepositoryTest {
             it.getInt(0)
         }
 
-    private fun download(filename: String, time: Long, bytes: Long = 0) = Download().apply {
+    private fun download(
+        filename: String,
+        time: Long,
+        bytes: Long = 0,
+    ) = Download().apply {
         this.filename = filename
         this.filepath = "/downloads/$filename"
         this.url = "https://example.com/$filename"
@@ -56,57 +59,61 @@ class HostsAndDownloadsRepositoryTest {
     }
 
     @Test
-    fun unknownHostHasNoConfig() = runBlocking {
-        assertNull(hosts.findByHostName("example.com"))
-    }
+    fun unknownHostHasNoConfig() =
+        runBlocking {
+            assertNull(hosts.findByHostName("example.com"))
+        }
 
     @Test
-    fun upsertKeepsASingleRowPerHost() = runBlocking {
-        hosts.upsert(HostConfig("example.com"))
-        hosts.upsert(HostConfig("other.example").apply { popupBlockLevel = HostConfig.POPUP_BLOCK_NONE })
-        hosts.upsert(HostConfig("example.com").apply { popupBlockLevel = HostConfig.POPUP_BLOCK_DIALOGS })
+    fun upsertKeepsASingleRowPerHost() =
+        runBlocking {
+            hosts.upsert(HostConfig("example.com"))
+            hosts.upsert(HostConfig("other.example").apply { popupBlockLevel = HostConfig.POPUP_BLOCK_NONE })
+            hosts.upsert(HostConfig("example.com").apply { popupBlockLevel = HostConfig.POPUP_BLOCK_DIALOGS })
 
-        assertEquals(2, hostRowCount())
-        assertEquals(
-            HostConfig.POPUP_BLOCK_DIALOGS,
-            hosts.findByHostName("example.com")?.popupBlockLevel
-        )
-    }
-
-    @Test
-    fun hostConfigCanBeUpdated() = runBlocking {
-        val id = hosts.upsert(HostConfig("example.com"))
-        val config = hosts.findByHostName("example.com")!!
-
-        config.popupBlockLevel = HostConfig.POPUP_BLOCK_NEW_TABS_EVEN_BY_USER_GESTURE
-        hosts.update(config)
-
-        assertEquals(
-            HostConfig.POPUP_BLOCK_NEW_TABS_EVEN_BY_USER_GESTURE,
-            hosts.findByHostName("example.com")?.popupBlockLevel
-        )
-        assertEquals(id, hosts.findByHostName("example.com")?.id)
-    }
+            assertEquals(2, hostRowCount())
+            assertEquals(
+                HostConfig.POPUP_BLOCK_DIALOGS,
+                hosts.findByHostName("example.com")?.popupBlockLevel,
+            )
+        }
 
     @Test
-    fun downloadLogIsNewestFirstAndPaged() = runBlocking {
-        val id = downloads.add(download("one.apk", 1000))
-        downloads.add(download("two.apk", 2000))
-        downloads.add(download("three.apk", 3000))
-        assertEquals(3, downloads.all().size)
+    fun hostConfigCanBeUpdated() =
+        runBlocking {
+            val id = hosts.upsert(HostConfig("example.com"))
+            val config = hosts.findByHostName("example.com")!!
 
-        assertEquals(
-            listOf("three.apk", "two.apk", "one.apk"),
-            downloads.page(0).map { it.filename }
-        )
-        assertEquals(listOf("two.apk", "one.apk"), downloads.page(1).map { it.filename })
+            config.popupBlockLevel = HostConfig.POPUP_BLOCK_NEW_TABS_EVEN_BY_USER_GESTURE
+            hosts.update(config)
 
-        val first = downloads.all().first { it.id == id }
-        first.bytesReceived = 100
-        downloads.update(first)
-        assertEquals(100, downloads.all().first { it.id == id }.bytesReceived)
+            assertEquals(
+                HostConfig.POPUP_BLOCK_NEW_TABS_EVEN_BY_USER_GESTURE,
+                hosts.findByHostName("example.com")?.popupBlockLevel,
+            )
+            assertEquals(id, hosts.findByHostName("example.com")?.id)
+        }
 
-        downloads.delete(first)
-        assertEquals(2, downloads.all().size)
-    }
+    @Test
+    fun downloadLogIsNewestFirstAndPaged() =
+        runBlocking {
+            val id = downloads.add(download("one.apk", 1000))
+            downloads.add(download("two.apk", 2000))
+            downloads.add(download("three.apk", 3000))
+            assertEquals(3, downloads.all().size)
+
+            assertEquals(
+                listOf("three.apk", "two.apk", "one.apk"),
+                downloads.page(0).map { it.filename },
+            )
+            assertEquals(listOf("two.apk", "one.apk"), downloads.page(1).map { it.filename })
+
+            val first = downloads.all().first { it.id == id }
+            first.bytesReceived = 100
+            downloads.update(first)
+            assertEquals(100, downloads.all().first { it.id == id }.bytesReceived)
+
+            downloads.delete(first)
+            assertEquals(2, downloads.all().size)
+        }
 }

@@ -10,7 +10,6 @@ import org.junit.Test
  * Unit tests for [SiteDomains], the registrable-domain logic behind the automatic-redirect blocker.
  */
 class SiteDomainsTest {
-
     @Test
     fun blankHostIsNull() {
         assertNull(SiteDomains.siteDomain(null))
