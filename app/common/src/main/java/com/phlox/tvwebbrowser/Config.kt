@@ -15,9 +15,10 @@ import com.phlox.tvwebbrowser.utils.observable.ObservableValue
  */
 class Config(
     val prefs: SharedPreferences,
-    private val installedByApk: () -> Boolean = { Utils.isInstalledByAPK(AppContext.get()) }
+    private val installedByApk: () -> Boolean = { Utils.isInstalledByAPK(AppContext.get()) },
 ) {
     val cursorConfig: CursorConfig = CursorConfig(prefs)
+
     companion object {
         const val SEARCH_ENGINE_URL_PREF_KEY = "search_engine_url"
         const val SEARCH_ENGINE_AS_HOME_PAGE_KEY = "search_engine_as_home_page"
@@ -43,7 +44,8 @@ class Config(
         const val BLOCK_AUTOMATIC_REDIRECTS_KEY = "block_automatic_redirects"
         const val KEEP_TOOLBAR_OPEN_KEY = "keep_toolbar_open"
         const val RESTORE_TABS_ON_STARTUP_KEY = "restore_tabs_on_startup"
-        //const val HOME_PAGE_VERSION_EXTRACTED = "home_page_version_extracted"
+
+        // const val HOME_PAGE_VERSION_EXTRACTED = "home_page_version_extracted"
         const val INITIAL_BOOKMARKS_SUGGESTIONS_LOADED = "initial_bookmarks_suggestions_loaded"
         const val ADBLOCK_ENABLED_PREF_KEY = "adblock_enabled"
         const val ADBLOCK_LAST_UPDATE_LIST_KEY = "adblock_last_update"
@@ -61,7 +63,7 @@ class Config(
         const val DEFAULT_ADBLOCK_LIST_URL = "https://easylist.to/easylist/easylist.txt"
 
         const val HOME_PAGE_URL = "https://tvbro.phlox.dev/appcontent/home/"
-        //const val HOME_PAGE_URL = "http://10.0.2.2:5000/appcontent/home/"
+        // const val HOME_PAGE_URL = "http://10.0.2.2:5000/appcontent/home/"
 
         /**
          * Set by the loopback asset server (see LocalAssetServer) when it is running. When null
@@ -74,30 +76,38 @@ class Config(
         fun currentHomePageUrl(): String = localHomePageUrl ?: HOME_PAGE_URL
 
         fun canRecommendGeckoView(): Boolean {
-            //disable recommendation for now
-            //There are plans to keep its support, but user reports and internal testing show
+            // disable recommendation for now
+            // There are plans to keep its support, but user reports and internal testing show
             // that, at least for now, in terms of performance and stability, it is inferior to WebView.
             return false
         }
     }
 
     enum class Theme {
-        SYSTEM, WHITE, BLACK;
+        SYSTEM,
+        WHITE,
+        BLACK,
     }
 
     enum class HomePageMode {
-        HOME_PAGE, SEARCH_ENGINE, CUSTOM, BLANK;
+        HOME_PAGE,
+        SEARCH_ENGINE,
+        CUSTOM,
+        BLANK,
+        ;
 
         companion object {
             /** Stored ordinal → mode; an unknown value falls back to [HOME_PAGE]. */
-            fun fromStored(ordinal: Int): HomePageMode =
-                entries.getOrElse(ordinal) { HOME_PAGE }
+            fun fromStored(ordinal: Int): HomePageMode = entries.getOrElse(ordinal) { HOME_PAGE }
         }
     }
 
     /** Player a detected stream is handed to. Default is the built-in ExoPlayer. */
     enum class PlayerKind {
-        BUILT_IN, SYSTEM, EXTERNAL;
+        BUILT_IN,
+        SYSTEM,
+        EXTERNAL,
+        ;
 
         companion object {
             /** Stored ordinal → kind; an unknown value falls back to [BUILT_IN]. */
@@ -107,6 +117,7 @@ class Config(
 
     var incognitoMode: Boolean
         get() = prefs.getBoolean(INCOGNITO_MODE_KEY, false)
+
         @SuppressLint("ApplySharedPref")
         set(value) {
             prefs.edit().putBoolean(INCOGNITO_MODE_KEY, value).commit()
@@ -130,25 +141,29 @@ class Config(
             prefs.edit().putBoolean(KEEP_SCREEN_ON_KEY, value).apply()
         }
 
-    var theme = object : ObservableValue<Theme>(Theme.SYSTEM) {
-        override var value: Theme = Theme.entries[prefs.getInt(THEME_KEY, 0)]
-            set(value) {
-                prefs.edit().putInt(THEME_KEY, value.ordinal).apply()
-                field = value
-                notifyObservers()
-            }
-    }
+    var theme =
+        object : ObservableValue<Theme>(Theme.SYSTEM) {
+            override var value: Theme = Theme.entries[prefs.getInt(THEME_KEY, 0)]
+                set(value) {
+                    prefs.edit().putInt(THEME_KEY, value.ordinal).apply()
+                    field = value
+                    notifyObservers()
+                }
+        }
 
     var homePageMode: HomePageMode
-        get() = prefs.getInt(HOME_PAGE_MODE, 0)
-            .let {
-                //ignore value if search engine as home page is set
-                if (prefs.getBoolean(SEARCH_ENGINE_AS_HOME_PAGE_KEY, false)) {
-                    prefs.edit().remove(SEARCH_ENGINE_AS_HOME_PAGE_KEY).apply()
-                    HomePageMode.SEARCH_ENGINE.ordinal
-                } else it
-            }
-            .let { HomePageMode.fromStored(it) }
+        get() =
+            prefs
+                .getInt(HOME_PAGE_MODE, 0)
+                .let {
+                    // ignore value if search engine as home page is set
+                    if (prefs.getBoolean(SEARCH_ENGINE_AS_HOME_PAGE_KEY, false)) {
+                        prefs.edit().remove(SEARCH_ENGINE_AS_HOME_PAGE_KEY).apply()
+                        HomePageMode.SEARCH_ENGINE.ordinal
+                    } else {
+                        it
+                    }
+                }.let { HomePageMode.fromStored(it) }
         set(value) {
             prefs.edit().putInt(HOME_PAGE_MODE, value.ordinal).apply()
         }
@@ -164,9 +179,16 @@ class Config(
     var webEngine: String
         get() {
             if (!prefs.contains(WEB_ENGINE)) {
-                prefs.edit().putString(
-                    WEB_ENGINE, if (canRecommendGeckoView())
-                    SupportedWebEngines[0] else SupportedWebEngines[1]).apply()
+                prefs
+                    .edit()
+                    .putString(
+                        WEB_ENGINE,
+                        if (canRecommendGeckoView()) {
+                            SupportedWebEngines[0]
+                        } else {
+                            SupportedWebEngines[1]
+                        },
+                    ).apply()
             }
 
             return prefs.getString(WEB_ENGINE, SupportedWebEngines[0])!!
@@ -195,19 +217,27 @@ class Config(
 
     var playerKind: PlayerKind
         get() = PlayerKind.fromStored(prefs.getInt(PLAYER_KIND_KEY, 0))
-        set(value) { prefs.edit().putInt(PLAYER_KIND_KEY, value.ordinal).apply() }
+        set(value) {
+            prefs.edit().putInt(PLAYER_KIND_KEY, value.ordinal).apply()
+        }
 
     var blockAutomaticRedirects: Boolean
         get() = prefs.getBoolean(BLOCK_AUTOMATIC_REDIRECTS_KEY, true)
-        set(value) { prefs.edit().putBoolean(BLOCK_AUTOMATIC_REDIRECTS_KEY, value).apply() }
+        set(value) {
+            prefs.edit().putBoolean(BLOCK_AUTOMATIC_REDIRECTS_KEY, value).apply()
+        }
 
     var keepToolbarOpen: Boolean
         get() = prefs.getBoolean(KEEP_TOOLBAR_OPEN_KEY, true)
-        set(value) { prefs.edit().putBoolean(KEEP_TOOLBAR_OPEN_KEY, value).apply() }
+        set(value) {
+            prefs.edit().putBoolean(KEEP_TOOLBAR_OPEN_KEY, value).apply()
+        }
 
     var restoreTabsOnStartup: Boolean
         get() = prefs.getBoolean(RESTORE_TABS_ON_STARTUP_KEY, false)
-        set(value) { prefs.edit().putBoolean(RESTORE_TABS_ON_STARTUP_KEY, value).apply() }
+        set(value) {
+            prefs.edit().putBoolean(RESTORE_TABS_ON_STARTUP_KEY, value).apply()
+        }
 
     /*var homePageVersionExtracted: Int
         get() = prefs.getInt(HOME_PAGE_VERSION_EXTRACTED, 0)
@@ -243,7 +273,7 @@ class Config(
             prefs.edit().putInt(APP_WEB_EXTENSION_VERSION_KEY, value).apply()
         }
 
-    //0 - not shown, any other value - app version code where notification already shown (to show only once after update)
+    // 0 - not shown, any other value - app version code where notification already shown (to show only once after update)
     var notificationAboutEngineChangeShown: Int
         get() = prefs.getInt(NOTIFICATION_ABOUT_ENGINE_CHANGE_SHOWN_KEY, 0)
         set(value) {
@@ -267,12 +297,19 @@ class Config(
      * difference matters: a fresh install must count as "just now shown" so the offer waits.
      */
     var lastUpdateUserNotificationTime: Long?
-        get() = if (prefs.contains(LAST_UPDATE_USER_NOTIFICATION_TIME_KEY))
-            prefs.getLong(LAST_UPDATE_USER_NOTIFICATION_TIME_KEY, 0) else null
+        get() =
+            if (prefs.contains(LAST_UPDATE_USER_NOTIFICATION_TIME_KEY)) {
+                prefs.getLong(LAST_UPDATE_USER_NOTIFICATION_TIME_KEY, 0)
+            } else {
+                null
+            }
         set(value) {
             val editor = prefs.edit()
-            if (value == null) editor.remove(LAST_UPDATE_USER_NOTIFICATION_TIME_KEY)
-            else editor.putLong(LAST_UPDATE_USER_NOTIFICATION_TIME_KEY, value)
+            if (value == null) {
+                editor.remove(LAST_UPDATE_USER_NOTIFICATION_TIME_KEY)
+            } else {
+                editor.putLong(LAST_UPDATE_USER_NOTIFICATION_TIME_KEY, value)
+            }
             editor.apply()
         }
 
@@ -282,7 +319,10 @@ class Config(
             prefs.edit().putInt(APP_VERSION_CODE_MARK_KEY, value).apply()
         }
 
-    inner class ObservableStringPreference(default: String, private val prefsKey: String) : ObservableValue<String>(default) {
+    inner class ObservableStringPreference(
+        default: String,
+        private val prefsKey: String,
+    ) : ObservableValue<String>(default) {
         override var value: String = prefs.getString(prefsKey, default)!!
             set(value) {
                 prefs.edit().putString(prefsKey, value).apply()
@@ -291,11 +331,17 @@ class Config(
             }
     }
 
-    inner class ObservableOptStringPreference(default: String?, private val prefsKey: String) : ObservableValue<String?>(default) {
+    inner class ObservableOptStringPreference(
+        default: String?,
+        private val prefsKey: String,
+    ) : ObservableValue<String?>(default) {
         override var value: String? = prefs.getString(prefsKey, default)
             set(value) {
-                if (value == null) prefs.edit().remove(prefsKey).apply()
-                else prefs.edit().putString(prefsKey, value).apply()
+                if (value == null) {
+                    prefs.edit().remove(prefsKey).apply()
+                } else {
+                    prefs.edit().putString(prefsKey, value).apply()
+                }
                 field = value
                 notifyObservers()
             }

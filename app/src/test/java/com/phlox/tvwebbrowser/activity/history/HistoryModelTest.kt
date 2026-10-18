@@ -19,9 +19,9 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
-import org.robolectric.annotation.Config as RobolectricConfig
 import java.time.Duration
 import java.util.concurrent.Executor
+import org.robolectric.annotation.Config as RobolectricConfig
 
 /**
  * Tests for [HistoryModel]'s loading window and its deletes, over an in-memory database so the
@@ -31,7 +31,6 @@ import java.util.concurrent.Executor
 @RunWith(RobolectricTestRunner::class)
 @RobolectricConfig(sdk = [26], application = Application::class)
 class HistoryModelTest {
-
     private lateinit var db: AppDatabase
     private lateinit var history: HistoryRepository
     private lateinit var model: HistoryModel
@@ -42,11 +41,13 @@ class HistoryModelTest {
     fun setUp() {
         val app = RuntimeEnvironment.getApplication()
         AppContext.init(app, Config(app.getSharedPreferences("history_test", Context.MODE_PRIVATE)))
-        db = Room.inMemoryDatabaseBuilder(app, AppDatabase::class.java)
-            .allowMainThreadQueries()
-            .setQueryExecutor(directExecutor)
-            .setTransactionExecutor(directExecutor)
-            .build()
+        db =
+            Room
+                .inMemoryDatabaseBuilder(app, AppDatabase::class.java)
+                .allowMainThreadQueries()
+                .setQueryExecutor(directExecutor)
+                .setTransactionExecutor(directExecutor)
+                .build()
         history = HistoryRepository(db.historyDao())
         model = HistoryModel(history)
     }
@@ -60,12 +61,18 @@ class HistoryModelTest {
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(seconds))
     }
 
-    private fun insert(title: String, url: String, time: Long = 0) = runBlocking {
-        history.add(HistoryItem().apply {
-            this.title = title
-            this.url = url
-            this.time = time
-        })
+    private fun insert(
+        title: String,
+        url: String,
+        time: Long = 0,
+    ) = runBlocking {
+        history.add(
+            HistoryItem().apply {
+                this.title = title
+                this.url = url
+                this.time = time
+            },
+        )
     }
 
     private fun urls() = model.lastLoadedItems.value.map { it.url }

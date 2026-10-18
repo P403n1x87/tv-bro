@@ -7,7 +7,6 @@ import org.junit.Test
  * Unit tests for [NewTabPositionPolicy], the position a page-requested tab takes in the tab list.
  */
 class NewTabPositionPolicyTest {
-
     @Test
     fun aTabRequestedByTheSelectedTabLandsRightAfterIt() {
         assertEquals(1, NewTabPositionPolicy.insertIndexAfter(requestingTabIndex = 0, tabCount = 3))

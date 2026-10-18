@@ -13,5 +13,5 @@ import com.phlox.tvwebbrowser.activity.main.SettingsModel
 class SettingsDeps(
     val settings: SettingsModel,
     val adblock: AdblockModel,
-    val autoUpdate: AutoUpdateModel
+    val autoUpdate: AutoUpdateModel,
 )

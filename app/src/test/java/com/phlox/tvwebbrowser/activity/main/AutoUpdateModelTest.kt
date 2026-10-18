@@ -13,8 +13,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
-import org.robolectric.annotation.Config as RobolectricConfig
 import java.util.Calendar
+import org.robolectric.annotation.Config as RobolectricConfig
 
 /**
  * Tests for [AutoUpdateModel]'s host seam: the model decides *whether* and *what* to offer and the
@@ -24,7 +24,6 @@ import java.util.Calendar
 @RunWith(RobolectricTestRunner::class)
 @RobolectricConfig(sdk = [26], application = Application::class)
 class AutoUpdateModelTest {
-
     private lateinit var model: AutoUpdateModel
     private lateinit var host: FakeHost
     private lateinit var config: Config
@@ -42,13 +41,14 @@ class AutoUpdateModelTest {
 
     /** Puts an available update in the checker, leaving the last-offer time alone. */
     private fun putAvailableUpdate() {
-        model.updateChecker.versionCheckResult = UpdateChecker.UpdateCheckResult(
-            "999.0.0",
-            UpdateChecker.CHANNEL_RELEASE,
-            "https://example.com/update.apk",
-            ArrayList(),
-            UpdateChecker.AVAILABLE_CHANNELS,
-        )
+        model.updateChecker.versionCheckResult =
+            UpdateChecker.UpdateCheckResult(
+                "999.0.0",
+                UpdateChecker.CHANNEL_RELEASE,
+                "https://example.com/update.apk",
+                ArrayList(),
+                UpdateChecker.AVAILABLE_CHANNELS,
+            )
     }
 
     /** Puts an available update in the checker and pretends the last offer was yesterday. */
@@ -69,8 +69,6 @@ class AutoUpdateModelTest {
         model.showUpdateDialogIfNeeded(host, force = true)
         assertEquals(1, host.updateDialogs)
     }
-
-
 
     @Test
     fun theUpdateIsOfferedOncePerDay() {
@@ -188,7 +186,10 @@ class AutoUpdateModelTest {
 
         override fun canInstallPackages(): Boolean = allowInstall
 
-        override fun showUpdateDialog(onDownload: () -> Unit, onSettings: () -> Unit) {
+        override fun showUpdateDialog(
+            onDownload: () -> Unit,
+            onSettings: () -> Unit,
+        ) {
             updateDialogs++
             this.onDownload = onDownload
             this.onSettings = onSettings

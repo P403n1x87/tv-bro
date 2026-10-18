@@ -9,8 +9,14 @@ import org.junit.Test
  * (release tags are dotted versions like "v2.1.7" with no numeric versionCode).
  */
 class UpdateCheckerVersionTest {
-
-    private fun sign(value: Int) = if (value > 0) 1 else if (value < 0) -1 else 0
+    private fun sign(value: Int) =
+        if (value > 0) {
+            1
+        } else if (value < 0) {
+            -1
+        } else {
+            0
+        }
 
     @Test
     fun equalVersionsIgnoringLeadingV() {
@@ -37,14 +43,14 @@ class UpdateCheckerVersionTest {
 
     @Test
     fun suffixIsIgnoredButDigitsBeforeItCount() {
-        //prerelease/build suffixes must not make a version look older than a released one
+        // prerelease/build suffixes must not make a version look older than a released one
         assertEquals(1, sign(UpdateChecker.compareVersions("2.1.6-beta", "2.1.5")))
         assertEquals(0, sign(UpdateChecker.compareVersions("2.1.6-beta", "2.1.6")))
     }
 
     @Test
     fun emptyVersionIsNeverNewer() {
-        //no matching release is reported as an empty version name and must not trigger an update
+        // no matching release is reported as an empty version name and must not trigger an update
         assertTrue(UpdateChecker.compareVersions("", "2.1.6") < 0)
     }
 }

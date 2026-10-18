@@ -30,12 +30,10 @@ class BackNavigationEventsAdapter(
      * invoke the callback only when a long-press back is detected, not on release.
      */
     private val onEmulatedBackEvent: () -> Unit,
-
     /**
      * Milliseconds after which a held BACK/B button emits a long-press BACK [KeyEvent].
      */
     private val longPressTimeoutMs: Int = DEFAULT_LONG_PRESS_TIMEOUT_MS,
-
     /**
      * When true, controller "B/back" short press does not trigger back navigation; long-press does.
      */
@@ -46,6 +44,7 @@ class BackNavigationEventsAdapter(
     }
 
     private val debugLogs: Boolean = false
+
     private fun d(msg: String) {
         if (debugLogs) {
             Log.d(TAG, msg)
@@ -66,10 +65,9 @@ class BackNavigationEventsAdapter(
 
     private enum class BackChannel { SYSTEM, KEY, MOTION }
 
-    private fun isControllerSource(source: Int): Boolean {
-        return (source and android.view.InputDevice.SOURCE_JOYSTICK) != 0 ||
+    private fun isControllerSource(source: Int): Boolean =
+        (source and android.view.InputDevice.SOURCE_JOYSTICK) != 0 ||
             (source and android.view.InputDevice.SOURCE_GAMEPAD) != 0
-    }
 
     /**
      * For non-controller sources, callback is fired only after ACTION_DOWN followed by
@@ -98,7 +96,10 @@ class BackNavigationEventsAdapter(
      */
     private val suppressOtherChannelsTimeoutMs: Long = 1000L
 
-    private fun shouldSuppress(from: BackChannel, eventTime: Long): Boolean {
+    private fun shouldSuppress(
+        from: BackChannel,
+        eventTime: Long,
+    ): Boolean {
         fun recent(other: BackChannel): Boolean {
             val t = lastBackDownEventTimeByChannel[other.ordinal]
             if (t < 0L) return false
@@ -113,7 +114,10 @@ class BackNavigationEventsAdapter(
         }
     }
 
-    private fun markBackDownGenerated(from: BackChannel, eventTime: Long) {
+    private fun markBackDownGenerated(
+        from: BackChannel,
+        eventTime: Long,
+    ) {
         lastBackDownEventTimeByChannel[from.ordinal] = eventTime
         d("markBackDownGenerated from=$from eventTime=$eventTime")
     }
@@ -145,9 +149,11 @@ class BackNavigationEventsAdapter(
     fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (!isKeyAllowed(event.keyCode)) return false
         val suppressed = shouldSuppress(BackChannel.KEY, event.eventTime)
-        d("dispatchKeyEvent keyCode=${event.keyCode} action=${event.action} source=${event.source} " +
-            "eventTime=${event.eventTime} downTime=${event.downTime} repeatCount=${event.repeatCount} " +
-            "isLongPress=${event.isLongPress} flags=${event.flags} suppressed=$suppressed")
+        d(
+            "dispatchKeyEvent keyCode=${event.keyCode} action=${event.action} source=${event.source} " +
+                "eventTime=${event.eventTime} downTime=${event.downTime} repeatCount=${event.repeatCount} " +
+                "isLongPress=${event.isLongPress} flags=${event.flags} suppressed=$suppressed",
+        )
         if (suppressed) return false
 
         return try {
@@ -179,6 +185,7 @@ class BackNavigationEventsAdapter(
                         pendingBackDown = true
                     }
                 }
+
                 KeyEvent.ACTION_UP -> {
                     if (keyPressControllerLongPressOnly) {
                         // Don't call callback on release; end long-press tracking.
@@ -217,9 +224,11 @@ class BackNavigationEventsAdapter(
         val controllerLongPressOnly =
             gameControllersLongPressBForBackNavigation && isControllerSource(event.source)
 
-        d("dispatchGenericMotionEvent buttonState=$buttonState source=${event.source} " +
-            "eventTime=${event.eventTime} downTime=${event.downTime} backPressedNow=$backPressedNow " +
-            "lastBackDown=$lastBackDown suppressed=$suppressed controllerLongPressOnly=$controllerLongPressOnly")
+        d(
+            "dispatchGenericMotionEvent buttonState=$buttonState source=${event.source} " +
+                "eventTime=${event.eventTime} downTime=${event.downTime} backPressedNow=$backPressedNow " +
+                "lastBackDown=$lastBackDown suppressed=$suppressed controllerLongPressOnly=$controllerLongPressOnly",
+        )
 
         if (backPressedNow && !lastBackDown) {
             // Track the hold regardless of suppression so long-press can still be emitted later.
@@ -259,8 +268,8 @@ class BackNavigationEventsAdapter(
             backLongPressEmitted = false
         } else if (
             backPressedNow && lastBackDown &&
-                isKeyAllowed(KeyEvent.KEYCODE_BACK) &&
-                !backLongPressEmitted
+            isKeyAllowed(KeyEvent.KEYCODE_BACK) &&
+            !backLongPressEmitted
         ) {
             val elapsed = max(0L, event.eventTime - backKeyDownTime)
             if (elapsed >= longPressTimeoutMs) {
@@ -306,4 +315,3 @@ class BackNavigationEventsAdapter(
         private const val DEFAULT_LONG_PRESS_TIMEOUT_MS: Int = 500
     }
 }
-

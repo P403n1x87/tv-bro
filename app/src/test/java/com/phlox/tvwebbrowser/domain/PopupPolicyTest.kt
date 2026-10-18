@@ -11,13 +11,12 @@ import org.junit.Test
  * `MainActivity.WebEngineCallback.shouldBlockNewWindow`.
  */
 class PopupPolicyTest {
-
     @Test
     fun noneLevelNeverBlocks() {
         for (dialog in listOf(false, true)) {
             for (gesture in listOf(false, true)) {
                 assertFalse(
-                    PopupPolicy.shouldBlockNewWindow(dialog, gesture, HostConfig.POPUP_BLOCK_NONE)
+                    PopupPolicy.shouldBlockNewWindow(dialog, gesture, HostConfig.POPUP_BLOCK_NONE),
                 )
             }
         }
@@ -27,15 +26,17 @@ class PopupPolicyTest {
     fun dialogsLevelBlocksDialogsOnly() {
         assertTrue(
             PopupPolicy.shouldBlockNewWindow(
-                dialog = true, userGesture = true,
-                popupBlockLevel = HostConfig.POPUP_BLOCK_DIALOGS
-            )
+                dialog = true,
+                userGesture = true,
+                popupBlockLevel = HostConfig.POPUP_BLOCK_DIALOGS,
+            ),
         )
         assertFalse(
             PopupPolicy.shouldBlockNewWindow(
-                dialog = false, userGesture = false,
-                popupBlockLevel = HostConfig.POPUP_BLOCK_DIALOGS
-            )
+                dialog = false,
+                userGesture = false,
+                popupBlockLevel = HostConfig.POPUP_BLOCK_DIALOGS,
+            ),
         )
     }
 
@@ -56,9 +57,10 @@ class PopupPolicyTest {
             for (gesture in listOf(false, true)) {
                 assertTrue(
                     PopupPolicy.shouldBlockNewWindow(
-                        dialog, gesture,
-                        HostConfig.POPUP_BLOCK_NEW_TABS_EVEN_BY_USER_GESTURE
-                    )
+                        dialog,
+                        gesture,
+                        HostConfig.POPUP_BLOCK_NEW_TABS_EVEN_BY_USER_GESTURE,
+                    ),
                 )
             }
         }
@@ -72,7 +74,7 @@ class PopupPolicyTest {
             for (gesture in listOf(false, true)) {
                 assertEquals(
                     PopupPolicy.shouldBlockNewWindow(dialog, gesture, level),
-                    PopupPolicy.shouldBlockNewWindow(dialog, gesture, null)
+                    PopupPolicy.shouldBlockNewWindow(dialog, gesture, null),
                 )
             }
         }

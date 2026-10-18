@@ -21,12 +21,20 @@ object MediaMetadataCache {
     private val listeners = CopyOnWriteArrayList<Listener>()
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    fun addListener(listener: Listener) { listeners.add(listener) }
-    fun removeListener(listener: Listener) { listeners.remove(listener) }
+    fun addListener(listener: Listener) {
+        listeners.add(listener)
+    }
+
+    fun removeListener(listener: Listener) {
+        listeners.remove(listener)
+    }
 
     fun get(url: String): MediaMetadata? = synchronized(lock) { entries[url] }
 
-    fun put(url: String, metadata: MediaMetadata) {
+    fun put(
+        url: String,
+        metadata: MediaMetadata,
+    ) {
         synchronized(lock) {
             entries.remove(url)
             entries[url] = metadata

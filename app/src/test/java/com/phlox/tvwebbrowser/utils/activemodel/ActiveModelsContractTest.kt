@@ -26,17 +26,17 @@ import kotlin.reflect.KClass
  * build native or Android-only state).
  */
 class ActiveModelsContractTest {
-
-    private val activeModels: List<KClass<out ActiveModel>> = listOf(
-        MainActivityViewModel::class,
-        SettingsModel::class,
-        AdblockModel::class,
-        TabsModel::class,
-        AutoUpdateModel::class,
-        HistoryModel::class,
-        ActiveDownloadsModel::class,
-        DownloadsHistoryModel::class,
-    )
+    private val activeModels: List<KClass<out ActiveModel>> =
+        listOf(
+            MainActivityViewModel::class,
+            SettingsModel::class,
+            AdblockModel::class,
+            TabsModel::class,
+            AutoUpdateModel::class,
+            HistoryModel::class,
+            ActiveDownloadsModel::class,
+            DownloadsHistoryModel::class,
+        )
 
     @Test
     fun everyActiveModelHasAPublicNoArgConstructor() {

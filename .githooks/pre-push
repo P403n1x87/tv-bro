@@ -1,0 +1,14 @@
+#!/bin/sh
+# tv-bro pre-push: Android lint on one flavor (~1m warm, ~2-3m cold) instead of all four.
+# Pushes are rarer than commits and this is the expensive gate; full coverage stays in CI.
+#
+# Enable once per clone:   git config core.hooksPath .githooks
+# Skip one push:           git push --no-verify
+
+if ! output=$(./gradlew -q :app:lintP403n1x87GeckoExcludedDebug 2>&1); then
+    echo "$output" | tail -30
+    echo "" >&2
+    echo "Android lint failed. Inspect app/build/reports/lint-results*.html, fix, and re-push" >&2
+    echo "(or use 'git push --no-verify' to bypass this gate)." >&2
+    exit 1
+fi

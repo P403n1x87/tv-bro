@@ -34,16 +34,17 @@ interface RowFocusPanel {
  */
 class PanelRowFocusDelegate(
     private val panel: View,
-    private val rowProvider: () -> View?
+    private val rowProvider: () -> View?,
 ) {
     private var pending = false
     private var waitingForLayout = false
 
-    private val preDrawListener = ViewTreeObserver.OnPreDrawListener {
-        waitingForLayout = false
-        tryFocusRow(retry = false)
-        true
-    }
+    private val preDrawListener =
+        ViewTreeObserver.OnPreDrawListener {
+            waitingForLayout = false
+            tryFocusRow(retry = false)
+            true
+        }
 
     fun requestRowFocus() {
         pending = true

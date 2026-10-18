@@ -16,8 +16,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
-import org.robolectric.annotation.Config as RobolectricConfig
 import java.io.File
+import org.robolectric.annotation.Config as RobolectricConfig
 
 /**
  * Tests the storage-info plumbing: the injected directory, formatter and repository reach the
@@ -27,19 +27,20 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 @RobolectricConfig(sdk = [26], application = android.app.Application::class)
 class DownloadStorageModelTest {
-
     private lateinit var db: AppDatabase
     private lateinit var repository: DownloadsRepository
 
     @Before
     fun setUp() {
-        db = Room.inMemoryDatabaseBuilder(
-            RuntimeEnvironment.getApplication(),
-            AppDatabase::class.java,
-        ).allowMainThreadQueries()
-            .setQueryExecutor { it.run() }
-            .setTransactionExecutor { it.run() }
-            .build()
+        db =
+            Room
+                .inMemoryDatabaseBuilder(
+                    RuntimeEnvironment.getApplication(),
+                    AppDatabase::class.java,
+                ).allowMainThreadQueries()
+                .setQueryExecutor { it.run() }
+                .setTransactionExecutor { it.run() }
+                .build()
         repository = DownloadsRepository(db.downloadDao())
     }
 
@@ -48,12 +49,13 @@ class DownloadStorageModelTest {
         db.close()
     }
 
-    private fun model(dir: File) = DownloadStorageModel(
-        downloads = repository,
-        downloadsDir = { dir },
-        formatBytes = { "$it bytes" },
-        ioDispatcher = Dispatchers.Unconfined,
-    )
+    private fun model(dir: File) =
+        DownloadStorageModel(
+            downloads = repository,
+            downloadsDir = { dir },
+            formatBytes = { "$it bytes" },
+            ioDispatcher = Dispatchers.Unconfined,
+        )
 
     private fun drainMainLooper() {
         shadowOf(Looper.getMainLooper()).idle()
@@ -75,9 +77,20 @@ class DownloadStorageModelTest {
     fun refreshPublishesTheFormattedUsedSpaceFromTheLog() {
         val dir = File("/tmp/tvbro-downloads-storage-test")
         val model = model(dir)
-        val finished = Download().apply { size = 500; bytesReceived = 500 }
-        val partial = Download().apply { size = 500; bytesReceived = 200 }
-        runBlocking { repository.add(finished); repository.add(partial) }
+        val finished =
+            Download().apply {
+                size = 500
+                bytesReceived = 500
+            }
+        val partial =
+            Download().apply {
+                size = 500
+                bytesReceived = 200
+            }
+        runBlocking {
+            repository.add(finished)
+            repository.add(partial)
+        }
 
         model.refresh()
         shadowOf(Looper.getMainLooper()).idle()

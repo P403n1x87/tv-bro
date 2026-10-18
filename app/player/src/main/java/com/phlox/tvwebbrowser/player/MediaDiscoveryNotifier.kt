@@ -10,7 +10,15 @@ import java.util.concurrent.CopyOnWriteArrayList
 object MediaDiscoveryNotifier {
     private val listeners = CopyOnWriteArrayList<() -> Unit>()
 
-    fun addListener(listener: () -> Unit) { listeners.add(listener) }
-    fun removeListener(listener: () -> Unit) { listeners.remove(listener) }
-    fun notifyChanged() { listeners.forEach { runCatching { it() } } }
+    fun addListener(listener: () -> Unit) {
+        listeners.add(listener)
+    }
+
+    fun removeListener(listener: () -> Unit) {
+        listeners.remove(listener)
+    }
+
+    fun notifyChanged() {
+        listeners.forEach { runCatching { it() } }
+    }
 }

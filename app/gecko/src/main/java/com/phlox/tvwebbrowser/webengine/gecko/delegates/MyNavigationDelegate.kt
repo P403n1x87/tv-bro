@@ -9,7 +9,9 @@ import org.mozilla.geckoview.GeckoSession
 import org.mozilla.geckoview.WebRequestError
 import java.io.BufferedReader
 
-class MyNavigationDelegate(private val webEngine: GeckoWebEngine) : GeckoSession.NavigationDelegate {
+class MyNavigationDelegate(
+    private val webEngine: GeckoWebEngine,
+) : GeckoSession.NavigationDelegate {
     companion object {
         val TAG: String = MyNavigationDelegate::class.java.simpleName
         const val ERROR_TEMPLATE_FILE = "pages/error.html"
@@ -20,11 +22,17 @@ class MyNavigationDelegate(private val webEngine: GeckoWebEngine) : GeckoSession
     var locationURL: String? = null
     private var errorTemplate: String? = null
 
-    override fun onCanGoBack(session: GeckoSession, canGoBack: Boolean) {
+    override fun onCanGoBack(
+        session: GeckoSession,
+        canGoBack: Boolean,
+    ) {
         this.canGoBack = canGoBack
     }
 
-    override fun onCanGoForward(session: GeckoSession, canGoForward: Boolean) {
+    override fun onCanGoForward(
+        session: GeckoSession,
+        canGoForward: Boolean,
+    ) {
         this.canGoForward = canGoForward
     }
 
@@ -32,30 +40,35 @@ class MyNavigationDelegate(private val webEngine: GeckoWebEngine) : GeckoSession
         session: GeckoSession,
         url: String?,
         perms: List<GeckoSession.PermissionDelegate.ContentPermission?>,
-        hasUserGesture: Boolean
+        hasUserGesture: Boolean,
     ) {
         Log.d(TAG, "onLocationChange: $url")
         locationURL = url
         webEngine.tab.url = url ?: ""
     }
 
-    override fun onLoadRequest(session: GeckoSession, request: GeckoSession.NavigationDelegate.LoadRequest
-            ): GeckoResult<AllowOrDeny>? {
-        Log.d(TAG,"onLoadRequest="
-                    + request.uri
-                    + " triggerUri="
-                    + request.triggerUri
-                    + " where="
-                    + request.target
-                    + " isRedirect="
-                    + request.isRedirect
-                    + " isDirectNavigation="
-                    + request.isDirectNavigation
+    override fun onLoadRequest(
+        session: GeckoSession,
+        request: GeckoSession.NavigationDelegate.LoadRequest,
+    ): GeckoResult<AllowOrDeny>? {
+        Log.d(
+            TAG,
+            "onLoadRequest=" +
+                request.uri +
+                " triggerUri=" +
+                request.triggerUri +
+                " where=" +
+                request.target +
+                " isRedirect=" +
+                request.isRedirect +
+                " isDirectNavigation=" +
+                request.isDirectNavigation,
         )
 
         val callback = webEngine.callback ?: return GeckoResult.deny()
 
-        val isAutomaticRedirect = request.target == GeckoSession.NavigationDelegate.TARGET_WINDOW_CURRENT &&
+        val isAutomaticRedirect =
+            request.target == GeckoSession.NavigationDelegate.TARGET_WINDOW_CURRENT &&
                 (!request.hasUserGesture || request.isRedirect)
         if (callback.shouldOverrideUrlLoading(request.uri, isAutomaticRedirect)) {
             return GeckoResult.deny()
@@ -66,23 +79,27 @@ class MyNavigationDelegate(private val webEngine: GeckoWebEngine) : GeckoSession
 
     override fun onSubframeLoadRequest(
         session: GeckoSession,
-        request: GeckoSession.NavigationDelegate.LoadRequest
+        request: GeckoSession.NavigationDelegate.LoadRequest,
     ): GeckoResult<AllowOrDeny>? {
-        Log.d(TAG,
-            "onSubframeLoadRequest="
-                    + request.uri
-                    + " triggerUri="
-                    + request.triggerUri
-                    + " isRedirect="
-                    + request.isRedirect
-                    + "isDirectNavigation="
-                    + request.isDirectNavigation
+        Log.d(
+            TAG,
+            "onSubframeLoadRequest=" +
+                request.uri +
+                " triggerUri=" +
+                request.triggerUri +
+                " isRedirect=" +
+                request.isRedirect +
+                "isDirectNavigation=" +
+                request.isDirectNavigation,
         )
 
         return GeckoResult.allow()
     }
 
-    override fun onNewSession(session: GeckoSession, uri: String): GeckoResult<GeckoSession>? {
+    override fun onNewSession(
+        session: GeckoSession,
+        uri: String,
+    ): GeckoResult<GeckoSession>? {
         Log.d(TAG, "onNewSession: $uri")
         val callback = webEngine.callback ?: return null
         if (webEngine.callback?.shouldBlockNewWindow(dialog = false, userGesture = false) == true) {
@@ -98,22 +115,26 @@ class MyNavigationDelegate(private val webEngine: GeckoWebEngine) : GeckoSession
     }
 
     override fun onLoadError(
-        session: GeckoSession, uri: String?, error: WebRequestError
+        session: GeckoSession,
+        uri: String?,
+        error: WebRequestError,
     ): GeckoResult<String>? {
-        Log.d(TAG,
-            "onLoadError=" + uri + " error category=" + error.category + " error=" + error.code
+        Log.d(
+            TAG,
+            "onLoadError=" + uri + " error category=" + error.category + " error=" + error.code,
         )
 
         return GeckoResult.fromValue(
-            "data:text/html," + createErrorPage(
-                error.category,
-                error.code
-            )
+            "data:text/html," +
+                createErrorPage(
+                    error.category,
+                    error.code,
+                ),
         )
     }
 
-    private fun categoryToString(category: Int): String {
-        return when (category) {
+    private fun categoryToString(category: Int): String =
+        when (category) {
             WebRequestError.ERROR_CATEGORY_UNKNOWN -> "ERROR_CATEGORY_UNKNOWN"
             WebRequestError.ERROR_CATEGORY_SECURITY -> "ERROR_CATEGORY_SECURITY"
             WebRequestError.ERROR_CATEGORY_NETWORK -> "ERROR_CATEGORY_NETWORK"
@@ -123,10 +144,9 @@ class MyNavigationDelegate(private val webEngine: GeckoWebEngine) : GeckoSession
             WebRequestError.ERROR_CATEGORY_SAFEBROWSING -> "ERROR_CATEGORY_SAFEBROWSING"
             else -> "UNKNOWN"
         }
-    }
 
-    private fun errorToString(error: Int): String {
-        return when (error) {
+    private fun errorToString(error: Int): String =
+        when (error) {
             WebRequestError.ERROR_UNKNOWN -> "ERROR_UNKNOWN"
             WebRequestError.ERROR_SECURITY_SSL -> "ERROR_SECURITY_SSL"
             WebRequestError.ERROR_SECURITY_BAD_CERT -> "ERROR_SECURITY_BAD_CERT"
@@ -157,13 +177,14 @@ class MyNavigationDelegate(private val webEngine: GeckoWebEngine) : GeckoSession
             WebRequestError.ERROR_BAD_HSTS_CERT -> "ERROR_BAD_HSTS_CERT"
             else -> "UNKNOWN"
         }
-    }
 
-    private fun createErrorPage(category: Int, error: Int): String {
-        return createErrorPage(
-            categoryToString(category) + " : " + errorToString(error)
+    private fun createErrorPage(
+        category: Int,
+        error: Int,
+    ): String =
+        createErrorPage(
+            categoryToString(category) + " : " + errorToString(error),
         )
-    }
 
     private fun createErrorPage(error: String): String {
         val template = readErrorTemplate() ?: "\$ERROR"
@@ -176,10 +197,11 @@ class MyNavigationDelegate(private val webEngine: GeckoWebEngine) : GeckoSession
         if (errorTemplate != null) return errorTemplate
 
         return try {
-            errorTemplate = webEngine.appContext.resources.assets
-                .open(ERROR_TEMPLATE_FILE)
-                .bufferedReader()
-                .use(BufferedReader::readText)
+            errorTemplate =
+                webEngine.appContext.resources.assets
+                    .open(ERROR_TEMPLATE_FILE)
+                    .bufferedReader()
+                    .use(BufferedReader::readText)
             this.errorTemplate = errorTemplate
             errorTemplate
         } catch (e: Exception) {

@@ -82,18 +82,25 @@ object LocalAssetServer {
         }
     }
 
-    private fun acceptLoop(context: Context, socket: ServerSocket) {
+    private fun acceptLoop(
+        context: Context,
+        socket: ServerSocket,
+    ) {
         while (!socket.isClosed) {
-            val client = try {
-                socket.accept()
-            } catch (e: Exception) {
-                break
-            }
+            val client =
+                try {
+                    socket.accept()
+                } catch (e: Exception) {
+                    break
+                }
             clientExecutor.execute { handleClient(context, client) }
         }
     }
 
-    private fun handleClient(context: Context, client: Socket) {
+    private fun handleClient(
+        context: Context,
+        client: Socket,
+    ) {
         try {
             client.use { c ->
                 c.soTimeout = 5000
@@ -103,7 +110,7 @@ object LocalAssetServer {
                 if (parts.size < 2) return
                 val method = parts[0]
                 var path = parts[1]
-                //drain headers until the blank line
+                // drain headers until the blank line
                 while (true) {
                     val line = reader.readLine() ?: break
                     if (line.isEmpty()) break
@@ -118,27 +125,30 @@ object LocalAssetServer {
 
                 val queryIndex = path.indexOf('?')
                 if (queryIndex >= 0) path = path.substring(0, queryIndex)
-                path = try {
-                    URLDecoder.decode(path, "UTF-8")
-                } catch (e: Exception) {
-                    path
-                }
+                path =
+                    try {
+                        URLDecoder.decode(path, "UTF-8")
+                    } catch (e: Exception) {
+                        path
+                    }
 
                 val assetPath = routeToAsset(path)
-                val bytes = assetPath?.let {
-                    try {
-                        context.assets.open(it).use { input -> input.readBytes() }
-                    } catch (e: Exception) {
-                        null
+                val bytes =
+                    assetPath?.let {
+                        try {
+                            context.assets.open(it).use { input -> input.readBytes() }
+                        } catch (e: Exception) {
+                            null
+                        }
                     }
-                }
                 if (assetPath == null || bytes == null) {
                     writeResponse(out, 404, "text/plain", "Not Found".toByteArray(), headOnly)
                     return
                 }
 
-                var contentType = URLConnection.guessContentTypeFromName(assetPath)
-                    ?: "application/octet-stream"
+                var contentType =
+                    URLConnection.guessContentTypeFromName(assetPath)
+                        ?: "application/octet-stream"
                 if (assetPath.endsWith(".svg")) contentType = "image/svg+xml"
                 writeResponse(out, 200, contentType, bytes, headOnly)
             }
@@ -161,15 +171,17 @@ object LocalAssetServer {
         code: Int,
         contentType: String,
         body: ByteArray,
-        headOnly: Boolean
+        headOnly: Boolean,
     ) {
-        val reason = when (code) {
-            200 -> "OK"
-            404 -> "Not Found"
-            405 -> "Method Not Allowed"
-            else -> "OK"
-        }
-        val header = "HTTP/1.1 $code $reason\r\n" +
+        val reason =
+            when (code) {
+                200 -> "OK"
+                404 -> "Not Found"
+                405 -> "Method Not Allowed"
+                else -> "OK"
+            }
+        val header =
+            "HTTP/1.1 $code $reason\r\n" +
                 "Content-Type: $contentType\r\n" +
                 "Content-Length: ${body.size}\r\n" +
                 "Cache-Control: no-store\r\n" +

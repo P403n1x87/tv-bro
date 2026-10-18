@@ -36,32 +36,27 @@ class DPADNavigationEventsAdapter(
      * [KeyEvent] generated from motion input.
      */
     private val onEmulatedKeyEvent: (KeyEvent) -> Boolean,
-
     /**
      * Axis absolute value threshold beyond which we consider a stick/hat deflection "intentional".
      */
     private val deadZone: Float = DEFAULT_DEAD_ZONE,
-
     /**
      * Smaller threshold used to decide when to release a direction after it was previously active.
      * Helps avoid jitter toggling around [deadZone].
      */
     private val releaseDeadZone: Float = DEFAULT_RELEASE_DEAD_ZONE,
-
     /**
      * Preferred axis pair ordering:
      * - hat axes ([MotionEvent.AXIS_HAT_X]/[MotionEvent.AXIS_HAT_Y]) if they look active
      * - otherwise analog stick axes ([MotionEvent.AXIS_X]/[MotionEvent.AXIS_Y])
      */
     private val preferHatAxes: Boolean = true,
-
     /**
      * When false, [handleAxes] is skipped (no stick/hat → DPAD translation from the motion channel).
      * Buttons and directional DPAD button bits are unaffected. Use a live lambda so preferences
      * apply without recreating the adapter.
      */
     private val motionAxesTranslationEnabled: () -> Boolean = { true },
-
     /**
      * When true, DPAD navigation keys and motion-emulated navigation are not forwarded; use while
      * the IME is shown so typing / keyboard navigation is not overridden by cursor logic.
@@ -147,7 +142,11 @@ class DPADNavigationEventsAdapter(
         }
     }
 
-    private data class KeyDispatchSignature(val eventTime: Long, val action: Int, val keyCode: Int)
+    private data class KeyDispatchSignature(
+        val eventTime: Long,
+        val action: Int,
+        val keyCode: Int,
+    )
 
     // Keeps a short history of the signatures that were actually forwarded to `onEmulatedKeyEvent`.
     // This is used for duplicate filtering and also makes it easy to inspect behavior in a debugger.
@@ -198,7 +197,7 @@ class DPADNavigationEventsAdapter(
                         (buttonState and dpadButtonBits.downBit) != 0 ||
                         (buttonState and dpadButtonBits.leftBit) != 0 ||
                         (buttonState and dpadButtonBits.rightBit) != 0
-                    )
+                )
 
         emittedAnyKey = handleDirectionalDpadButtons(event) || emittedAnyKey
         emittedAnyKey = handleButtons(event) || emittedAnyKey
@@ -247,24 +246,37 @@ class DPADNavigationEventsAdapter(
         val dead = deadZone
         val releaseDead = minOf(releaseDeadZone, dead) // ensure hysteresis is sane
 
-        val (xAxis, yAxis) = if (preferHatAxes) {
-            val hatX = event.getAxisValue(MotionEvent.AXIS_HAT_X)
-            val hatY = event.getAxisValue(MotionEvent.AXIS_HAT_Y)
-            val hatLooksActive = abs(hatX) >= dead || abs(hatY) >= dead
-            if (hatLooksActive) {
-                hatX to hatY
+        val (xAxis, yAxis) =
+            if (preferHatAxes) {
+                val hatX = event.getAxisValue(MotionEvent.AXIS_HAT_X)
+                val hatY = event.getAxisValue(MotionEvent.AXIS_HAT_Y)
+                val hatLooksActive = abs(hatX) >= dead || abs(hatY) >= dead
+                if (hatLooksActive) {
+                    hatX to hatY
+                } else {
+                    event.getAxisValue(MotionEvent.AXIS_X) to event.getAxisValue(MotionEvent.AXIS_Y)
+                }
             } else {
                 event.getAxisValue(MotionEvent.AXIS_X) to event.getAxisValue(MotionEvent.AXIS_Y)
             }
-        } else {
-            event.getAxisValue(MotionEvent.AXIS_X) to event.getAxisValue(MotionEvent.AXIS_Y)
-        }
 
-        fun axisToDir(axisValue: Float, lastDir: Int): Int {
-            return when {
-                axisValue >= dead -> 1
-                axisValue <= -dead -> -1
-                abs(axisValue) <= releaseDead -> 0
+        fun axisToDir(
+            axisValue: Float,
+            lastDir: Int,
+        ): Int =
+            when {
+                axisValue >= dead -> {
+                    1
+                }
+
+                axisValue <= -dead -> {
+                    -1
+                }
+
+                abs(axisValue) <= releaseDead -> {
+                    0
+                }
+
                 else -> {
                     // Hysteresis band: keep direction only if axis is still on the same side
                     // (prevents "stickiness" when crossing through center with jitter).
@@ -272,7 +284,6 @@ class DPADNavigationEventsAdapter(
                     if (sameSign) lastDir else 0
                 }
             }
-        }
 
         val newDirX = axisToDir(xAxis, lastDirX)
         val newDirY = axisToDir(yAxis, lastDirY)
@@ -316,11 +327,12 @@ class DPADNavigationEventsAdapter(
         if (!isAnyPressed) {
             // Release old direction only if we previously emitted it from button DPAD.
             if (lastDpadFromButtons && lastDpadKeyCode != 0) {
-                val emitted = if (isKeyAllowed(lastDpadKeyCode)) {
-                    emitKeyEvent(event, action = KeyEvent.ACTION_UP, keyCode = lastDpadKeyCode)
-                } else {
-                    false
-                }
+                val emitted =
+                    if (isKeyAllowed(lastDpadKeyCode)) {
+                        emitKeyEvent(event, action = KeyEvent.ACTION_UP, keyCode = lastDpadKeyCode)
+                    } else {
+                        false
+                    }
                 lastDpadKeyCode = 0
                 lastDirX = 0
                 lastDirY = 0
@@ -334,11 +346,12 @@ class DPADNavigationEventsAdapter(
         if (newKeyCode == 0) {
             // Contradictory button combination: treat as neutral and release if needed.
             if (lastDpadFromButtons && lastDpadKeyCode != 0) {
-                val emitted = if (isKeyAllowed(lastDpadKeyCode)) {
-                    emitKeyEvent(event, action = KeyEvent.ACTION_UP, keyCode = lastDpadKeyCode)
-                } else {
-                    false
-                }
+                val emitted =
+                    if (isKeyAllowed(lastDpadKeyCode)) {
+                        emitKeyEvent(event, action = KeyEvent.ACTION_UP, keyCode = lastDpadKeyCode)
+                    } else {
+                        false
+                    }
                 lastDpadKeyCode = 0
                 lastDirX = 0
                 lastDirY = 0
@@ -377,29 +390,32 @@ class DPADNavigationEventsAdapter(
         upPressed: Boolean,
         downPressed: Boolean,
         leftPressed: Boolean,
-        rightPressed: Boolean
+        rightPressed: Boolean,
     ): Triple<Int, Int, Int> {
-        val dirX = when {
-            leftPressed && !rightPressed -> -1
-            rightPressed && !leftPressed -> 1
-            else -> 0
-        }
-        val dirY = when {
-            upPressed && !downPressed -> -1
-            downPressed && !upPressed -> 1
-            else -> 0
-        }
-        val keyCode = when {
-            dirX == 0 && dirY == -1 -> KeyEvent.KEYCODE_DPAD_UP
-            dirX == 0 && dirY == 1 -> KeyEvent.KEYCODE_DPAD_DOWN
-            dirX == -1 && dirY == 0 -> KeyEvent.KEYCODE_DPAD_LEFT
-            dirX == 1 && dirY == 0 -> KeyEvent.KEYCODE_DPAD_RIGHT
-            dirX == -1 && dirY == -1 -> KeyEvent.KEYCODE_DPAD_UP_LEFT
-            dirX == 1 && dirY == -1 -> KeyEvent.KEYCODE_DPAD_UP_RIGHT
-            dirX == -1 && dirY == 1 -> KeyEvent.KEYCODE_DPAD_DOWN_LEFT
-            dirX == 1 && dirY == 1 -> KeyEvent.KEYCODE_DPAD_DOWN_RIGHT
-            else -> 0
-        }
+        val dirX =
+            when {
+                leftPressed && !rightPressed -> -1
+                rightPressed && !leftPressed -> 1
+                else -> 0
+            }
+        val dirY =
+            when {
+                upPressed && !downPressed -> -1
+                downPressed && !upPressed -> 1
+                else -> 0
+            }
+        val keyCode =
+            when {
+                dirX == 0 && dirY == -1 -> KeyEvent.KEYCODE_DPAD_UP
+                dirX == 0 && dirY == 1 -> KeyEvent.KEYCODE_DPAD_DOWN
+                dirX == -1 && dirY == 0 -> KeyEvent.KEYCODE_DPAD_LEFT
+                dirX == 1 && dirY == 0 -> KeyEvent.KEYCODE_DPAD_RIGHT
+                dirX == -1 && dirY == -1 -> KeyEvent.KEYCODE_DPAD_UP_LEFT
+                dirX == 1 && dirY == -1 -> KeyEvent.KEYCODE_DPAD_UP_RIGHT
+                dirX == -1 && dirY == 1 -> KeyEvent.KEYCODE_DPAD_DOWN_LEFT
+                dirX == 1 && dirY == 1 -> KeyEvent.KEYCODE_DPAD_DOWN_RIGHT
+                else -> 0
+            }
         return Triple(dirX, dirY, keyCode)
     }
 
@@ -429,8 +445,11 @@ class DPADNavigationEventsAdapter(
         return emittedAny
     }
 
-    private fun dpadKeyCodeFromDirs(dirX: Int, dirY: Int): Int {
-        return when {
+    private fun dpadKeyCodeFromDirs(
+        dirX: Int,
+        dirY: Int,
+    ): Int =
+        when {
             dirX == 0 && dirY == 0 -> 0
             dirX == -1 && dirY == -1 -> KeyEvent.KEYCODE_DPAD_UP_LEFT
             dirX == 1 && dirY == -1 -> KeyEvent.KEYCODE_DPAD_UP_RIGHT
@@ -442,7 +461,6 @@ class DPADNavigationEventsAdapter(
             dirX == 0 && dirY == 1 -> KeyEvent.KEYCODE_DPAD_DOWN
             else -> 0
         }
-    }
 
     private fun emitKeyEvent(
         event: MotionEvent,
@@ -472,18 +490,23 @@ class DPADNavigationEventsAdapter(
         }
 
         // Preserve the originating [MotionEvent] source (e.g. joystick / gamepad).
-        val emulated = KeyEvent(
-            downTime,
-            event.eventTime,
-            action,
-            keyCode,
-            repeat,
-            /* metaState */ 0,
-            /* deviceId */ event.deviceId,
-            /* scanCode */ 0,
-            flags,
-            /* source */ event.source
-        )
+        val emulated =
+            KeyEvent(
+                downTime,
+                event.eventTime,
+                action,
+                keyCode,
+                repeat,
+                // metaState
+                0,
+                // deviceId
+                event.deviceId,
+                // scanCode
+                0,
+                flags,
+                // source
+                event.source,
+            )
         try {
             onEmulatedKeyEvent(emulated)
             return true
@@ -501,24 +524,22 @@ class DPADNavigationEventsAdapter(
         private const val DEFAULT_DEAD_ZONE: Float = 0.4f
         private const val DEFAULT_RELEASE_DEAD_ZONE: Float = 0.28f
 
-        private fun readMotionEventStaticInt(fieldName: String): Int? {
-            return try {
+        private fun readMotionEventStaticInt(fieldName: String): Int? =
+            try {
                 val field = MotionEvent::class.java.getField(fieldName)
                 field.getInt(null)
             } catch (_: Throwable) {
                 null
             }
-        }
 
         /**
          * True for sources that legitimately deliver joystick/DPAD-style generic motion.
          * Pointer-class devices (mouse, touchpad, etc.) are excluded.
          */
-        fun isNavigationGenericMotionSource(source: Int): Boolean {
-            return (source and InputDevice.SOURCE_JOYSTICK) != 0 ||
-                    (source and InputDevice.SOURCE_GAMEPAD) != 0 ||
-                    (source and InputDevice.SOURCE_DPAD) != 0
-        }
+        fun isNavigationGenericMotionSource(source: Int): Boolean =
+            (source and InputDevice.SOURCE_JOYSTICK) != 0 ||
+                (source and InputDevice.SOURCE_GAMEPAD) != 0 ||
+                (source and InputDevice.SOURCE_DPAD) != 0
     }
 
     private data class DpadButtonBits(
@@ -526,7 +547,7 @@ class DPADNavigationEventsAdapter(
         val upBit: Int,
         val downBit: Int,
         val leftBit: Int,
-        val rightBit: Int
+        val rightBit: Int,
     ) {
         companion object {
             fun fromMotionEvent(): DpadButtonBits {
@@ -541,7 +562,7 @@ class DPADNavigationEventsAdapter(
                     upBit = up ?: 0,
                     downBit = down ?: 0,
                     leftBit = left ?: 0,
-                    rightBit = right ?: 0
+                    rightBit = right ?: 0,
                 )
             }
         }

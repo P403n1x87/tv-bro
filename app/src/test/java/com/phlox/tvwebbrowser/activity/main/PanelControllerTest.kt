@@ -30,7 +30,6 @@ import org.robolectric.annotation.Config as RobolectricConfig
 @RunWith(RobolectricTestRunner::class)
 @RobolectricConfig(sdk = [26], application = Application::class)
 class PanelControllerTest {
-
     private lateinit var activity: Activity
     private lateinit var binding: ActivityMainBinding
     private lateinit var panelController: PanelController

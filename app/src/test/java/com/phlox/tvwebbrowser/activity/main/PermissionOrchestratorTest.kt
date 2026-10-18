@@ -19,7 +19,6 @@ import org.robolectric.annotation.Config as RobolectricConfig
 @RunWith(RobolectricTestRunner::class)
 @RobolectricConfig(sdk = [26], application = Application::class)
 class PermissionOrchestratorTest {
-
     private val host = FakeDownloadHost()
     private val coordinator = DownloadCoordinator(host) { }
 
@@ -36,15 +35,16 @@ class PermissionOrchestratorTest {
         voiceActivityHandled = false
         engineHandled = false
         engineCalls = 0
-        orchestrator = PermissionOrchestrator(
-            downloadCoordinator = coordinator,
-            voiceSearchPermissionsResult = { _, _, _ -> voicePermissionsHandled },
-            voiceSearchActivityResult = { _, _, _ -> voiceActivityHandled },
-            enginePermissionsResult = { _, _, _ ->
-                engineCalls++
-                engineHandled
-            },
-        )
+        orchestrator =
+            PermissionOrchestrator(
+                downloadCoordinator = coordinator,
+                voiceSearchPermissionsResult = { _, _, _ -> voicePermissionsHandled },
+                voiceSearchActivityResult = { _, _, _ -> voiceActivityHandled },
+                enginePermissionsResult = { _, _, _ ->
+                    engineCalls++
+                    engineHandled
+                },
+            )
     }
 
     @Test
@@ -69,11 +69,12 @@ class PermissionOrchestratorTest {
 
     @Test
     fun theDownloadPermissionResultsAreClaimedHere() {
-        val handled = orchestrator.onRequestPermissionsResult(
-            DownloadCoordinator.MY_PERMISSIONS_REQUEST_EXTERNAL_STORAGE_ACCESS,
-            emptyArray(),
-            intArrayOf(PackageManager.PERMISSION_DENIED),
-        )
+        val handled =
+            orchestrator.onRequestPermissionsResult(
+                DownloadCoordinator.MY_PERMISSIONS_REQUEST_EXTERNAL_STORAGE_ACCESS,
+                emptyArray(),
+                intArrayOf(PackageManager.PERMISSION_DENIED),
+            )
 
         assertTrue(handled)
         assertEquals(1, engineCalls)

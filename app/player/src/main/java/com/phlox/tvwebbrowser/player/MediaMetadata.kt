@@ -10,11 +10,10 @@ data class MediaMetadata(
     val height: Int? = null,
     val languages: List<String> = emptyList(),
     val durationMs: Long? = null,
-    val bandwidth: Long? = null
+    val bandwidth: Long? = null,
 ) {
     val resolution: String?
-        get() = if (width != null && height != null) "${width}×$height" else null
+        get() = if (width != null && height != null) "$width×$height" else null
 
-    fun isEmpty(): Boolean =
-        width == null && height == null && languages.isEmpty() && durationMs == null && bandwidth == null
+    fun isEmpty(): Boolean = width == null && height == null && languages.isEmpty() && durationMs == null && bandwidth == null
 }

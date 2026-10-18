@@ -26,7 +26,9 @@ import kotlin.system.exitProcess
 /**
  * Created by PDT on 09.09.2016.
  */
-class TVBro : Application(), Application.ActivityLifecycleCallbacks {
+class TVBro :
+    Application(),
+    Application.ActivityLifecycleCallbacks {
     companion object {
         lateinit var instance: TVBro
         const val CHANNEL_ID_DOWNLOADS: String = "downloads"
@@ -39,13 +41,14 @@ class TVBro : Application(), Application.ActivityLifecycleCallbacks {
 
     var needToExitProcessAfterMainActivityFinish = false
     var needRestartMainActivityAfterExitingProcess = false
+
     override fun onCreate() {
         Log.i(TAG, "onCreate")
         super.onCreate()
 
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
-            //we need this since when targetSdkVersion >= 33 then
-            //deprecated WebSettingsCompat.setForceDark stops working on android 9 and below
+            // we need this since when targetSdkVersion >= 33 then
+            // deprecated WebSettingsCompat.setForceDark stops working on android 9 and below
             applicationInfo.targetSdkVersion = 32
         }
 
@@ -56,8 +59,14 @@ class TVBro : Application(), Application.ActivityLifecycleCallbacks {
         LocalAssetServer.start(this)
 
         val maxThreadsInOfflineJobsPool = Runtime.getRuntime().availableProcessors()
-        threadPool = ThreadPoolExecutor(0, maxThreadsInOfflineJobsPool, 20,
-                TimeUnit.SECONDS, ArrayBlockingQueue(maxThreadsInOfflineJobsPool))
+        threadPool =
+            ThreadPoolExecutor(
+                0,
+                maxThreadsInOfflineJobsPool,
+                20,
+                TimeUnit.SECONDS,
+                ArrayBlockingQueue(maxThreadsInOfflineJobsPool),
+            )
 
         initWebEngineStuff()
 
@@ -86,24 +95,23 @@ class TVBro : Application(), Application.ActivityLifecycleCallbacks {
         try {
             Class.forName("com.phlox.tvwebbrowser.webengine.gecko.GeckoWebEngine")
         } catch (e: ClassNotFoundException) {
-            Log.w(TAG, "GeckoWebEngine not found")//it is ok
+            Log.w(TAG, "GeckoWebEngine not found") // it is ok
         }
 
         val cookieManager = CookieManager()
         CookieHandler.setDefault(cookieManager)
-        FaviconsPool.databaseDelegate = object : FaviconsPool.DatabaseDelegate {
-            override suspend fun findByHostName(host: String): HostConfig? {
-                return Repositories.hosts.findByHostName(host)
-            }
+        FaviconsPool.databaseDelegate =
+            object : FaviconsPool.DatabaseDelegate {
+                override suspend fun findByHostName(host: String): HostConfig? = Repositories.hosts.findByHostName(host)
 
-            override suspend fun update(hostConfig: HostConfig) {
-                Repositories.hosts.update(hostConfig)
-            }
+                override suspend fun update(hostConfig: HostConfig) {
+                    Repositories.hosts.update(hostConfig)
+                }
 
-            override suspend fun insert(newHostConfig: HostConfig) {
-                Repositories.hosts.upsert(newHostConfig)
+                override suspend fun insert(newHostConfig: HostConfig) {
+                    Repositories.hosts.upsert(newHostConfig)
+                }
             }
-        }
     }
 
     private fun initNotificationChannels() {
@@ -118,12 +126,23 @@ class TVBro : Application(), Application.ActivityLifecycleCallbacks {
         }
     }
 
-    override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
+    override fun onActivityCreated(
+        activity: Activity,
+        savedInstanceState: Bundle?,
+    ) {}
+
     override fun onActivityStarted(activity: Activity) {}
+
     override fun onActivityResumed(activity: Activity) {}
+
     override fun onActivityPaused(activity: Activity) {}
+
     override fun onActivityStopped(activity: Activity) {}
-    override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
+
+    override fun onActivitySaveInstanceState(
+        activity: Activity,
+        outState: Bundle,
+    ) {}
 
     override fun onActivityDestroyed(activity: Activity) {
         Log.i(TAG, "onActivityDestroyed: " + activity.javaClass.simpleName)

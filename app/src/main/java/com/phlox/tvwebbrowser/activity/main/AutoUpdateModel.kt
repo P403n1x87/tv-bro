@@ -24,7 +24,10 @@ interface AutoUpdateHost {
     fun canInstallPackages(): Boolean
 
     /** Renders the changelog dialog; [onDownload]/[onSettings] are its action buttons. */
-    fun showUpdateDialog(onDownload: () -> Unit, onSettings: () -> Unit)
+    fun showUpdateDialog(
+        onDownload: () -> Unit,
+        onSettings: () -> Unit,
+    )
 
     /** Renders the "allow installing from unknown sources" dialog; [onConfirm] runs on OK. */
     fun showUnknownSourcesDialog(onConfirm: () -> Unit)
@@ -44,13 +47,15 @@ interface AutoUpdateHost {
 
 class AutoUpdateModel(
     val config: Config = AppContext.provideConfig(),
-): ActiveModel() {
+) : ActiveModel() {
     var needToShowUpdateDlgAgain: Boolean = false
     val updateChecker = UpdateChecker(BuildConfig.VERSION_NAME)
     var lastUpdateNotificationTime: Calendar
     var needAutoCheckUpdates: Boolean
         get() = config.autoCheckUpdates && BuildConfig.BUILT_IN_AUTO_UPDATE
-        set(value) { config.autoCheckUpdates = value }
+        set(value) {
+            config.autoCheckUpdates = value
+        }
 
     init {
         lastUpdateNotificationTime = config.lastUpdateUserNotificationTime
@@ -58,7 +63,10 @@ class AutoUpdateModel(
             ?: Calendar.getInstance()
     }
 
-    fun checkUpdate(force: Boolean, onDoneCallback: () -> Unit) = modelScope.launch(Dispatchers.Main) {
+    fun checkUpdate(
+        force: Boolean,
+        onDoneCallback: () -> Unit,
+    ) = modelScope.launch(Dispatchers.Main) {
         if (updateChecker.versionCheckResult == null || force) {
             launch(Dispatchers.IO) {
                 try {
@@ -67,7 +75,7 @@ class AutoUpdateModel(
                         arrayOf(config.updateChannel),
                         BuildConfig.FLAVOR_appstore,
                         BuildConfig.FLAVOR_webengine,
-                        Build.SUPPORTED_ABIS[0]
+                        Build.SUPPORTED_ABIS[0],
                     )
                 } catch (e: Exception) {
                     e.printStackTrace()
@@ -81,7 +89,10 @@ class AutoUpdateModel(
      * Offers [host] the update, at most once a day unless [force]. The model only decides *that*
      * there is something to show; the host renders the dialogs and runs the platform actions.
      */
-    fun showUpdateDialogIfNeeded(host: AutoUpdateHost, force: Boolean = false) {
+    fun showUpdateDialogIfNeeded(
+        host: AutoUpdateHost,
+        force: Boolean = false,
+    ) {
         val now = Calendar.getInstance()
         if (lastUpdateNotificationTime.sameDay(now) && !force) {
             return

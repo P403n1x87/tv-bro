@@ -18,8 +18,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
-import org.robolectric.annotation.Config as RobolectricConfig
 import java.util.concurrent.Executor
+import org.robolectric.annotation.Config as RobolectricConfig
 
 /**
  * Tests for [ActiveDownloadsModel]'s listener fan-out, cancellation and completion, plus the
@@ -28,7 +28,6 @@ import java.util.concurrent.Executor
 @RunWith(RobolectricTestRunner::class)
 @RobolectricConfig(sdk = [26], application = Application::class)
 class ActiveDownloadsModelTest {
-
     private lateinit var db: AppDatabase
     private lateinit var downloads: DownloadsRepository
     private lateinit var model: ActiveDownloadsModel
@@ -38,11 +37,13 @@ class ActiveDownloadsModelTest {
     @Before
     fun setUp() {
         val app = RuntimeEnvironment.getApplication()
-        db = Room.inMemoryDatabaseBuilder(app, AppDatabase::class.java)
-            .allowMainThreadQueries()
-            .setQueryExecutor(directExecutor)
-            .setTransactionExecutor(directExecutor)
-            .build()
+        db =
+            Room
+                .inMemoryDatabaseBuilder(app, AppDatabase::class.java)
+                .allowMainThreadQueries()
+                .setQueryExecutor(directExecutor)
+                .setTransactionExecutor(directExecutor)
+                .build()
         downloads = DownloadsRepository(db.downloadDao())
         model = ActiveDownloadsModel(downloads, contentResolver = { app.contentResolver })
     }
@@ -52,9 +53,22 @@ class ActiveDownloadsModelTest {
         db.close()
     }
 
-    private fun task(id: Long, url: String = "https://example.com/a.apk"): DownloadTask {
-        val download = Download(url, "a.apk", "/tmp/nonexistent-$id.apk", Download.OperationAfterDownload.NOP,
-            null, null, null, null, null)
+    private fun task(
+        id: Long,
+        url: String = "https://example.com/a.apk",
+    ): DownloadTask {
+        val download =
+            Download(
+                url,
+                "a.apk",
+                "/tmp/nonexistent-$id.apk",
+                Download.OperationAfterDownload.NOP,
+                null,
+                null,
+                null,
+                null,
+                null,
+            )
         download.id = id
         return FileDownloadTask(download, null, NoOpCallback, RuntimeEnvironment.getApplication().contentResolver)
     }
@@ -122,54 +136,124 @@ class ActiveDownloadsModelTest {
     }
 
     @Test
-    fun deletingAnItemRemovesItFromTheLog() = runBlocking {
-        downloads.add(Download("https://example.com/a.apk", "a.apk", "/tmp/nonexistent.apk",
-            Download.OperationAfterDownload.NOP, null, null, null, null, null))
-        val stored = downloads.all().single()
+    fun deletingAnItemRemovesItFromTheLog() =
+        runBlocking {
+            downloads.add(
+                Download(
+                    "https://example.com/a.apk",
+                    "a.apk",
+                    "/tmp/nonexistent.apk",
+                    Download.OperationAfterDownload.NOP,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                ),
+            )
+            val stored = downloads.all().single()
 
-        model.deleteItem(stored)
+            model.deleteItem(stored)
 
-        assertTrue(downloads.all().isEmpty())
-    }
+            assertTrue(downloads.all().isEmpty())
+        }
 
     @Test
     @RobolectricConfig(sdk = [30])
-    fun deletingAContentUriOnApi30GoesThroughTheInjectedResolverAndStillClearsTheLog() = runBlocking {
-        val uri = Uri.parse("content://com.phlox.tvwebbrowser.test/Download/a.apk")
-        downloads.add(Download("https://example.com/a.apk", "a.apk", uri.toString(),
-            Download.OperationAfterDownload.NOP, null, null, null, null, null))
-        val stored = downloads.all().single()
+    fun deletingAContentUriOnApi30GoesThroughTheInjectedResolverAndStillClearsTheLog() =
+        runBlocking {
+            val uri = Uri.parse("content://com.phlox.tvwebbrowser.test/Download/a.apk")
+            downloads.add(
+                Download(
+                    "https://example.com/a.apk",
+                    "a.apk",
+                    uri.toString(),
+                    Download.OperationAfterDownload.NOP,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                ),
+            )
+            val stored = downloads.all().single()
 
-        model.deleteItem(stored)
+            model.deleteItem(stored)
 
-        assertTrue(downloads.all().isEmpty())
-    }
-
-    @Test
-    fun deletingASelectionRemovesOnlyThoseRows() = runBlocking {
-        downloads.add(Download("https://example.com/a.apk", "a.apk", "/tmp/a.apk",
-            Download.OperationAfterDownload.NOP, null, null, null, null, null))
-        downloads.add(Download("https://example.com/b.apk", "b.apk", "/tmp/b.apk",
-            Download.OperationAfterDownload.NOP, null, null, null, null, null))
-        val stored = downloads.all()
-        val selected = stored.first { it.filename == "a.apk" }
-
-        model.deleteItems(listOf(selected))
-
-        assertEquals(listOf("b.apk"), downloads.all().map { it.filename })
-    }
+            assertTrue(downloads.all().isEmpty())
+        }
 
     @Test
-    fun deletingAllEmptiesTheLog() = runBlocking {
-        downloads.add(Download("https://example.com/a.apk", "a.apk", "/tmp/a.apk",
-            Download.OperationAfterDownload.NOP, null, null, null, null, null))
-        downloads.add(Download("https://example.com/b.apk", "b.apk", "/tmp/b.apk",
-            Download.OperationAfterDownload.NOP, null, null, null, null, null))
+    fun deletingASelectionRemovesOnlyThoseRows() =
+        runBlocking {
+            downloads.add(
+                Download(
+                    "https://example.com/a.apk",
+                    "a.apk",
+                    "/tmp/a.apk",
+                    Download.OperationAfterDownload.NOP,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                ),
+            )
+            downloads.add(
+                Download(
+                    "https://example.com/b.apk",
+                    "b.apk",
+                    "/tmp/b.apk",
+                    Download.OperationAfterDownload.NOP,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                ),
+            )
+            val stored = downloads.all()
+            val selected = stored.first { it.filename == "a.apk" }
 
-        model.deleteAll()
+            model.deleteItems(listOf(selected))
 
-        assertTrue(downloads.all().isEmpty())
-    }
+            assertEquals(listOf("b.apk"), downloads.all().map { it.filename })
+        }
+
+    @Test
+    fun deletingAllEmptiesTheLog() =
+        runBlocking {
+            downloads.add(
+                Download(
+                    "https://example.com/a.apk",
+                    "a.apk",
+                    "/tmp/a.apk",
+                    Download.OperationAfterDownload.NOP,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                ),
+            )
+            downloads.add(
+                Download(
+                    "https://example.com/b.apk",
+                    "b.apk",
+                    "/tmp/b.apk",
+                    Download.OperationAfterDownload.NOP,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                ),
+            )
+
+            model.deleteAll()
+
+            assertTrue(downloads.all().isEmpty())
+        }
 
     private class FakeListener : ActiveDownloadsModel.Listener {
         val updated = mutableListOf<Download>()
@@ -180,7 +264,11 @@ class ActiveDownloadsModelTest {
             updated += downloadInfo
         }
 
-        override fun onDownloadError(downloadInfo: Download, responseCode: Int, responseMessage: String) {
+        override fun onDownloadError(
+            downloadInfo: Download,
+            responseCode: Int,
+            responseMessage: String,
+        ) {
             errors += Triple(downloadInfo, responseCode, responseMessage)
         }
 
@@ -191,7 +279,13 @@ class ActiveDownloadsModelTest {
 
     private object NoOpCallback : DownloadTask.Callback {
         override fun onProgress(task: DownloadTask) {}
-        override fun onError(task: DownloadTask, responseCode: Int, responseMessage: String) {}
+
+        override fun onError(
+            task: DownloadTask,
+            responseCode: Int,
+            responseMessage: String,
+        ) {}
+
         override fun onDone(task: DownloadTask) {}
     }
 }

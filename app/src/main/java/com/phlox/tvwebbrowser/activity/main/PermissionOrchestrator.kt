@@ -44,6 +44,9 @@ class PermissionOrchestrator(
     }
 
     /** @return true when the result was handled here (the caller must not handle it further). */
-    fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean =
-        voiceSearchActivityResult(requestCode, resultCode, data)
+    fun onActivityResult(
+        requestCode: Int,
+        resultCode: Int,
+        data: Intent?,
+    ): Boolean = voiceSearchActivityResult(requestCode, resultCode, data)
 }

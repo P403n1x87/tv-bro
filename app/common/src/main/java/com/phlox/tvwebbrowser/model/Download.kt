@@ -7,8 +7,14 @@ import java.io.InputStream
  * Created by PDT on 23.01.2017.
  */
 
-@Entity(tableName = "downloads", indices = arrayOf(Index(value = ["time"], name = "downloads_time_idx"),
-        Index(value = ["filename"], name = "downloads_filename_idx")))
+@Entity(
+    tableName = "downloads",
+    indices =
+        arrayOf(
+            Index(value = ["time"], name = "downloads_time_idx"),
+            Index(value = ["filename"], name = "downloads_filename_idx"),
+        ),
+)
 class Download() {
     @PrimaryKey(autoGenerate = true)
     var id: Long = 0
@@ -19,38 +25,60 @@ class Download() {
 
     @Volatile
     var size: Long = 0
-    @Volatile @ColumnInfo(name = "bytes_received")
+
+    @Volatile
+    @ColumnInfo(name = "bytes_received")
     var bytesReceived: Long = 0
+
     @Ignore
     var operationAfterDownload = OperationAfterDownload.NOP
 
-    //non-db fields
+    // non-db fields
     @Ignore
     @Volatile
     var cancelled: Boolean = false
+
     @Ignore
-    var isDateHeader = false//user for displaying date headers inside list view
+    var isDateHeader = false
+
+    // user for displaying date headers inside list view
     @Ignore
     @Volatile
-    var selected = false//used for multi-select deletion inside list view
+    var selected = false
+
+    // used for multi-select deletion inside list view
     @Ignore
     var mimeType: String? = null
+
     @Ignore
     var referer: String? = null
+
     @Ignore
     var userAgentString: String? = null
+
     @Ignore
     var base64BlobData: String? = null
+
     @Ignore
     var stream: InputStream? = null
 
     enum class OperationAfterDownload {
-        NOP, INSTALL
+        NOP,
+        INSTALL,
     }
 
-    constructor(url: String, filename: String, filepath: String?, operationAfterDownload: OperationAfterDownload,
-                mimeType: String?, referer: String?, userAgentString: String?, base64BlobData: String?,
-                stream: InputStream?, size: Long = 0L) : this() {
+    constructor(
+        url: String,
+        filename: String,
+        filepath: String?,
+        operationAfterDownload: OperationAfterDownload,
+        mimeType: String?,
+        referer: String?,
+        userAgentString: String?,
+        base64BlobData: String?,
+        stream: InputStream?,
+        size: Long = 0L,
+    ) : this() {
         this.url = url
         this.filename = filename
         this.filepath = filepath ?: ""

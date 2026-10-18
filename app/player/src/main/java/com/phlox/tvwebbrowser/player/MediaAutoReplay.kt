@@ -27,7 +27,11 @@ class MediaAutoReplay(
 ) {
     /** Small seam over a main-thread handler so the state machine is unit-testable off Android. */
     interface Scheduler {
-        fun postDelayed(delayMs: Long, task: Runnable)
+        fun postDelayed(
+            delayMs: Long,
+            task: Runnable,
+        )
+
         fun removeCallbacks(task: Runnable)
     }
 
@@ -84,7 +88,17 @@ class MediaAutoReplay(
 }
 
 /** [MediaAutoReplay.Scheduler] backed by a [Handler] (the main looper in production). */
-class HandlerScheduler(private val handler: Handler) : MediaAutoReplay.Scheduler {
-    override fun postDelayed(delayMs: Long, task: Runnable) { handler.postDelayed(task, delayMs) }
-    override fun removeCallbacks(task: Runnable) { handler.removeCallbacks(task) }
+class HandlerScheduler(
+    private val handler: Handler,
+) : MediaAutoReplay.Scheduler {
+    override fun postDelayed(
+        delayMs: Long,
+        task: Runnable,
+    ) {
+        handler.postDelayed(task, delayMs)
+    }
+
+    override fun removeCallbacks(task: Runnable) {
+        handler.removeCallbacks(task)
+    }
 }

@@ -6,24 +6,30 @@ import android.os.Build
 import android.util.Log
 import com.phlox.tvwebbrowser.TVBro
 import com.phlox.tvwebbrowser.model.Download
-import com.phlox.tvwebbrowser.service.downloads.DownloadTask
-import com.phlox.tvwebbrowser.service.downloads.FileDownloadTask
 import com.phlox.tvwebbrowser.repository.DownloadsRepository
 import com.phlox.tvwebbrowser.repository.Repositories
-import com.phlox.tvwebbrowser.utils.observable.ObservableList
+import com.phlox.tvwebbrowser.service.downloads.DownloadTask
+import com.phlox.tvwebbrowser.service.downloads.FileDownloadTask
 import com.phlox.tvwebbrowser.utils.activemodel.ActiveModel
+import com.phlox.tvwebbrowser.utils.observable.ObservableList
 import java.io.File
 
 class ActiveDownloadsModel(
     private val downloads: DownloadsRepository = Repositories.downloads,
     private val contentResolver: () -> ContentResolver = { TVBro.instance.contentResolver },
-): ActiveModel() {
+) : ActiveModel() {
     val activeDownloads = ObservableList<DownloadTask>()
     private val listeners = java.util.ArrayList<Listener>()
 
     interface Listener {
         fun onDownloadUpdated(downloadInfo: Download)
-        fun onDownloadError(downloadInfo: Download, responseCode: Int, responseMessage: String)
+
+        fun onDownloadError(
+            downloadInfo: Download,
+            responseCode: Int,
+            responseMessage: String,
+        )
+
         fun onAllDownloadsComplete()
     }
 
@@ -52,12 +58,13 @@ class ActiveDownloadsModel(
     private fun deleteFile(download: Download) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val contentResolver = contentResolver()
-            val rowsDeleted = try {
-                contentResolver.delete(Uri.parse(download.filepath), null)
-            } catch (e: Exception) {
-                Log.w(FileDownloadTask.TAG, "Failed to delete file from MediaStore", e)
-                0
-            }
+            val rowsDeleted =
+                try {
+                    contentResolver.delete(Uri.parse(download.filepath), null)
+                } catch (e: Exception) {
+                    Log.w(FileDownloadTask.TAG, "Failed to delete file from MediaStore", e)
+                    0
+                }
             if (rowsDeleted < 1) {
                 Log.e(FileDownloadTask.TAG, "Failed to delete file from MediaStore")
             }
@@ -84,7 +91,11 @@ class ActiveDownloadsModel(
         }
     }
 
-    fun notifyListenersAboutError(task: DownloadTask, responseCode: Int, responseMessage: String) {
+    fun notifyListenersAboutError(
+        task: DownloadTask,
+        responseCode: Int,
+        responseMessage: String,
+    ) {
         for (i in listeners.indices) {
             listeners[i].onDownloadError(task.downloadInfo, responseCode, responseMessage)
         }

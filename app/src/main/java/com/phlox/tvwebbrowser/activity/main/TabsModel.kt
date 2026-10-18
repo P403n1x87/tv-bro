@@ -29,7 +29,10 @@ interface TabViewHost {
     fun createView(tab: WebTabState): Boolean
 
     /** Attaches [tab]'s engine to this host's window. */
-    fun attachEngineToWindow(tab: WebTabState, callback: WebEngineWindowProviderCallback)
+    fun attachEngineToWindow(
+        tab: WebTabState,
+        callback: WebEngineWindowProviderCallback,
+    )
 }
 
 /**
@@ -51,7 +54,7 @@ class TabsModel(
     private val networkAvailable: () -> Boolean = { Utils.isNetworkConnected(TVBro.instance) },
 ) : ActiveModel() {
     companion object {
-        var TAG: String = TabsModel::class.java.simpleName
+        val TAG: String = TabsModel::class.java.simpleName
     }
 
     var loaded = false
@@ -61,7 +64,7 @@ class TabsModel(
 
     init {
         tabsStates.subscribe({
-            //auto-update positions on any list change
+            // auto-update positions on any list change
             var positionsChanged = false
             tabsStates.forEachIndexed { index, webTabState ->
                 if (webTabState.position != index) {
@@ -78,30 +81,31 @@ class TabsModel(
         }, false)
     }
 
-    fun loadState() = modelScope.launch(Dispatchers.Main) {
-        if (loaded) {
-            //check is incognito mode changed
-            if (incognitoMode != config.incognitoMode) {
-                incognitoMode = config.incognitoMode
-                loaded = false
-            } else {
-                return@launch
+    fun loadState() =
+        modelScope.launch(Dispatchers.Main) {
+            if (loaded) {
+                // check is incognito mode changed
+                if (incognitoMode != config.incognitoMode) {
+                    incognitoMode = config.incognitoMode
+                    loaded = false
+                } else {
+                    return@launch
+                }
+            }
+            tabsStates.replaceAll(tabsRepository.all(config.incognitoMode))
+            loaded = true
+        }
+
+    fun discardSavedState() =
+        modelScope.launch(Dispatchers.Main) {
+            loaded = true
+            tabsRepository.deleteAll(config.incognitoMode)
+            withContext(Dispatchers.IO) {
+                tabWvStatesDir()?.deleteRecursively()
             }
         }
-        tabsStates.replaceAll(tabsRepository.all(config.incognitoMode))
-        loaded = true
-    }
 
-    fun discardSavedState() = modelScope.launch(Dispatchers.Main) {
-        loaded = true
-        tabsRepository.deleteAll(config.incognitoMode)
-        withContext(Dispatchers.IO) {
-            tabWvStatesDir()?.deleteRecursively()
-        }
-    }
-
-    private fun tabWvStatesDir() =
-        filesDir()?.let { File(it, WebTabState.TAB_WVSTATES_DIR) }
+    private fun tabWvStatesDir() = filesDir()?.let { File(it, WebTabState.TAB_WVSTATES_DIR) }
 
     suspend fun saveTab(tab: WebTabState) {
         if (tab.selected) {
@@ -133,7 +137,11 @@ class TabsModel(
      * Materialising an engine view for the tab that becomes current is view business, hence the
      * two callbacks.
      */
-    fun onCloseTab(tab: WebTabState, switchTo: (WebTabState) -> Unit, openNewTab: () -> Unit) {
+    fun onCloseTab(
+        tab: WebTabState,
+        switchTo: (WebTabState) -> Unit,
+        openNewTab: () -> Unit,
+    ) {
         val position = tabsStates.indexOf(tab)
         if (currentTab.value == tab) {
             currentTab.value = null
@@ -161,7 +169,10 @@ class TabsModel(
      * ([defaultEnabled]) otherwise. The new value is returned so the caller can push it into the
      * tab's engine and repaint.
      */
-    fun onToggleAdBlock(tab: WebTabState, defaultEnabled: Boolean): Boolean {
+    fun onToggleAdBlock(
+        tab: WebTabState,
+        defaultEnabled: Boolean,
+    ): Boolean {
         val newState = !(tab.adblock ?: defaultEnabled)
         tab.adblock = newState
         return newState
@@ -172,15 +183,16 @@ class TabsModel(
      * it — nothing is selected when no tab exists), the rows are deleted from the repository and
      * the tab files go away in the background.
      */
-    fun onCloseAllTabs() = modelScope.launch(Dispatchers.Main) {
-        val tabsClone = ArrayList(tabsStates)
-        tabsStates.clear()
-        currentTab.value = null
-        tabsRepository.deleteAll(config.incognitoMode)
-        withContext(Dispatchers.IO) {
-            tabsClone.forEach { it.removeFiles(filesDir(), cacheDir()) }
+    fun onCloseAllTabs() =
+        modelScope.launch(Dispatchers.Main) {
+            val tabsClone = ArrayList(tabsStates)
+            tabsStates.clear()
+            currentTab.value = null
+            tabsRepository.deleteAll(config.incognitoMode)
+            withContext(Dispatchers.IO) {
+                tabsClone.forEach { it.removeFiles(filesDir(), cacheDir()) }
+            }
         }
-    }
 
     fun onDetachActivity() {
         for (tab in tabsStates) {
@@ -193,14 +205,17 @@ class TabsModel(
      * inserted at [index] and the caller then materialises its engine view and switches to it. The
      * list observer updates the stored positions.
      */
-    fun onOpenTab(tab: WebTabState, index: Int) {
+    fun onOpenTab(
+        tab: WebTabState,
+        index: Int,
+    ) {
         tabsStates.add(index.coerceIn(0, tabsStates.size), tab)
     }
 
     fun changeTab(
         newTab: WebTabState,
         viewHost: TabViewHost,
-        webEngineWindowProviderCallback: WebEngineWindowProviderCallback
+        webEngineWindowProviderCallback: WebEngineWindowProviderCallback,
     ) {
         if (currentTab.value == newTab && newTab.webEngine.getView() != null) return
         if (currentTab.value != newTab) {
@@ -243,7 +258,10 @@ class TabsModel(
     }
 
     /** The engine is about to load [url] in [tab]; remembered as the redirect-blocker's fallback. */
-    fun onNavigationRequested(tab: WebTabState, url: String) {
+    fun onNavigationRequested(
+        tab: WebTabState,
+        url: String,
+    ) {
         tab.lastLoadingUrl = url
     }
 
@@ -252,7 +270,11 @@ class TabsModel(
      * after redirects, so its value wins and the url the callback reported is only a fallback; the
      * blocked-ad/popup counters restart with every new document.
      */
-    fun onPageStarted(tab: WebTabState, engineUrl: String?, callbackUrl: String?) {
+    fun onPageStarted(
+        tab: WebTabState,
+        engineUrl: String?,
+        callbackUrl: String?,
+    ) {
         onPageUrlUpdated(tab, engineUrl, callbackUrl)
         tab.blockedAds = 0
         tab.blockedPopups = 0
@@ -262,7 +284,11 @@ class TabsModel(
         modelScope.launch { findHostConfig(tab, false) }
     }
 
-    fun onPageFinished(tab: WebTabState, engineUrl: String?, callbackUrl: String?) {
+    fun onPageFinished(
+        tab: WebTabState,
+        engineUrl: String?,
+        callbackUrl: String?,
+    ) {
         onPageUrlUpdated(tab, engineUrl, callbackUrl)
         // A settled page invalidates the thumbnails of the other tabs (the one that just finished
         // keeps its own: it is about to be re-rendered right away).
@@ -270,7 +296,10 @@ class TabsModel(
     }
 
     /** The engine knows the document title; the tabs panel repaints the row from the new value. */
-    fun onPageTitleUpdated(tab: WebTabState, title: String) {
+    fun onPageTitleUpdated(
+        tab: WebTabState,
+        title: String,
+    ) {
         tab.title = title
     }
 
@@ -283,25 +312,36 @@ class TabsModel(
     }
 
     /** The engine reports a page-scale change; kept on the tab so it survives switching. */
-    fun onScaleChanged(tab: WebTabState, newScale: Float) {
+    fun onScaleChanged(
+        tab: WebTabState,
+        newScale: Float,
+    ) {
         tab.scale = newScale
     }
 
-    private fun onPageUrlUpdated(tab: WebTabState, engineUrl: String?, callbackUrl: String?) {
+    private fun onPageUrlUpdated(
+        tab: WebTabState,
+        engineUrl: String?,
+        callbackUrl: String?,
+    ) {
         val url = engineUrl ?: callbackUrl
         if (url != null) {
             tab.url = url
         }
     }
 
-    suspend fun findHostConfig(tab: WebTabState, createIfNotFound: Boolean): HostConfig? {
+    suspend fun findHostConfig(
+        tab: WebTabState,
+        createIfNotFound: Boolean,
+    ): HostConfig? {
         Log.d(WebTabState.TAG, "findOrCreateHostConfig")
-        val currentHostName = try {
-            URL(tab.url).host
-        } catch (e: Exception) {
-            Log.w(WebTabState.TAG, "Can not parse current url host: $e")
-            return null
-        }
+        val currentHostName =
+            try {
+                URL(tab.url).host
+            } catch (e: Exception) {
+                Log.w(WebTabState.TAG, "Can not parse current url host: $e")
+                return null
+            }
         var hostConfig = tab.cachedHostConfig
         if (hostConfig == null || hostConfig.hostName != currentHostName) {
             hostConfig = hostsRepository.findByHostName(currentHostName)
@@ -314,8 +354,11 @@ class TabsModel(
         return hostConfig
     }
 
-    suspend fun changePopupBlockingLevel(newLevel: Int, tab: WebTabState) {
-        val hostConfig = findHostConfig(tab,true) ?: return
+    suspend fun changePopupBlockingLevel(
+        newLevel: Int,
+        tab: WebTabState,
+    ) {
+        val hostConfig = findHostConfig(tab, true) ?: return
         hostConfig.popupBlockLevel = newLevel
         hostsRepository.update(hostConfig)
     }
@@ -324,7 +367,10 @@ class TabsModel(
      * Moves the tab at [from] to [to]. The tab panel asks for this instead of swapping the list
      * itself, so the list mutation (and the position persistence it triggers) stays in the model.
      */
-    fun moveTab(from: Int, to: Int) {
+    fun moveTab(
+        from: Int,
+        to: Int,
+    ) {
         if (from !in tabsStates.indices || to !in tabsStates.indices || from == to) return
         tabsStates.swap(from, to)
     }

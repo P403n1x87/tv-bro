@@ -13,9 +13,11 @@ import com.phlox.tvwebbrowser.player.MediaMetadataCache
 import com.phlox.tvwebbrowser.webengine.MediaCandidate
 import java.util.Locale
 
-class MediaListAdapter(context: Context, private val items: List<MediaCandidate>) :
-    BaseAdapter(), MediaMetadataCache.Listener {
-
+class MediaListAdapter(
+    context: Context,
+    private val items: List<MediaCandidate>,
+) : BaseAdapter(),
+    MediaMetadataCache.Listener {
     private val inflater = LayoutInflater.from(context)
 
     /** URLs of the listed rows, so a metadata callback is an O(1) lookup instead of a list scan. */
@@ -40,7 +42,11 @@ class MediaListAdapter(context: Context, private val items: List<MediaCandidate>
         if (url in listedUrls) notifyDataSetChanged()
     }
 
-    override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+    override fun getView(
+        position: Int,
+        convertView: View?,
+        parent: ViewGroup,
+    ): View {
         val view = convertView ?: inflater.inflate(R.layout.view_media_candidate_item, parent, false)
         val vb = ViewMediaCandidateItemBinding.bind(view)
         val candidate = items[position]
@@ -51,12 +57,22 @@ class MediaListAdapter(context: Context, private val items: List<MediaCandidate>
         return view
     }
 
-    private fun title(uri: Uri, candidate: MediaCandidate): String {
-        val last = uri.path.orEmpty().trimEnd('/').substringAfterLast('/')
+    private fun title(
+        uri: Uri,
+        candidate: MediaCandidate,
+    ): String {
+        val last =
+            uri.path
+                .orEmpty()
+                .trimEnd('/')
+                .substringAfterLast('/')
         return if (last.isNotBlank()) Uri.decode(last) else (uri.host ?: candidate.url)
     }
 
-    private fun subtitle(uri: Uri, candidate: MediaCandidate): String {
+    private fun subtitle(
+        uri: Uri,
+        candidate: MediaCandidate,
+    ): String {
         val host = uri.host
         return if (host.isNullOrBlank()) candidate.kind.name else "${candidate.kind.name} · $host"
     }

@@ -10,12 +10,17 @@ import java.util.concurrent.Executors
  * progressive files carry no cheaply parseable metadata.
  */
 object MediaMetadataPrefetcher {
-    private val workers = Executors.newFixedThreadPool(2) { runnable ->
-        Thread(runnable, "TVBroMediaMeta").apply { isDaemon = true }
-    }
+    private val workers =
+        Executors.newFixedThreadPool(2) { runnable ->
+            Thread(runnable, "TVBroMediaMeta").apply { isDaemon = true }
+        }
     private val inFlight: MutableSet<String> = Collections.synchronizedSet(mutableSetOf())
 
-    fun prefetch(url: String, kind: MediaRequestCatalog.Kind, context: MediaRequestContext) {
+    fun prefetch(
+        url: String,
+        kind: MediaRequestCatalog.Kind,
+        context: MediaRequestContext,
+    ) {
         if (kind == MediaRequestCatalog.Kind.PROGRESSIVE) return
         if (MediaMetadataCache.get(url) != null) return
         if (!inFlight.add(url)) return

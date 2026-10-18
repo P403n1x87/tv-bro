@@ -13,18 +13,26 @@ import org.mozilla.geckoview.GeckoSession
 import org.mozilla.geckoview.SlowScriptResponse
 import org.mozilla.geckoview.WebResponse
 
-class MyContentDelegate(private val webEngine: GeckoWebEngine): GeckoSession.ContentDelegate {
+class MyContentDelegate(
+    private val webEngine: GeckoWebEngine,
+) : GeckoSession.ContentDelegate {
     private var activeAlert: Boolean = false
 
     companion object {
         val TAG: String = MyContentDelegate::class.java.simpleName
     }
 
-    override fun onTitleChange(session: GeckoSession, title: String?) {
+    override fun onTitleChange(
+        session: GeckoSession,
+        title: String?,
+    ) {
         title?.let { webEngine.callback?.onReceivedTitle(it) }
     }
 
-    override fun onPreviewImage(session: GeckoSession, previewImageUrl: String) {
+    override fun onPreviewImage(
+        session: GeckoSession,
+        previewImageUrl: String,
+    ) {
         super.onPreviewImage(session, previewImageUrl)
     }
 
@@ -37,7 +45,10 @@ class MyContentDelegate(private val webEngine: GeckoWebEngine): GeckoSession.Con
         webEngine.callback?.closeWindow(session)
     }
 
-    override fun onFullScreen(session: GeckoSession, fullScreen: Boolean) {
+    override fun onFullScreen(
+        session: GeckoSession,
+        fullScreen: Boolean,
+    ) {
         Log.i("TVBroAutoVideo", "document-fullscreen=$fullScreen")
         if (fullScreen) {
             webEngine.callback?.onPrepareForFullscreen()
@@ -46,7 +57,10 @@ class MyContentDelegate(private val webEngine: GeckoWebEngine): GeckoSession.Con
         }
     }
 
-    override fun onMetaViewportFitChange(session: GeckoSession, viewportFit: String) {
+    override fun onMetaViewportFitChange(
+        session: GeckoSession,
+        viewportFit: String,
+    ) {
         super.onMetaViewportFitChange(session, viewportFit)
     }
 
@@ -54,22 +68,24 @@ class MyContentDelegate(private val webEngine: GeckoWebEngine): GeckoSession.Con
         session: GeckoSession,
         screenX: Int,
         screenY: Int,
-        element: GeckoSession.ContentDelegate.ContextElement
+        element: GeckoSession.ContentDelegate.ContextElement,
     ) {
-        Log.d(TAG,"onContextMenu screenX="
-                    + screenX
-                    + " screenY="
-                    + screenY
-                    + " type="
-                    + element.type
-                    + " linkUri="
-                    + element.linkUri
-                    + " title="
-                    + element.title
-                    + " alt="
-                    + element.altText
-                    + " srcUri="
-                    + element.srcUri
+        Log.d(
+            TAG,
+            "onContextMenu screenX=" +
+                screenX +
+                " screenY=" +
+                screenY +
+                " type=" +
+                element.type +
+                " linkUri=" +
+                element.linkUri +
+                " title=" +
+                element.title +
+                " alt=" +
+                element.altText +
+                " srcUri=" +
+                element.srcUri,
         )
         val webView = webEngine.getView() as? GeckoViewWithVirtualCursor ?: return
         webEngine.callback?.onContextMenu(
@@ -80,12 +96,17 @@ class MyContentDelegate(private val webEngine: GeckoWebEngine): GeckoSession.Con
             element.title,
             element.altText,
             element.textContent,
-            webView.cursorDrawerDelegate.cursorPosition.x.toInt(),
-            webView.cursorDrawerDelegate.cursorPosition.y.toInt()
+            webView.cursorDrawerDelegate.cursorPosition.x
+                .toInt(),
+            webView.cursorDrawerDelegate.cursorPosition.y
+                .toInt(),
         )
     }
 
-    override fun onExternalResponse(session: GeckoSession, response: WebResponse) {
+    override fun onExternalResponse(
+        session: GeckoSession,
+        response: WebResponse,
+    ) {
         Log.d(TAG, "onExternalResponse: " + response.uri)
 
         if (response.requestExternalApp) {
@@ -106,7 +127,7 @@ class MyContentDelegate(private val webEngine: GeckoWebEngine): GeckoSession.Con
             null,
             response.body,
             contentLength,
-            contentDisposition
+            contentDisposition,
         )
     }
 
@@ -118,7 +139,8 @@ class MyContentDelegate(private val webEngine: GeckoWebEngine): GeckoSession.Con
 
     override fun onKill(session: GeckoSession) {
         if (webEngine.session != session || !webEngine.tab.selected ||
-            !webEngine.isForeground) {
+            !webEngine.isForeground
+        ) {
             Log.w(TAG, "Background session killed")
             return
         }
@@ -140,17 +162,23 @@ class MyContentDelegate(private val webEngine: GeckoWebEngine): GeckoSession.Con
         super.onPaintStatusReset(session)
     }
 
-    override fun onPointerIconChange(session: GeckoSession, icon: PointerIcon) {
+    override fun onPointerIconChange(
+        session: GeckoSession,
+        icon: PointerIcon,
+    ) {
         super.onPointerIconChange(session, icon)
     }
 
-    override fun onWebAppManifest(session: GeckoSession, manifest: JSONObject) {
-        Log.d(TAG,"onWebAppManifest: $manifest")
+    override fun onWebAppManifest(
+        session: GeckoSession,
+        manifest: JSONObject,
+    ) {
+        Log.d(TAG, "onWebAppManifest: $manifest")
     }
 
     override fun onSlowScript(
         geckoSession: GeckoSession,
-        scriptFileName: String
+        scriptFileName: String,
     ): GeckoResult<SlowScriptResponse>? {
         val prompt: MyPromptDelegate? =
             webEngine.session.promptDelegate as? MyPromptDelegate

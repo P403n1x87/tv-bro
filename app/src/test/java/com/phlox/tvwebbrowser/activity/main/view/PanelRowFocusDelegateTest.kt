@@ -25,7 +25,6 @@ import org.robolectric.annotation.Config as RobolectricConfig
 @RunWith(RobolectricTestRunner::class)
 @RobolectricConfig(sdk = [26], application = Application::class)
 class PanelRowFocusDelegateTest {
-
     private lateinit var activity: Activity
     private lateinit var root: FrameLayout
     private lateinit var panel: FrameLayout
@@ -36,10 +35,11 @@ class PanelRowFocusDelegateTest {
     fun setUp() {
         activity = Robolectric.buildActivity(Activity::class.java).setup().get()
         root = FrameLayout(activity)
-        panel = FrameLayout(activity).apply {
-            isFocusable = true
-            isFocusableInTouchMode = true
-        }
+        panel =
+            FrameLayout(activity).apply {
+                isFocusable = true
+                isFocusableInTouchMode = true
+            }
         root.addView(panel, FrameLayout.LayoutParams(200, 400))
         activity.setContentView(root)
         shadowOf(Looper.getMainLooper()).idle()
@@ -88,11 +88,12 @@ class PanelRowFocusDelegateTest {
 
     @Test
     fun givesUpWhenTheFocusHasLeftThePanel() {
-        val other = View(activity).apply {
-            isFocusable = true
-            isFocusableInTouchMode = true
-            layoutParams = FrameLayout.LayoutParams(200, 200)
-        }
+        val other =
+            View(activity).apply {
+                isFocusable = true
+                isFocusableInTouchMode = true
+                layoutParams = FrameLayout.LayoutParams(200, 200)
+            }
         root.addView(other, 0)
         layoutPass()
         other.requestFocus()

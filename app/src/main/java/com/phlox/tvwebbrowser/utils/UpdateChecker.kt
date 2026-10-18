@@ -20,15 +20,29 @@ import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
-class UpdateChecker(val currentVersionName: String) {
+class UpdateChecker(
+    val currentVersionName: String,
+) {
     var versionCheckResult: UpdateCheckResult? = null
 
-    class ChangelogEntry(val versionName: String, val changes: String)
-    class UpdateCheckResult(val latestVersionName: String, val channel:String,
-                            val url: String, val changelog: ArrayList<ChangelogEntry>, val availableChannels: Array<String>)
+    class ChangelogEntry(
+        val versionName: String,
+        val changes: String,
+    )
+
+    class UpdateCheckResult(
+        val latestVersionName: String,
+        val channel: String,
+        val url: String,
+        val changelog: ArrayList<ChangelogEntry>,
+        val availableChannels: Array<String>,
+    )
+
     interface DialogCallback {
         fun download()
+
         fun later()
+
         fun settings()
     }
 
@@ -41,12 +55,17 @@ class UpdateChecker(val currentVersionName: String) {
      * for the running build ([appStoreFlavor] + [webEngineFlavor], plus [abi] when the engine ships
      * native code) are considered, mirroring the asset naming of `.github/workflows/release.yml`.
      */
-    fun checkGitHubReleases(repo: String, channelsToCheck: Array<String>, appStoreFlavor: String,
-                            webEngineFlavor: String, abi: String) {
+    fun checkGitHubReleases(
+        repo: String,
+        channelsToCheck: Array<String>,
+        appStoreFlavor: String,
+        webEngineFlavor: String,
+        abi: String,
+    ) {
         val includePrereleases = channelsToCheck.any { it != CHANNEL_RELEASE }
         val urlConnection = URL("https://api.github.com/repos/$repo/releases?per_page=30").openConnection() as HttpURLConnection
         try {
-            //GitHub's API rejects requests without a User-Agent
+            // GitHub's API rejects requests without a User-Agent
             urlConnection.setRequestProperty("User-Agent", USER_AGENT)
             urlConnection.setRequestProperty("Accept", "application/vnd.github+json")
             val content = urlConnection.inputStream.bufferedReader().use { it.readText() }
@@ -81,7 +100,7 @@ class UpdateChecker(val currentVersionName: String) {
             }
 
             if (latestVersionName == null) {
-                //a successful check with nothing to offer: cache an empty result so we don't re-fetch
+                // a successful check with nothing to offer: cache an empty result so we don't re-fetch
                 versionCheckResult = UpdateCheckResult("", "", "", ArrayList<ChangelogEntry>(), AVAILABLE_CHANNELS)
                 return
             }
@@ -101,7 +120,11 @@ class UpdateChecker(val currentVersionName: String) {
         }
     }
 
-    private fun findAssetUrl(assetsJson: JSONArray?, assetNeedle: String, abi: String): String? {
+    private fun findAssetUrl(
+        assetsJson: JSONArray?,
+        assetNeedle: String,
+        abi: String,
+    ): String? {
         if (assetsJson == null) return null
         var fallback: String? = null
         for (j in 0 until assetsJson.length()) {
@@ -115,29 +138,36 @@ class UpdateChecker(val currentVersionName: String) {
         return fallback
     }
 
-    fun showUpdateDialog(context: Activity, callback: DialogCallback) {
+    fun showUpdateDialog(
+        context: Activity,
+        callback: DialogCallback,
+    ) {
         val version = versionCheckResult ?: return
         var message = ""
         for (changelogEntry in version.changelog) {
             if (compareVersions(changelogEntry.versionName, currentVersionName) > 0) {
                 message += "<b>${changelogEntry.versionName}</b><br>" +
-                        changelogEntry.changes.replace("\n", "<br>") + "<br>"
+                    changelogEntry.changes.replace("\n", "<br>") + "<br>"
             }
         }
         val textView = TextView(context)
         textView.text = Html.fromHtml(message)
-        val padding = Utils.D2P(context, 25f).toInt()
+        val padding = Utils.dpToPx(context, 25f).toInt()
         textView.setPadding(padding, padding, padding, padding)
-        AlertDialog.Builder(context)
-                .setTitle(R.string.new_version_dialog_title)
-                .setView(textView)
-                .setPositiveButton(R.string.download) { _, _ -> callback.download() }
-                .setNegativeButton(R.string.later) { _, _ -> callback.later() }
-                .setNeutralButton(R.string.settings) { _, _ -> callback.settings() }
-                .show()
+        AlertDialog
+            .Builder(context)
+            .setTitle(R.string.new_version_dialog_title)
+            .setView(textView)
+            .setPositiveButton(R.string.download) { _, _ -> callback.download() }
+            .setNegativeButton(R.string.later) { _, _ -> callback.later() }
+            .setNeutralButton(R.string.settings) { _, _ -> callback.settings() }
+            .show()
     }
 
-    suspend fun downloadUpdate(context: Activity, modelScope: CoroutineScope) {
+    suspend fun downloadUpdate(
+        context: Activity,
+        modelScope: CoroutineScope,
+    ) {
         val update = versionCheckResult ?: return
         val dialog = ProgressDialog(context)
         dialog.setCancelable(true)
@@ -149,70 +179,76 @@ class UpdateChecker(val currentVersionName: String) {
         var downloadedFile = Utils.createTempFile(context, UPDATE_APK_FILE_NAME)
         var nextDialogUpdateTime = System.currentTimeMillis()
 
-        val job = modelScope.launch(Dispatchers.IO) io_launch@{
-            var input: InputStream? = null
-            var output: OutputStream? = null
-            var connection: HttpURLConnection? = null
-            try {
-                val url = URL(update.url)
-                connection = url.openConnection() as HttpURLConnection
-                // GitHub release assets answer with a 302 to a signed object URL; HttpURLConnection
-                // follows GET redirects, but only within a protocol, and GitHub wants a User-Agent.
-                connection.instanceFollowRedirects = true
-                connection.setRequestProperty("User-Agent", USER_AGENT)
-                connection.connect()
+        val job =
+            modelScope.launch(Dispatchers.IO) io_launch@{
+                var input: InputStream? = null
+                var output: OutputStream? = null
+                var connection: HttpURLConnection? = null
+                try {
+                    val url = URL(update.url)
+                    connection = url.openConnection() as HttpURLConnection
+                    // GitHub release assets answer with a 302 to a signed object URL; HttpURLConnection
+                    // follows GET redirects, but only within a protocol, and GitHub wants a User-Agent.
+                    connection.instanceFollowRedirects = true
+                    connection.setRequestProperty("User-Agent", USER_AGENT)
+                    connection.connect()
 
-                if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(context, (connection.responseMessage ?: context.getString(R.string.error)) +
-                                " (${connection.responseCode})", Toast.LENGTH_LONG).show()
-                    }
-                    return@io_launch
-                }
-
-                var fileLength = connection.contentLength.toLong()
-                if (fileLength == -1L) {
-                    withContext(Dispatchers.Main) {
-                        dialog.isIndeterminate = true
-                        dialog.setProgressStyle(ProgressDialog.STYLE_SPINNER)
-                    }
-                }
-
-                input = connection.inputStream
-                output = downloadedFile.outputStream()
-                val data = ByteArray(8 * 1024)
-                var total: Long = 0
-                var count: Int
-                do {
-                    if (!isActive) {
+                    if (connection.responseCode != HttpURLConnection.HTTP_OK) {
+                        withContext(Dispatchers.Main) {
+                            Toast
+                                .makeText(
+                                    context,
+                                    (connection.responseMessage ?: context.getString(R.string.error)) +
+                                        " (${connection.responseCode})",
+                                    Toast.LENGTH_LONG,
+                                ).show()
+                        }
                         return@io_launch
                     }
-                    count = input!!.read(data)
-                    if (count > 0) {
-                        total += count.toLong()
-                        output.write(data, 0, count)
-                    }
-                    if (fileLength != -1L && System.currentTimeMillis() >= nextDialogUpdateTime) {
-                        withContext(Dispatchers.Main) {
-                            val progress = total * 100 / fileLength
-                            dialog.progress = progress.toInt()
-                        }
-                        nextDialogUpdateTime += 50
-                    }
-                } while (count != -1)
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, e.toString(), Toast.LENGTH_LONG).show()
-                }
-                return@io_launch
-            } finally {
-                output?.close()
-                input?.close()
-                connection?.disconnect()
-            }
 
-            downloaded = true
-        }
+                    var fileLength = connection.contentLength.toLong()
+                    if (fileLength == -1L) {
+                        withContext(Dispatchers.Main) {
+                            dialog.isIndeterminate = true
+                            dialog.setProgressStyle(ProgressDialog.STYLE_SPINNER)
+                        }
+                    }
+
+                    input = connection.inputStream
+                    output = downloadedFile.outputStream()
+                    val data = ByteArray(8 * 1024)
+                    var total: Long = 0
+                    var count: Int
+                    do {
+                        if (!isActive) {
+                            return@io_launch
+                        }
+                        count = input!!.read(data)
+                        if (count > 0) {
+                            total += count.toLong()
+                            output.write(data, 0, count)
+                        }
+                        if (fileLength != -1L && System.currentTimeMillis() >= nextDialogUpdateTime) {
+                            withContext(Dispatchers.Main) {
+                                val progress = total * 100 / fileLength
+                                dialog.progress = progress.toInt()
+                            }
+                            nextDialogUpdateTime += 50
+                        }
+                    } while (count != -1)
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, e.toString(), Toast.LENGTH_LONG).show()
+                    }
+                    return@io_launch
+                } finally {
+                    output?.close()
+                    input?.close()
+                    connection?.disconnect()
+                }
+
+                downloaded = true
+            }
         dialog.setOnCancelListener {
             job.cancel()
         }
@@ -227,9 +263,12 @@ class UpdateChecker(val currentVersionName: String) {
         }
 
         val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(downloadedFile.extension)
-        val apkURI = FileProvider.getUriForFile(
+        val apkURI =
+            FileProvider.getUriForFile(
                 context,
-                context.applicationContext.packageName + ".provider", downloadedFile)
+                context.applicationContext.packageName + ".provider",
+                downloadedFile,
+            )
 
         val install = Intent(Intent.ACTION_INSTALL_PACKAGE)
         install.setDataAndType(apkURI, mimeType)
@@ -259,7 +298,10 @@ class UpdateChecker(val currentVersionName: String) {
          * negative value if [a] is older than [b], zero if they are equal, and a positive value if
          * [a] is newer. Comparison is numeric per component, so "2.1.10" is newer than "2.1.9".
          */
-        fun compareVersions(a: String, b: String): Int {
+        fun compareVersions(
+            a: String,
+            b: String,
+        ): Int {
             val partsA = versionParts(a)
             val partsB = versionParts(b)
             for (i in 0 until maxOf(partsA.size, partsB.size)) {
@@ -270,7 +312,10 @@ class UpdateChecker(val currentVersionName: String) {
         }
 
         private fun versionParts(version: String): List<Int> =
-            version.trim().removePrefix("v").split('.', '-', '+')
+            version
+                .trim()
+                .removePrefix("v")
+                .split('.', '-', '+')
                 .map { part -> part.takeWhile(Char::isDigit).toIntOrNull() ?: 0 }
 
         fun clearTempFilesIfAny(context: Context) {

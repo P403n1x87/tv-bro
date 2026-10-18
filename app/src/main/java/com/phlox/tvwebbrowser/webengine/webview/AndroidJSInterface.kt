@@ -4,13 +4,12 @@ import android.content.Context
 import android.net.http.SslError
 import android.webkit.JavascriptInterface
 import com.phlox.tvwebbrowser.Config
+import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.SearchEngines
 import com.phlox.tvwebbrowser.domain.HomePagePolicy
-import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.model.Download
 import com.phlox.tvwebbrowser.utils.DownloadUtils
 import org.json.JSONArray
-
 
 class AndroidJSInterface(
     private val webEngine: WebViewWebEngine,
@@ -37,8 +36,8 @@ class AndroidJSInterface(
     @JavascriptInterface
     fun getStringByName(name: String): String {
         val ctx = context
-        //val resId = ctx.resources.getIdentifier(name, "string", ctx.packageName)
-        //return ctx.getString(resId)
+        // val resId = ctx.resources.getIdentifier(name, "string", ctx.packageName)
+        // return ctx.getString(resId)
         when (name) {
             "connection_isnt_secure" -> return ctx.getString(R.string.connection_isnt_secure)
             "hostname" -> return ctx.getString(R.string.hostname)
@@ -58,7 +57,10 @@ class AndroidJSInterface(
     }
 
     @JavascriptInterface
-    fun setSearchEngine(engine: String, customSearchEngineURL: String) {
+    fun setSearchEngine(
+        engine: String,
+        customSearchEngineURL: String,
+    ) {
         if (!isHomePage()) return
         config.searchEngineURL.value = customSearchEngineURL
     }
@@ -79,6 +81,7 @@ class AndroidJSInterface(
             // can run before tab.url has been updated to the new page.
             val webView = webEngine.getView() as? WebViewEx ?: return@runOnUiThread
             if (!HomePagePolicy.isHomePageUrl(webView.url, Config.localHomePageUrl)) return@runOnUiThread
+
             fun linksToJson(links: List<com.phlox.tvwebbrowser.model.HomePageLink>): String {
                 val jsArr = JSONArray()
                 for (item in links) {
@@ -90,7 +93,8 @@ class AndroidJSInterface(
             val history = linksToJson(callback.getHomePageHistoryLinks())
             webEngine.evaluateJavascript("renderSections($bookmarks, $history)")
             webEngine.evaluateJavascript(
-                "applySearchEngine(\"${SearchEngines.nameFor(config.searchEngineURL.value)}\", \"${config.searchEngineURL.value}\")")
+                "applySearchEngine(\"${SearchEngines.nameFor(config.searchEngineURL.value)}\", \"${config.searchEngineURL.value}\")",
+            )
         }
     }
 
@@ -111,12 +115,23 @@ class AndroidJSInterface(
     }
 
     @JavascriptInterface
-    fun takeBlobDownloadData(base64BlobData: String, fileName: String?, url: String, mimetype: String) {
+    fun takeBlobDownloadData(
+        base64BlobData: String,
+        fileName: String?,
+        url: String,
+        mimetype: String,
+    ) {
         val callback = webEngine.callback ?: return
         val finalFileName = fileName ?: DownloadUtils.guessFileName(url, null, mimetype)
-        callback.onDownloadRequested(url, "",
-                finalFileName, "TV Bro",
-            mimetype, Download.OperationAfterDownload.NOP, base64BlobData)
+        callback.onDownloadRequested(
+            url,
+            "",
+            finalFileName,
+            "TV Bro",
+            mimetype,
+            Download.OperationAfterDownload.NOP,
+            base64BlobData,
+        )
     }
 
     @JavascriptInterface
@@ -126,7 +141,5 @@ class AndroidJSInterface(
         callback.getActivity().runOnUiThread { callback.markBookmarkRecommendationAsUseful(bookmarkOrder) }
     }
 
-    private fun isHomePage(): Boolean {
-        return HomePagePolicy.isHomePageUrl(webEngine.tab.url, Config.localHomePageUrl)
-    }
+    private fun isHomePage(): Boolean = HomePagePolicy.isHomePageUrl(webEngine.tab.url, Config.localHomePageUrl)
 }

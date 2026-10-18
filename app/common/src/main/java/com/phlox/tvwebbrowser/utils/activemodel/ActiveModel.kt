@@ -23,20 +23,20 @@ import kotlinx.coroutines.cancel
  * logic block of application becomes domain data and actions on it.
  */
 abstract class ActiveModel {
-  private var _modelScope: CoroutineScope? = null
-  val modelScope: CoroutineScope
-    get() {
-      return _modelScope ?: kotlin.run {
-        val newScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-        _modelScope = newScope
-        return newScope
-      }
+    private var _modelScope: CoroutineScope? = null
+    val modelScope: CoroutineScope
+        get() {
+            return _modelScope ?: kotlin.run {
+                val newScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+                _modelScope = newScope
+                return newScope
+            }
+        }
+
+    final fun clear() {
+        _modelScope?.cancel()
+        onClear()
     }
 
-  final fun clear() {
-    _modelScope?.cancel()
-    onClear()
-  }
-
-  open fun onClear() {}
+    open fun onClear() {}
 }

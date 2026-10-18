@@ -3,8 +3,8 @@ package com.phlox.tvwebbrowser.activity.downloads
 import com.phlox.tvwebbrowser.model.Download
 import com.phlox.tvwebbrowser.repository.DownloadsRepository
 import com.phlox.tvwebbrowser.repository.Repositories
-import com.phlox.tvwebbrowser.utils.observable.ObservableValue
 import com.phlox.tvwebbrowser.utils.activemodel.ActiveModel
+import com.phlox.tvwebbrowser.utils.observable.ObservableValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -16,33 +16,34 @@ import kotlinx.coroutines.launch
  * it a repository over an in-memory database.
  */
 class DownloadsHistoryModel(
-  private val downloads: DownloadsRepository = Repositories.downloads,
-): ActiveModel() {
-  val allItems = ArrayList<Download>()
-  val lastLoadedItems = ObservableValue<List<Download>>(ArrayList())
-  private var loading = false
+    private val downloads: DownloadsRepository = Repositories.downloads,
+) : ActiveModel() {
+    val allItems = ArrayList<Download>()
+    val lastLoadedItems = ObservableValue<List<Download>>(ArrayList())
+    private var loading = false
 
-  fun loadNextItems() = modelScope.launch(Dispatchers.Main) {
-    if (loading) {
-      return@launch
+    fun loadNextItems() =
+        modelScope.launch(Dispatchers.Main) {
+            if (loading) {
+                return@launch
+            }
+            loading = true
+
+            val newItems = downloads.page(allItems.size.toLong())
+            lastLoadedItems.value = newItems
+            allItems.addAll(newItems)
+
+            loading = false
+        }
+
+    /** Drops [items] from the cached window so a re-created view does not re-show deleted rows. */
+    fun remove(items: List<Download>) {
+        allItems.removeAll(items.toSet())
     }
-    loading = true
 
-    val newItems = downloads.page(allItems.size.toLong())
-    lastLoadedItems.value = newItems
-    allItems.addAll(newItems)
-
-    loading = false
-  }
-
-  /** Drops [items] from the cached window so a re-created view does not re-show deleted rows. */
-  fun remove(items: List<Download>) {
-    allItems.removeAll(items.toSet())
-  }
-
-  /** Forgets the cached window after every download has been deleted. */
-  fun reset() {
-    allItems.clear()
-    lastLoadedItems.value = emptyList()
-  }
+    /** Forgets the cached window after every download has been deleted. */
+    fun reset() {
+        allItems.clear()
+        lastLoadedItems.value = emptyList()
+    }
 }

@@ -5,20 +5,23 @@ import org.mozilla.geckoview.GeckoResult
 import org.mozilla.geckoview.GeckoSession
 import org.mozilla.geckoview.GeckoSession.SelectionActionDelegate
 
-class MySelectionActionDelegate: SelectionActionDelegate {
-    override fun onShowActionRequest(session: GeckoSession, selection: SelectionActionDelegate.Selection) {
-
+class MySelectionActionDelegate : SelectionActionDelegate {
+    override fun onShowActionRequest(
+        session: GeckoSession,
+        selection: SelectionActionDelegate.Selection,
+    ) {
     }
 
-    override fun onHideAction(p0: GeckoSession, p1: Int) {
+    override fun onHideAction(
+        p0: GeckoSession,
+        p1: Int,
+    ) {
     }
 
     override fun onShowClipboardPermissionRequest(
         p0: GeckoSession,
-        p1: SelectionActionDelegate.ClipboardPermission
-    ): GeckoResult<AllowOrDeny>? {
-        return GeckoResult.allow()
-    }
+        p1: SelectionActionDelegate.ClipboardPermission,
+    ): GeckoResult<AllowOrDeny>? = GeckoResult.allow()
 
     override fun onDismissClipboardPermissionRequest(p0: GeckoSession) {
     }

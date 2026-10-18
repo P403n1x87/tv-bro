@@ -27,13 +27,14 @@ class MediaListPresenter(
         }
         val listed = candidates.take(MAX_MEDIA_LIST_ITEMS)
         val adapter = MediaListAdapter(activity, listed)
-        val dialog = AlertDialog.Builder(activity)
-            .setTitle(R.string.media_list_title)
-            .setAdapter(adapter) { _, which ->
-                if (tab != null) tab.webEngine.playMediaCandidate(listed[which])
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .create()
+        val dialog =
+            AlertDialog
+                .Builder(activity)
+                .setTitle(R.string.media_list_title)
+                .setAdapter(adapter) { _, which ->
+                    if (tab != null) tab.webEngine.playMediaCandidate(listed[which])
+                }.setNegativeButton(android.R.string.cancel, null)
+                .create()
         dialog.setOnDismissListener { adapter.release() }
         dialog.show()
         tab?.webEngine?.prefetchMediaMetadata()

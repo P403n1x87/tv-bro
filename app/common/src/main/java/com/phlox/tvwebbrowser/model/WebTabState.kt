@@ -19,29 +19,30 @@ import java.io.File
 import java.io.FileOutputStream
 import java.nio.charset.Charset
 
-
 /**
  * Created by PDT on 24.08.2016.
  *
  * Class to store state of tab with webView
  */
 @Entity(tableName = "tabs")
-data class WebTabState(@PrimaryKey(autoGenerate = true)
-                       var id: Long = 0,
-                       var url: String = "",
-                       var title: String = "",
-                       var selected: Boolean = false,
-                       var thumbnailHash: String? = null,
-                       var faviconHash: String? = null,
-                       var incognito: Boolean = false,
-                       var position: Int = 0,
-                       @Deprecated("This field is not used anymore")
-                       @ColumnInfo(name = "wv_state", typeAffinity = ColumnInfo.BLOB)
-                       var wvState: ByteArray? = null,
-                       @ColumnInfo(name = "wv_state_file")
-                       var wvStateFileName: String? = null,
-                       var adblock: Boolean? = null,
-                       var scale: Float? = null) {
+data class WebTabState(
+    @PrimaryKey(autoGenerate = true)
+    var id: Long = 0,
+    var url: String = "",
+    var title: String = "",
+    var selected: Boolean = false,
+    var thumbnailHash: String? = null,
+    var faviconHash: String? = null,
+    var incognito: Boolean = false,
+    var position: Int = 0,
+    @Deprecated("This field is not used anymore")
+    @ColumnInfo(name = "wv_state", typeAffinity = ColumnInfo.BLOB)
+    var wvState: ByteArray? = null,
+    @ColumnInfo(name = "wv_state_file")
+    var wvStateFileName: String? = null,
+    var adblock: Boolean? = null,
+    var scale: Float? = null,
+) {
     companion object {
         val TAG: String = WebTabState::class.java.simpleName
 
@@ -52,16 +53,23 @@ data class WebTabState(@PrimaryKey(autoGenerate = true)
 
     @Ignore
     var thumbnail: Bitmap? = null
+
     @Ignore
     var savedState: Any? = null
+
     @delegate:Ignore
     val webEngine by lazy { WebEngineFactory.createWebEngine(this) }
+
     @Ignore
-    var lastLoadingUrl: String? = null //this is last url appeared in WebViewClient.shouldOverrideUrlLoading callback
+    var lastLoadingUrl: String? = null
+
+    // this is last url appeared in WebViewClient.shouldOverrideUrlLoading callback
     @Ignore
     var blockedAds = 0
+
     @Ignore
     var blockedPopups = 0
+
     @Ignore
     var cachedHostConfig: HostConfig? = null
 
@@ -82,7 +90,6 @@ data class WebTabState(@PrimaryKey(autoGenerate = true)
         } catch (e: JSONException) {
             e.printStackTrace()
         }
-
     }
 
     private suspend fun saveThumbnail(cacheDir: File) {
@@ -95,7 +102,7 @@ data class WebTabState(@PrimaryKey(autoGenerate = true)
                 val tabsThumbsDir = File(cacheDir, TAB_THUMBNAILS_DIR)
                 if (tabsThumbsDir.exists() || tabsThumbsDir.mkdir()) {
                     try {
-                        val hash = Utils.MD5_Hash(url.toByteArray(Charset.defaultCharset()))
+                        val hash = Utils.md5Hash(url.toByteArray(Charset.defaultCharset()))
                         if (hash != null && hash != thumbnailHash) {
                             if (thumbnailHash != null) {
                                 removeThumbnailFile(cacheDir)
@@ -121,19 +128,29 @@ data class WebTabState(@PrimaryKey(autoGenerate = true)
         }
     }
 
-    private fun getThumbnailPath(cacheDir: File, hash: String): File =
-        File(cacheDir, TAB_THUMBNAILS_DIR + File.separator + hash + ".png")
+    private fun getThumbnailPath(
+        cacheDir: File,
+        hash: String,
+    ): File = File(cacheDir, TAB_THUMBNAILS_DIR + File.separator + hash + ".png")
 
-    private fun getWVStatePath(filesDir: File, hash: String): File {
-        return if (hash.startsWith(GECKO_SESSION_STATE_HASH_PREFIX)) {
-            File(filesDir, TAB_WVSTATES_DIR + File.separator + hash.substring(
-                GECKO_SESSION_STATE_HASH_PREFIX.length))
+    private fun getWVStatePath(
+        filesDir: File,
+        hash: String,
+    ): File =
+        if (hash.startsWith(GECKO_SESSION_STATE_HASH_PREFIX)) {
+            File(
+                filesDir,
+                TAB_WVSTATES_DIR + File.separator +
+                    hash.substring(GECKO_SESSION_STATE_HASH_PREFIX.length),
+            )
         } else {
             File(filesDir, TAB_WVSTATES_DIR + File.separator + hash)
         }
-    }
 
-    fun removeFiles(filesDir: File?, cacheDir: File?) {
+    fun removeFiles(
+        filesDir: File?,
+        cacheDir: File?,
+    ) {
         if (thumbnailHash != null) {
             removeThumbnailFile(cacheDir)
         }
@@ -179,27 +196,36 @@ data class WebTabState(@PrimaryKey(autoGenerate = true)
         val state = savedState
         var stateFileName = wvStateFileName
         if (stateFileName != null && (
-                    (webEngine.isGecko() && !stateFileName.startsWith(
-                        GECKO_SESSION_STATE_HASH_PREFIX
-                    )) ||
-                            ((!webEngine.isGecko()) && stateFileName.startsWith(
-                                GECKO_SESSION_STATE_HASH_PREFIX
-                            ))
-                    )) {
+                (
+                    webEngine.isGecko() &&
+                        !stateFileName.startsWith(
+                            GECKO_SESSION_STATE_HASH_PREFIX,
+                        )
+                ) ||
+                    (
+                        (!webEngine.isGecko()) &&
+                            stateFileName.startsWith(
+                                GECKO_SESSION_STATE_HASH_PREFIX,
+                            )
+                    )
+            )
+        ) {
             filesDir?.let { getWVStatePath(it, stateFileName).delete() }
             stateFileName = null
         }
         if (state == null) return
-        val stateBytes = when (state) {
-            is Bundle -> {
-                Utils.bundleToBytes(state) ?: return
+        val stateBytes =
+            when (state) {
+                is Bundle -> {
+                    Utils.bundleToBytes(state) ?: return
+                }
+
+                else -> {
+                    state.toString().toByteArray(Charsets.UTF_8)
+                }
             }
-            else -> {
-                state.toString().toByteArray(Charsets.UTF_8)
-            }
-        }
         if (stateFileName == null) {
-            stateFileName = Utils.MD5_Hash(stateBytes) ?: return
+            stateFileName = Utils.md5Hash(stateBytes) ?: return
             if (webEngine.isGecko()) {
                 stateFileName = GECKO_SESSION_STATE_HASH_PREFIX + stateFileName
             }
@@ -227,12 +253,15 @@ data class WebTabState(@PrimaryKey(autoGenerate = true)
         }
     }
 
-    suspend fun updateThumbnail(cacheDir: File, thumbnail: Bitmap) {
+    suspend fun updateThumbnail(
+        cacheDir: File,
+        thumbnail: Bitmap,
+    ) {
         this.thumbnail = thumbnail
         val url = url
-        var hash = Utils.MD5_Hash(url.toByteArray(Charset.defaultCharset()))
+        var hash = Utils.md5Hash(url.toByteArray(Charset.defaultCharset()))
         if (hash != null) {
-            hash += hashCode()//to make thumbnails from different tabs unique even with same url
+            hash += hashCode() // to make thumbnails from different tabs unique even with same url
             if (hash != thumbnailHash) {
                 saveThumbnail(cacheDir)
             }
@@ -244,8 +273,11 @@ data class WebTabState(@PrimaryKey(autoGenerate = true)
         if (cacheDir == null) return null
         val thumbnailFile = getThumbnailPath(cacheDir, hash)
         if (thumbnailFile.exists()) {
-            thumbnail = BitmapFactory.decodeFile(thumbnailFile.absolutePath,
-                    BitmapFactory.Options().apply { this.inMutable = true })
+            thumbnail =
+                BitmapFactory.decodeFile(
+                    thumbnailFile.absolutePath,
+                    BitmapFactory.Options().apply { this.inMutable = true },
+                )
             return thumbnail
         } else {
             thumbnailHash = null

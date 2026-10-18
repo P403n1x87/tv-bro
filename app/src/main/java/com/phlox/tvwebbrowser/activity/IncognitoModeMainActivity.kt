@@ -7,9 +7,9 @@ import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.TVBro
 import com.phlox.tvwebbrowser.activity.main.MainActivity
 
-//Same as MainActivity but runs in separate process
-//and store all WebView data separately
-class IncognitoModeMainActivity: MainActivity() {
+// Same as MainActivity but runs in separate process
+// and store all WebView data separately
+class IncognitoModeMainActivity : MainActivity() {
     companion object {
         private val TAG = MainActivity::class.java.simpleName
     }
@@ -30,7 +30,8 @@ class IncognitoModeMainActivity: MainActivity() {
     }
 
     private fun showIncognitoModeHintDialog() {
-        AlertDialog.Builder(this)
+        AlertDialog
+            .Builder(this)
             .setTitle(R.string.incognito_mode)
             .setIcon(R.drawable.ic_incognito)
             .setMessage(R.string.incognito_mode_hint)
@@ -38,7 +39,6 @@ class IncognitoModeMainActivity: MainActivity() {
             .setNeutralButton(R.string.don_t_show_again) { dialog, _ ->
                 settingsModel.incognitoModeHintSuppress = true
                 dialog.dismiss()
-            }
-            .show()
+            }.show()
     }
 }

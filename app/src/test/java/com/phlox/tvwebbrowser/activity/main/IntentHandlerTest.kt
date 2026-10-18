@@ -30,7 +30,6 @@ import org.robolectric.annotation.Config as RobolectricConfig
 @RunWith(RobolectricTestRunner::class)
 @RobolectricConfig(sdk = [26], application = Application::class)
 class IntentHandlerTest {
-
     private lateinit var db: AppDatabase
     private lateinit var tabsModel: TabsModel
 
@@ -43,9 +42,11 @@ class IntentHandlerTest {
     fun setUp() {
         val app = RuntimeEnvironment.getApplication()
         AppContext.init(app, Config(app.getSharedPreferences("intent_test", Context.MODE_PRIVATE)))
-        db = Room.inMemoryDatabaseBuilder(app, AppDatabase::class.java)
-            .allowMainThreadQueries()
-            .build()
+        db =
+            Room
+                .inMemoryDatabaseBuilder(app, AppDatabase::class.java)
+                .allowMainThreadQueries()
+                .build()
         tabsModel = TabsModel(TabsRepository(db.tabsDao()), HostsRepository(db.hostsDao()))
     }
 
@@ -54,20 +55,23 @@ class IntentHandlerTest {
         db.close()
     }
 
-    private fun handler() = IntentHandler(
-        tabsModel = tabsModel,
-        openInNewTab = { url, index, navigateImmediately -> opened += Triple(url, index, navigateImmediately) },
-        navigate = { navigated += it },
-        changeTab = { changed += it },
-        autoHideMenuOverlay = { overlayHidden++ },
-    )
+    private fun handler() =
+        IntentHandler(
+            tabsModel = tabsModel,
+            openInNewTab = { url, index, navigateImmediately -> opened += Triple(url, index, navigateImmediately) },
+            navigate = { navigated += it },
+            changeTab = { changed += it },
+            autoHideMenuOverlay = { overlayHidden++ },
+        )
 
-    private fun viewIntent(url: String, sameTab: Boolean = false) =
-        Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-            if (sameTab) {
-                putExtra("com.phlox.tvwebbrowser.EXTRA_OPEN_IN_SAME_TAB", true)
-            }
+    private fun viewIntent(
+        url: String,
+        sameTab: Boolean = false,
+    ) = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+        if (sameTab) {
+            putExtra("com.phlox.tvwebbrowser.EXTRA_OPEN_IN_SAME_TAB", true)
         }
+    }
 
     @Test
     fun aPlainDeepLinkOpensANewTabAtTheEnd() {

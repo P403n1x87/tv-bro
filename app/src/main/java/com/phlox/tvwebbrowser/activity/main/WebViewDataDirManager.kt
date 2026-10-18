@@ -44,6 +44,7 @@ class DefaultWebViewDataDirManager(
     }
 
     private fun dataDir(name: String) = File(appFilesDir().parentFile, name)
+
     private fun cacheDir(name: String) = File(appCacheDir(), name)
 
     override fun prepareIncognitoSession() {
@@ -73,9 +74,10 @@ class DefaultWebViewDataDirManager(
             deleteDirectory(dataDir(DATA_FOLDER + "_" + INCOGNITO_SUFFIX))
             var webViewCache = cacheDir(CACHE_FOLDER + "_" + INCOGNITO_SUFFIX)
             if (!webViewCache.exists()) {
-                webViewCache = cacheDir(
-                    CACHE_FOLDER.lowercase(Locale.getDefault()) + "_" + INCOGNITO_SUFFIX
-                )
+                webViewCache =
+                    cacheDir(
+                        CACHE_FOLDER.lowercase(Locale.getDefault()) + "_" + INCOGNITO_SUFFIX,
+                    )
             }
             deleteDirectory(webViewCache)
         } else {

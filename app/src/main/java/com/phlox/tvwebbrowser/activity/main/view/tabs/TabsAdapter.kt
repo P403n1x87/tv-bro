@@ -11,11 +11,11 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.phlox.tvwebbrowser.Config
-import com.phlox.tvwebbrowser.domain.HomePagePolicy
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.activity.main.TabsModel
 import com.phlox.tvwebbrowser.activity.main.view.tabs.TabsAdapter.TabViewHolder
 import com.phlox.tvwebbrowser.databinding.ViewHorizontalWebtabItemBinding
+import com.phlox.tvwebbrowser.domain.HomePagePolicy
 import com.phlox.tvwebbrowser.model.WebTabState
 import com.phlox.tvwebbrowser.singleton.FaviconsPool
 import com.phlox.tvwebbrowser.utils.activity
@@ -23,8 +23,9 @@ import com.phlox.tvwebbrowser.widgets.CheckableContainer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-
-class TabsAdapter(private val tabsView: TabsView) : RecyclerView.Adapter<TabViewHolder>() {
+class TabsAdapter(
+    private val tabsView: TabsView,
+) : RecyclerView.Adapter<TabViewHolder>() {
     var tabsModel: TabsModel? = null
         set(value) {
             field = value
@@ -47,26 +48,36 @@ class TabsAdapter(private val tabsView: TabsView) : RecyclerView.Adapter<TabView
 
     interface Listener {
         fun onTitleChanged(index: Int)
+
         fun onTitleSelected(index: Int)
+
         fun onAddNewTabSelected()
+
         fun closeTab(tabState: WebTabState?)
+
         /** A new tab was asked for at [tabIndex]; what it opens with is the owner's business. */
         fun onNewTabRequested(tabIndex: Int)
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): TabViewHolder {
-        val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.view_horizontal_webtab_item, parent, false)
+    override fun onCreateViewHolder(
+        parent: ViewGroup,
+        viewType: Int,
+    ): TabViewHolder {
+        val view =
+            LayoutInflater
+                .from(parent.context)
+                .inflate(R.layout.view_horizontal_webtab_item, parent, false)
         return TabViewHolder(view)
     }
 
-    override fun onBindViewHolder(holder: TabViewHolder, position: Int) {
+    override fun onBindViewHolder(
+        holder: TabViewHolder,
+        position: Int,
+    ) {
         holder.bind(tabsCopy[position], position)
     }
 
-    override fun getItemCount(): Int {
-        return tabsCopy.size
-    }
+    override fun getItemCount(): Int = tabsCopy.size
 
     fun onTabListChanged() {
         val tabsDiffUtilCallback =
@@ -76,10 +87,15 @@ class TabsAdapter(private val tabsView: TabsView) : RecyclerView.Adapter<TabView
         tabsDiffResult.dispatchUpdatesTo(this)
     }
 
-    inner class TabViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+    inner class TabViewHolder(
+        itemView: View,
+    ) : RecyclerView.ViewHolder(itemView) {
         val vb = ViewHorizontalWebtabItemBinding.bind(itemView)
 
-        fun bind(tabState: WebTabState, position: Int) {
+        fun bind(
+            tabState: WebTabState,
+            position: Int,
+        ) {
             vb.root.tag = tabState
             vb.root.setBackgroundResource(tabBackgroundRes)
 
@@ -99,7 +115,7 @@ class TabsAdapter(private val tabsView: TabsView) : RecyclerView.Adapter<TabView
                 scope.launch(Dispatchers.Main) {
                     val favicon = FaviconsPool.get(url)
                     val ts = vb.root.tag as WebTabState
-                    if (url != ts.url) return@launch //url was changed while loading favicon
+                    if (url != ts.url) return@launch // url was changed while loading favicon
                     if (!itemView.isAttachedToWindow) return@launch
                     favicon?.let {
                         vb.ivFavicon.setImageBitmap(it)
@@ -129,20 +145,24 @@ class TabsAdapter(private val tabsView: TabsView) : RecyclerView.Adapter<TabView
                 listener?.closeTab(tabState)
             }
 
-            //DPAD: the close button sits inside the item's bounds, so the default
-            //focus search treats it as "not to the right" and never reaches it.
-            //Move focus explicitly so the remote can highlight and use it.
+            // DPAD: the close button sits inside the item's bounds, so the default
+            // focus search treats it as "not to the right" and never reaches it.
+            // Move focus explicitly so the remote can highlight and use it.
             vb.root.setOnKeyListener { _, keyCode, event ->
                 if (event.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
                     vb.ibCloseTabItem.requestFocus()
                     true
-                } else false
+                } else {
+                    false
+                }
             }
             vb.ibCloseTabItem.setOnKeyListener { _, keyCode, event ->
                 if (event.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
                     vb.root.requestFocus()
                     true
-                } else false
+                } else {
+                    false
+                }
             }
 
             vb.root.setOnLongClickListener {

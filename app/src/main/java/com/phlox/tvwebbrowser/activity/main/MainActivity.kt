@@ -27,9 +27,9 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.Window
-import android.view.inputmethod.InputMethodManager
 import android.view.animation.Animation
 import android.view.animation.AnimationUtils
+import android.view.inputmethod.InputMethodManager
 import android.webkit.CookieManager
 import android.webkit.WebStorage
 import android.widget.Toast
@@ -46,8 +46,8 @@ import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.activity.IncognitoModeMainActivity
 import com.phlox.tvwebbrowser.activity.downloads.DownloadsActivity
 import com.phlox.tvwebbrowser.activity.history.HistoryActivity
-import com.phlox.tvwebbrowser.activity.main.dialogs.settings.SettingsDialog
 import com.phlox.tvwebbrowser.activity.main.dialogs.settings.SettingsDeps
+import com.phlox.tvwebbrowser.activity.main.dialogs.settings.SettingsDialog
 import com.phlox.tvwebbrowser.activity.main.view.ActionBar
 import com.phlox.tvwebbrowser.activity.main.view.CursorMenuView
 import com.phlox.tvwebbrowser.activity.main.view.tabs.TabsAdapter.Listener
@@ -56,17 +56,17 @@ import com.phlox.tvwebbrowser.domain.AddressInputPolicy
 import com.phlox.tvwebbrowser.domain.WebEnginePolicy
 import com.phlox.tvwebbrowser.model.HostConfig
 import com.phlox.tvwebbrowser.model.WebTabState
+import com.phlox.tvwebbrowser.player.MediaDiscoveryNotifier
 import com.phlox.tvwebbrowser.service.downloads.DownloadService
 import com.phlox.tvwebbrowser.singleton.shortcuts.ShortcutMgr
 import com.phlox.tvwebbrowser.utils.BackNavigationEventsAdapter
 import com.phlox.tvwebbrowser.utils.BaseAnimationListener
 import com.phlox.tvwebbrowser.utils.InstallPermissionHelper
-import com.phlox.tvwebbrowser.utils.Utils
 import com.phlox.tvwebbrowser.utils.UpdateChecker
+import com.phlox.tvwebbrowser.utils.Utils
 import com.phlox.tvwebbrowser.utils.VoiceSearchHelper
 import com.phlox.tvwebbrowser.utils.activemodel.ActiveModelsRepository
 import com.phlox.tvwebbrowser.utils.sameDay
-import com.phlox.tvwebbrowser.player.MediaDiscoveryNotifier
 import com.phlox.tvwebbrowser.webengine.WebEngine
 import com.phlox.tvwebbrowser.webengine.WebEngineFactory
 import com.phlox.tvwebbrowser.webengine.WebEngineWindowProviderCallback
@@ -81,8 +81,13 @@ import java.net.URL
 import java.util.Calendar
 import kotlin.system.exitProcess
 
-
-open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCallbackHost, TabViewHost, AutoUpdateHost, DownloadHost {
+open class MainActivity :
+    AppCompatActivity(),
+    ActionBar.Callback,
+    WebEngineCallbackHost,
+    TabViewHost,
+    AutoUpdateHost,
+    DownloadHost {
     companion object {
         private val TAG = MainActivity::class.java.simpleName
         const val VOICE_SEARCH_REQUEST_CODE = 10001
@@ -97,6 +102,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     private lateinit var vb: ActivityMainBinding
     private lateinit var viewModel: MainActivityViewModel
     private lateinit var tabsModel: TabsModel
+
     /** Composition root for the settings: also read by [com.phlox.tvwebbrowser.activity.IncognitoModeMainActivity]. */
     protected lateinit var settingsModel: SettingsModel
     private lateinit var adblockModel: AdblockModel
@@ -114,8 +120,12 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     private lateinit var sessionObservers: SessionObservers
     private lateinit var sessionStartup: SessionStartup
     protected val config = AppContext.provideConfig()
-    private val voiceSearchHelper = VoiceSearchHelper(this, VOICE_SEARCH_REQUEST_CODE,
-        MY_PERMISSIONS_REQUEST_VOICE_SEARCH_PERMISSIONS)
+    private val voiceSearchHelper =
+        VoiceSearchHelper(
+            this,
+            VOICE_SEARCH_REQUEST_CODE,
+            MY_PERMISSIONS_REQUEST_VOICE_SEARCH_PERMISSIONS,
+        )
     private val downloadCoordinator by lazy {
         DownloadCoordinator(this) { onDownloadStarted(it) }
     }
@@ -179,59 +189,93 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
      */
     private fun composeViews() {
         panelController = PanelController(vb) { focusCurrentEngine() }
-        toolbarController = ToolbarController(
-            this, vb,
-            keepScreenOn = { settingsModel.keepScreenOn.value },
-            focusEngine = { focusCurrentEngine() },
-        )
+        toolbarController =
+            ToolbarController(
+                this,
+                vb,
+                keepScreenOn = { settingsModel.keepScreenOn.value },
+                focusEngine = { focusCurrentEngine() },
+            )
         mediaListPresenter = MediaListPresenter(this, tabsModel)
-        permissionOrchestrator = PermissionOrchestrator(
-            downloadCoordinator,
-            voiceSearchPermissionsResult = voiceSearchHelper::processPermissionsResult,
-            voiceSearchActivityResult = voiceSearchHelper::processActivityResult,
-        ) { requestCode, permissions, grantResults ->
-            tabsModel.currentTab.value?.webEngine?.onPermissionsResult(requestCode, permissions, grantResults) == true
-        }
-        intentHandler = IntentHandler(
-            tabsModel = tabsModel,
-            openInNewTab = { url, index, navigateImmediately ->
-                openInNewTab(url, index, needToHideMenuOverlay = true, navigateImmediately = navigateImmediately)
-            },
-            navigate = { navigate(it) },
-            changeTab = { changeTab(it) },
-            autoHideMenuOverlay = { toolbarController.autoHideMenuOverlay() },
-        )
-        bookmarksController = BookmarksController(
-            this, lifecycleScope, vb, viewModel, panelController,
-            currentTab = { tabsModel.currentTab.value },
-            navigate = { navigate(it) },
-        )
-        cursorMenuController = CursorMenuController(
-            this, vb, uiHandler, toolbarController, backNavigationEventsAdapter
-        )
-        thumbnailPresenter = TabThumbnailPresenter(
-            vb, uiHandler, lifecycleScope,
-            cacheDir = { cacheDir },
-            keepToolbarOpen = { settingsModel.keepToolbarOpen.value },
-            isCurrentTab = { tabByTitleIndex(vb.vTabs.current) == it },
-        )
-        sessionObservers = SessionObservers(
-            this, vb, config, settingsModel, adblockModel, viewModel, tabsModel,
-            toolbarController, bookmarksController,
-            onCurrentTabChanged = { onWebViewUpdated(it) },
-        )
-        sessionStartup = SessionStartup(
-            this, vb, config, viewModel, settingsModel, tabsModel, toolbarController,
-            handleIntent = { handleIntent(it) },
-            openInNewTab = { url, index, needToHideMenuOverlay, navigateImmediately ->
-                openInNewTab(url, index, needToHideMenuOverlay, navigateImmediately)
-            },
-            changeTab = { changeTab(it) },
-            onLoaded = {
-                checkForUpdatesOnStartup()
-                updateUpdateBadge()
-            },
-        )
+        permissionOrchestrator =
+            PermissionOrchestrator(
+                downloadCoordinator,
+                voiceSearchPermissionsResult = voiceSearchHelper::processPermissionsResult,
+                voiceSearchActivityResult = voiceSearchHelper::processActivityResult,
+            ) { requestCode, permissions, grantResults ->
+                tabsModel.currentTab.value
+                    ?.webEngine
+                    ?.onPermissionsResult(requestCode, permissions, grantResults) == true
+            }
+        intentHandler =
+            IntentHandler(
+                tabsModel = tabsModel,
+                openInNewTab = { url, index, navigateImmediately ->
+                    openInNewTab(url, index, needToHideMenuOverlay = true, navigateImmediately = navigateImmediately)
+                },
+                navigate = { navigate(it) },
+                changeTab = { changeTab(it) },
+                autoHideMenuOverlay = { toolbarController.autoHideMenuOverlay() },
+            )
+        bookmarksController =
+            BookmarksController(
+                this,
+                lifecycleScope,
+                vb,
+                viewModel,
+                panelController,
+                currentTab = { tabsModel.currentTab.value },
+                navigate = { navigate(it) },
+            )
+        cursorMenuController =
+            CursorMenuController(
+                this,
+                vb,
+                uiHandler,
+                toolbarController,
+                backNavigationEventsAdapter,
+            )
+        thumbnailPresenter =
+            TabThumbnailPresenter(
+                vb,
+                uiHandler,
+                lifecycleScope,
+                cacheDir = { cacheDir },
+                keepToolbarOpen = { settingsModel.keepToolbarOpen.value },
+                isCurrentTab = { tabByTitleIndex(vb.vTabs.current) == it },
+            )
+        sessionObservers =
+            SessionObservers(
+                this,
+                vb,
+                config,
+                settingsModel,
+                adblockModel,
+                viewModel,
+                tabsModel,
+                toolbarController,
+                bookmarksController,
+                onCurrentTabChanged = { onWebViewUpdated(it) },
+            )
+        sessionStartup =
+            SessionStartup(
+                this,
+                vb,
+                config,
+                viewModel,
+                settingsModel,
+                tabsModel,
+                toolbarController,
+                handleIntent = { handleIntent(it) },
+                openInNewTab = { url, index, needToHideMenuOverlay, navigateImmediately ->
+                    openInNewTab(url, index, needToHideMenuOverlay, navigateImmediately)
+                },
+                changeTab = { changeTab(it) },
+                onLoaded = {
+                    checkForUpdatesOnStartup()
+                    updateUpdateBadge()
+                },
+            )
     }
 
     /**
@@ -262,7 +306,10 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
 
     /** Puts the focus back on the page. */
     private fun focusCurrentEngine() {
-        tabsModel.currentTab.value?.webEngine?.getView()?.requestFocus()
+        tabsModel.currentTab.value
+            ?.webEngine
+            ?.getView()
+            ?.requestFocus()
     }
 
     /**
@@ -272,7 +319,8 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     private fun checkForUpdatesOnStartup() {
         if (!autoUpdateModel.needAutoCheckUpdates ||
             autoUpdateModel.updateChecker.versionCheckResult != null ||
-            autoUpdateModel.lastUpdateNotificationTime.sameDay(Calendar.getInstance())) {
+            autoUpdateModel.lastUpdateNotificationTime.sameDay(Calendar.getInstance())
+        ) {
             return
         }
         autoUpdateModel.checkUpdate(false) {
@@ -283,58 +331,68 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         }
     }
 
-    private var progressBarHideRunnable: Runnable = Runnable {
-        val anim = AnimationUtils.loadAnimation(this@MainActivity, android.R.anim.fade_out)
-        anim.setAnimationListener(object : BaseAnimationListener() {
-            override fun onAnimationEnd(animation: Animation) {
-                vb.progressBar.visibility = View.GONE
-            }
-        })
-        vb.progressBar.startAnimation(anim)
-    }
-
-    private val mConnectivityChangeReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-            val activeNetwork = cm.activeNetworkInfo
-            val isConnected = activeNetwork != null && activeNetwork.isConnectedOrConnecting
-            val tab = tabsModel.currentTab.value ?: return
-            tab.webEngine.setNetworkAvailable(isConnected)
-        }
-    }
-
-    private val tabsListener = object : Listener {
-        override fun onTitleChanged(index: Int) {
-            Log.d(TAG, "onTitleChanged: $index")
-            val tab = tabByTitleIndex(index)
-            vb.vActionBar.setAddressBoxText(tab?.url ?: "")
-            thumbnailPresenter.schedule(tab)
-        }
-
-        override fun onTitleSelected(index: Int) {
-            val tab = tabByTitleIndex(index)
-            if (tab == null) {
-                syncTabWithTitles()
-            } else if (!tab.selected) {
-                changeTab(tab)
-            }
-            panelController.hideTabsPanel()
-            toolbarController.autoHideMenuOverlay()
-        }
-
-        override fun onAddNewTabSelected() {
-            onNewTabRequested(tabsModel.tabsStates.size)
-        }
-
-        override fun closeTab(tabState: WebTabState?) = this@MainActivity.closeTab(tabState)
-
-        override fun onNewTabRequested(tabIndex: Int) {
-            this@MainActivity.openInNewTab(settingsModel.homePage, tabIndex,
-                needToHideMenuOverlay = false,
-                navigateImmediately = true
+    private var progressBarHideRunnable: Runnable =
+        Runnable {
+            val anim = AnimationUtils.loadAnimation(this@MainActivity, android.R.anim.fade_out)
+            anim.setAnimationListener(
+                object : BaseAnimationListener() {
+                    override fun onAnimationEnd(animation: Animation) {
+                        vb.progressBar.visibility = View.GONE
+                    }
+                },
             )
+            vb.progressBar.startAnimation(anim)
         }
-    }
+
+    private val mConnectivityChangeReceiver =
+        object : BroadcastReceiver() {
+            override fun onReceive(
+                context: Context,
+                intent: Intent,
+            ) {
+                val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+                val activeNetwork = cm.activeNetworkInfo
+                val isConnected = activeNetwork != null && activeNetwork.isConnectedOrConnecting
+                val tab = tabsModel.currentTab.value ?: return
+                tab.webEngine.setNetworkAvailable(isConnected)
+            }
+        }
+
+    private val tabsListener =
+        object : Listener {
+            override fun onTitleChanged(index: Int) {
+                Log.d(TAG, "onTitleChanged: $index")
+                val tab = tabByTitleIndex(index)
+                vb.vActionBar.setAddressBoxText(tab?.url ?: "")
+                thumbnailPresenter.schedule(tab)
+            }
+
+            override fun onTitleSelected(index: Int) {
+                val tab = tabByTitleIndex(index)
+                if (tab == null) {
+                    syncTabWithTitles()
+                } else if (!tab.selected) {
+                    changeTab(tab)
+                }
+                panelController.hideTabsPanel()
+                toolbarController.autoHideMenuOverlay()
+            }
+
+            override fun onAddNewTabSelected() {
+                onNewTabRequested(tabsModel.tabsStates.size)
+            }
+
+            override fun closeTab(tabState: WebTabState?) = this@MainActivity.closeTab(tabState)
+
+            override fun onNewTabRequested(tabIndex: Int) {
+                this@MainActivity.openInNewTab(
+                    settingsModel.homePage,
+                    tabIndex,
+                    needToHideMenuOverlay = false,
+                    navigateImmediately = true,
+                )
+            }
+        }
 
     override fun closeWindow() {
         Log.d(TAG, "closeWindow")
@@ -352,8 +410,9 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
 
     override fun showHistory() {
         startActivityForResult(
-                Intent(this@MainActivity, HistoryActivity::class.java),
-                IntentHandler.REQUEST_CODE_HISTORY_ACTIVITY)
+            Intent(this@MainActivity, HistoryActivity::class.java),
+            IntentHandler.REQUEST_CODE_HISTORY_ACTIVITY,
+        )
         toolbarController.autoHideMenuOverlay()
     }
 
@@ -361,21 +420,21 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         bookmarksController.togglePanel()
     }
 
-    private fun tabByTitleIndex(index: Int) =
-            if (index >= 0 && index < tabsModel.tabsStates.size) tabsModel.tabsStates[index] else null
+    private fun tabByTitleIndex(index: Int) = if (index >= 0 && index < tabsModel.tabsStates.size) tabsModel.tabsStates[index] else null
 
     override fun showSettings() {
-        SettingsDialog(this, SettingsDeps(settingsModel, adblockModel, autoUpdateModel)).apply {
-            // The ad-block toggle is global (adblockModel.adBlockEnabled) while the overlay zapper is a
-            // document-start script registered per WebView; re-sync every open tab on dismiss so
-            // the zapper matches the network blocker. Per-tab overrides are preserved.
-            onDismissed = {
-                tabsModel.tabsStates.forEach {
-                    it.webEngine.onUpdateAdblockSetting(it.adblock ?: adblockModel.adBlockEnabled)
+        SettingsDialog(this, SettingsDeps(settingsModel, adblockModel, autoUpdateModel))
+            .apply {
+                // The ad-block toggle is global (adblockModel.adBlockEnabled) while the overlay zapper is a
+                // document-start script registered per WebView; re-sync every open tab on dismiss so
+                // the zapper matches the network blocker. Per-tab overrides are preserved.
+                onDismissed = {
+                    tabsModel.tabsStates.forEach {
+                        it.webEngine.onUpdateAdblockSetting(it.adblock ?: adblockModel.adBlockEnabled)
+                    }
+                    updateUpdateBadge()
                 }
-                updateUpdateBadge()
-            }
-        }.show()
+            }.show()
     }
 
     override fun onExtendedAddressBarMode() {
@@ -414,39 +473,80 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
 
     override fun onShowMenu() {
         val currentTab = tabsModel.currentTab.value
-        val items = arrayListOf(
-            getString(R.string.navigate_home),
-            getString(R.string.new_tab),
-            getString(R.string.add_bookmark),
-            getString(R.string.toggle_ads_blocking),
-            getString(R.string.block_popups),
-            getString(R.string.history),
-            getString(R.string.downloads),
-            getString(R.string.incognito_mode),
-            getString(R.string.voice_search),
-            getString(R.string.toggle_theme),
-            getString(R.string.close_tab),
-            getString(R.string.close_application)
-        ).toTypedArray()
-        AlertDialog.Builder(this)
+        val items =
+            arrayListOf(
+                getString(R.string.navigate_home),
+                getString(R.string.new_tab),
+                getString(R.string.add_bookmark),
+                getString(R.string.toggle_ads_blocking),
+                getString(R.string.block_popups),
+                getString(R.string.history),
+                getString(R.string.downloads),
+                getString(R.string.incognito_mode),
+                getString(R.string.voice_search),
+                getString(R.string.toggle_theme),
+                getString(R.string.close_tab),
+                getString(R.string.close_application),
+            ).toTypedArray()
+        AlertDialog
+            .Builder(this)
             .setTitle(R.string.menu)
             .setItems(items) { _, which ->
                 when (which) {
-                    0 -> navigate(settingsModel.homePage)
-                    1 -> openInNewTab(settingsModel.homePage, tabsModel.tabsStates.size, needToHideMenuOverlay = false, navigateImmediately = true)
-                    2 -> bookmarksController.addCurrentPage()
-                    3 -> toggleAdBlockForTab()
-                    4 -> lifecycleScope.launch(Dispatchers.Main) { showPopupBlockOptions() }
-                    5 -> showHistory()
-                    6 -> showDownloads()
-                    7 -> toggleIncognitoMode()
-                    8 -> initiateVoiceSearch()
-                    9 -> toggleTheme()
-                    10 -> currentTab?.let { closeTab(it) }
-                    11 -> closeWindow()
+                    0 -> {
+                        navigate(settingsModel.homePage)
+                    }
+
+                    1 -> {
+                        openInNewTab(
+                            settingsModel.homePage,
+                            tabsModel.tabsStates.size,
+                            needToHideMenuOverlay = false,
+                            navigateImmediately = true,
+                        )
+                    }
+
+                    2 -> {
+                        bookmarksController.addCurrentPage()
+                    }
+
+                    3 -> {
+                        toggleAdBlockForTab()
+                    }
+
+                    4 -> {
+                        lifecycleScope.launch(Dispatchers.Main) { showPopupBlockOptions() }
+                    }
+
+                    5 -> {
+                        showHistory()
+                    }
+
+                    6 -> {
+                        showDownloads()
+                    }
+
+                    7 -> {
+                        toggleIncognitoMode()
+                    }
+
+                    8 -> {
+                        initiateVoiceSearch()
+                    }
+
+                    9 -> {
+                        toggleTheme()
+                    }
+
+                    10 -> {
+                        currentTab?.let { closeTab(it) }
+                    }
+
+                    11 -> {
+                        closeWindow()
+                    }
                 }
-            }
-            .show()
+            }.show()
     }
 
     /**
@@ -459,7 +559,9 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     }
 
     fun refresh() {
-        tabsModel.currentTab.value?.webEngine?.reload()
+        tabsModel.currentTab.value
+            ?.webEngine
+            ?.reload()
     }
 
     /** Public entry point for the Close tab shortcut (the overflow menu calls [closeTab] directly). */
@@ -469,8 +571,8 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
 
     override fun onDestroy() {
         Log.d(TAG, "onDestroy")
-        //here properties can be uninitialized in case of wrong activity for incognito mode
-        //detection and force activity restart in onCreate()
+        // here properties can be uninitialized in case of wrong activity for incognito mode
+        // detection and force activity restart in onCreate()
         if (::tabsModel.isInitialized) {
             tabsModel.onDetachActivity()
         }
@@ -497,20 +599,27 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
 
     override fun canInstallPackages(): Boolean = InstallPermissionHelper.canInstallPackages(this)
 
-    override fun showUpdateDialog(onDownload: () -> Unit, onSettings: () -> Unit) {
-        autoUpdateModel.updateChecker.showUpdateDialog(this, object : UpdateChecker.DialogCallback {
-            override fun download() = onDownload()
-            override fun later() {}
-            override fun settings() = onSettings()
-        })
+    override fun showUpdateDialog(
+        onDownload: () -> Unit,
+        onSettings: () -> Unit,
+    ) {
+        autoUpdateModel.updateChecker.showUpdateDialog(
+            this,
+            object : UpdateChecker.DialogCallback {
+                override fun download() = onDownload()
+
+                override fun later() {}
+
+                override fun settings() = onSettings()
+            },
+        )
     }
 
     override fun showUnknownSourcesDialog(onConfirm: () -> Unit) {
         InstallPermissionHelper.showEnableUnknownSourcesDialog(this, onConfirm)
     }
 
-    override fun openInstallPermissionSettings(): Boolean =
-        InstallPermissionHelper.openUnknownSourcesSettings(this)
+    override fun openInstallPermissionSettings(): Boolean = InstallPermissionHelper.openUnknownSourcesSettings(this)
 
     override fun downloadUpdate() {
         autoUpdateModel.modelScope.launch(Dispatchers.Main) {
@@ -528,27 +637,33 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         unbindService(connection)
     }
 
-    override fun hasPermission(permission: String): Boolean =
-        checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+    override fun hasPermission(permission: String): Boolean = checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
 
-    override fun requestPermission(permission: String, requestCode: Int) {
+    override fun requestPermission(
+        permission: String,
+        requestCode: Int,
+    ) {
         requestPermissions(arrayOf(permission), requestCode)
     }
 
-    override fun downloadFreeSpaceBytes(): Long =
-        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).freeSpace
+    override fun downloadFreeSpaceBytes(): Long = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).freeSpace
 
-    override fun onDownloadNoSpace(fileName: String, neededBytes: Long, freeBytes: Long) {
-        AlertDialog.Builder(this)
+    override fun onDownloadNoSpace(
+        fileName: String,
+        neededBytes: Long,
+        freeBytes: Long,
+    ) {
+        AlertDialog
+            .Builder(this)
             .setTitle(R.string.download)
             .setMessage(
                 getString(
-                    R.string.msg_not_enough_space, fileName,
+                    R.string.msg_not_enough_space,
+                    fileName,
                     Formatter.formatFileSize(this, neededBytes),
                     Formatter.formatFileSize(this, freeBytes),
-                )
-            )
-            .setPositiveButton(android.R.string.ok, null)
+                ),
+            ).setPositiveButton(android.R.string.ok, null)
             .show()
     }
 
@@ -556,8 +671,17 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         intentHandler.handleIntent(intent)
     }
 
-    private fun openInNewTab(url: String?, index: Int = 0, needToHideMenuOverlay: Boolean = true, navigateImmediately: Boolean): WebEngine? {
-        Log.d(TAG, "openInNewTab: url: $url, index: $index, needToHideMenuOverlay: $needToHideMenuOverlay, navigateImmediately: $navigateImmediately")
+    private fun openInNewTab(
+        url: String?,
+        index: Int = 0,
+        needToHideMenuOverlay: Boolean = true,
+        navigateImmediately: Boolean,
+    ): WebEngine? {
+        Log.d(
+            TAG,
+            "openInNewTab: url: $url, index: $index, needToHideMenuOverlay: $needToHideMenuOverlay, " +
+                "navigateImmediately: $navigateImmediately",
+        )
         if (url == null) {
             return null
         }
@@ -596,7 +720,10 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
 
     override fun createView(tab: WebTabState): Boolean = createWebView(tab) != null
 
-    override fun attachEngineToWindow(tab: WebTabState, callback: WebEngineWindowProviderCallback) {
+    override fun attachEngineToWindow(
+        tab: WebTabState,
+        callback: WebEngineWindowProviderCallback,
+    ) {
         tab.webEngine.onAttachToWindow(callback, vb.flWebViewContainer)
     }
 
@@ -604,16 +731,19 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     override fun createWebView(tab: WebTabState): View? {
         val webView: View
         try {
-            webView = tab.webEngine.getOrCreateView(this) //WebViewEx(this, WebViewCallback(tab), AndroidJSInterface(this, viewModel, tabsModel, tab))
+            // was: WebViewEx(this, WebViewCallback(tab), AndroidJSInterface(this, viewModel, tabsModel, tab))
+            webView = tab.webEngine.getOrCreateView(this)
         } catch (e: Throwable) {
             e.printStackTrace()
 
             if (!WebEnginePolicy.isGecko(config.webEngine)) {
-                val dialogBuilder = AlertDialog.Builder(this)
-                    .setTitle(R.string.error)
-                    .setCancelable(false)
-                    .setMessage(R.string.err_webview_can_not_link)
-                    .setNegativeButton(R.string.exit) { _, _ -> finish() }
+                val dialogBuilder =
+                    AlertDialog
+                        .Builder(this)
+                        .setTitle(R.string.error)
+                        .setCancelable(false)
+                        .setMessage(R.string.err_webview_can_not_link)
+                        .setNegativeButton(R.string.exit) { _, _ -> finish() }
 
                 val appPackageName = "com.google.android.webview"
                 val intent =
@@ -635,7 +765,7 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         }
 
         var ua = settingsModel.userAgentString.value
-        if (ua?.contains("TV Bro/1.0 ") == true) {//legacy ua string - now default one should be used
+        if (ua?.contains("TV Bro/1.0 ") == true) { // legacy ua string - now default one should be used
             settingsModel.userAgentString.value = null
             ua = null
         }
@@ -655,7 +785,11 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     }
 
     private fun updateMediaCounter() {
-        val count = tabsModel.currentTab.value?.webEngine?.mediaCandidates()?.size ?: 0
+        val count =
+            tabsModel.currentTab.value
+                ?.webEngine
+                ?.mediaCandidates()
+                ?.size ?: 0
         vb.vActionBar.setMediaCounter(count)
     }
 
@@ -668,8 +802,11 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         super.onTrimMemory(level)
     }
 
-    override fun onRequestPermissionsResult(requestCode: Int,
-                                            permissions: Array<String>, grantResults: IntArray) {
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray,
+    ) {
         if (permissionOrchestrator.onRequestPermissionsResult(requestCode, permissions, grantResults)) {
             return
         }
@@ -677,21 +814,34 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     }
 
     @Deprecated("Deprecated in Java")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+    override fun onActivityResult(
+        requestCode: Int,
+        resultCode: Int,
+        data: Intent?,
+    ) {
         if (permissionOrchestrator.onActivityResult(requestCode, resultCode, data)) {
             return
         }
         when (requestCode) {
             PICK_FILE_REQUEST_CODE -> {
-                tabsModel.currentTab.value?.webEngine?.onFilePicked(resultCode, data)
-            }
-            IntentHandler.REQUEST_CODE_HISTORY_ACTIVITY ->
-                intentHandler.handleHistoryResult(resultCode, data)
-            InstallPermissionHelper.REQUEST_CODE_UNKNOWN_APP_SOURCES -> if (autoUpdateModel.needToShowUpdateDlgAgain) {
-                autoUpdateModel.showUpdateDialogIfNeeded(this)
+                tabsModel.currentTab.value
+                    ?.webEngine
+                    ?.onFilePicked(resultCode, data)
             }
 
-            else -> super.onActivityResult(requestCode, resultCode, data)
+            IntentHandler.REQUEST_CODE_HISTORY_ACTIVITY -> {
+                intentHandler.handleHistoryResult(resultCode, data)
+            }
+
+            InstallPermissionHelper.REQUEST_CODE_UNKNOWN_APP_SOURCES -> {
+                if (autoUpdateModel.needToShowUpdateDlgAgain) {
+                    autoUpdateModel.showUpdateDialogIfNeeded(this)
+                }
+            }
+
+            else -> {
+                super.onActivityResult(requestCode, resultCode, data)
+            }
         }
     }
 
@@ -710,7 +860,9 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         updateUpdateBadge()
         val intentFilter = IntentFilter("android.net.conn.CONNECTIVITY_CHANGE")
         registerReceiver(mConnectivityChangeReceiver, intentFilter)
-        tabsModel.currentTab.value?.webEngine?.onResume()
+        tabsModel.currentTab.value
+            ?.webEngine
+            ?.onResume()
     }
 
     override fun onPause() {
@@ -733,18 +885,23 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
 
     private suspend fun showPopupBlockOptions() {
         val tab = tabsModel.currentTab.value ?: return
-        val currentHostConfig = tabsModel.findHostConfig(tab,false)
+        val currentHostConfig = tabsModel.findHostConfig(tab, false)
         val currentBlockPopupsLevelValue = currentHostConfig?.popupBlockLevel ?: HostConfig.DEFAULT_BLOCK_POPUPS_VALUE
-        val hostName = currentHostConfig?.hostName ?: try { URL(tab.url).host } catch (e: Exception) { "" }
-        AlertDialog.Builder(this)
-            .setTitle(getString(R.string.block_popups_s, hostName))
-            .setSingleChoiceItems(R.array.popup_blocking_level, currentBlockPopupsLevelValue) {
-                    dialog, itemId -> lifecycleScope.launch {
-                        tabsModel.changePopupBlockingLevel(itemId, tab)
-                        dialog.dismiss()
-                    }
+        val hostName =
+            currentHostConfig?.hostName ?: try {
+                URL(tab.url).host
+            } catch (e: Exception) {
+                ""
             }
-            .show()
+        AlertDialog
+            .Builder(this)
+            .setTitle(getString(R.string.block_popups_s, hostName))
+            .setSingleChoiceItems(R.array.popup_blocking_level, currentBlockPopupsLevelValue) { dialog, itemId ->
+                lifecycleScope.launch {
+                    tabsModel.changePopupBlockingLevel(itemId, tab)
+                    dialog.dismiss()
+                }
+            }.show()
     }
 
     fun navigate(url: String) {
@@ -756,10 +913,11 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     }
 
     override fun search(aText: String) {
-        val url = AddressInputPolicy.resolveUrl(
-            aText,
-            settingsModel.searchEngineURL,
-        ) { Patterns.WEB_URL.matcher(it).matches() }
+        val url =
+            AddressInputPolicy.resolveUrl(
+                aText,
+                settingsModel.searchEngineURL,
+            ) { Patterns.WEB_URL.matcher(it).matches() }
         if (url == null) {
             Utils.showToast(this, R.string.error)
             return
@@ -782,27 +940,35 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     private suspend fun toggleIncognitoMode(andSwitchProcess: Boolean) {
         Log.d(TAG, "toggleIncognitoMode andSwitchProcess: $andSwitchProcess")
         vb.progressBarGeneric.visibility = View.VISIBLE
-        val newMode = viewModel.toggleIncognitoMode(
-            clearEngineSession = {
-                withContext(Dispatchers.IO) {
-                    WebStorage.getInstance().deleteAllData()
-                    CookieManager.getInstance().removeAllCookies(null)
-                    CookieManager.getInstance().flush()
-                }
-                WebEngineFactory.clearCache(this@MainActivity)
-            },
-            clearOpenTabs = { tabsModel.onCloseAllTabs().join() },
-        )
+        val newMode =
+            viewModel.toggleIncognitoMode(
+                clearEngineSession = {
+                    withContext(Dispatchers.IO) {
+                        WebStorage.getInstance().deleteAllData()
+                        CookieManager.getInstance().removeAllCookies(null)
+                        CookieManager.getInstance().flush()
+                    }
+                    WebEngineFactory.clearCache(this@MainActivity)
+                },
+                clearOpenTabs = { tabsModel.onCloseAllTabs().join() },
+            )
         vb.progressBarGeneric.visibility = View.GONE
         if (andSwitchProcess) {
             switchProcess(newMode)
         }
     }
 
-    private fun switchProcess(incognitoMode: Boolean, intentDataToCopy: Bundle? = null) {
+    private fun switchProcess(
+        incognitoMode: Boolean,
+        intentDataToCopy: Bundle? = null,
+    ) {
         Log.d(TAG, "switchProcess incognitoMode: $incognitoMode")
-        val activityClass = if (incognitoMode) IncognitoModeMainActivity::class.java
-        else MainActivity::class.java
+        val activityClass =
+            if (incognitoMode) {
+                IncognitoModeMainActivity::class.java
+            } else {
+                MainActivity::class.java
+            }
         val intent = Intent(this@MainActivity, activityClass)
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         intent.putExtra(KEY_PROCESS_ID_TO_KILL, Process.myPid())
@@ -817,49 +983,54 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         toolbarController.toggleMenu()
     }
 
-    val onBackPressedCallback = object : OnBackPressedCallback(true) {
-        override fun handleOnBackPressed() {
-            backNavigationEventsAdapter.dispatchSystemBackNavigationEvent()
-        }
-    }
-
-    private val backNavigationEventsAdapter = BackNavigationEventsAdapter(
-        onEmulatedBackEvent = {
-            if (!hideSoftwareKeyboardIfVisible()) {
-                handleBackNavigation()
+    val onBackPressedCallback =
+        object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                backNavigationEventsAdapter.dispatchSystemBackNavigationEvent()
             }
         }
-    )
+
+    private val backNavigationEventsAdapter =
+        BackNavigationEventsAdapter(
+            onEmulatedBackEvent = {
+                if (!hideSoftwareKeyboardIfVisible()) {
+                    handleBackNavigation()
+                }
+            },
+        )
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         val localCallback = window.callback
-        window.callback = object : Window.Callback by localCallback {
-            override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-                //Log.d(TAG, "dispatchKeyEvent event: $event")
-                backNavigationEventsAdapter.dispatchKeyEvent(event)
+        window.callback =
+            object : Window.Callback by localCallback {
+                override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+                    // Log.d(TAG, "dispatchKeyEvent event: $event")
+                    backNavigationEventsAdapter.dispatchKeyEvent(event)
 
-                val keyCode = if (event.keyCode != 0) event.keyCode else event.scanCode
-                val keyCodeBackNavigation = keyCode == KeyEvent.KEYCODE_ESCAPE ||
-                        keyCode == KeyEvent.KEYCODE_BUTTON_B || keyCode == KeyEvent.KEYCODE_BACK
-                val shortcutMgr = ShortcutMgr.getInstance()
-                val currentTab = tabsModel.currentTab.value
-                if (!keyCodeBackNavigation &&
-                    shortcutMgr.handle(event, this@MainActivity, currentTab)) {
-                    return true
+                    val keyCode = if (event.keyCode != 0) event.keyCode else event.scanCode
+                    val keyCodeBackNavigation =
+                        keyCode == KeyEvent.KEYCODE_ESCAPE ||
+                            keyCode == KeyEvent.KEYCODE_BUTTON_B || keyCode == KeyEvent.KEYCODE_BACK
+                    val shortcutMgr = ShortcutMgr.getInstance()
+                    val currentTab = tabsModel.currentTab.value
+                    if (!keyCodeBackNavigation &&
+                        shortcutMgr.handle(event, this@MainActivity, currentTab)
+                    ) {
+                        return true
+                    }
+
+                    return localCallback.dispatchKeyEvent(event)
                 }
 
-                return localCallback.dispatchKeyEvent(event)
-            }
-
-            override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
-                //Log.d(TAG, "dispatchGenericMotionEvent event: $event")
-                if (backNavigationEventsAdapter.dispatchGenericMotionEvent(event)) {
-                    return true
+                override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+                    // Log.d(TAG, "dispatchGenericMotionEvent event: $event")
+                    if (backNavigationEventsAdapter.dispatchGenericMotionEvent(event)) {
+                        return true
+                    }
+                    return localCallback.dispatchGenericMotionEvent(event)
                 }
-                return localCallback.dispatchGenericMotionEvent(event)
             }
-        }
     }
 
     /**
@@ -882,8 +1053,13 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
 
     private fun handleBackNavigation() {
         Log.d(TAG, "handleBackNavigation")
-        if (tabsModel.currentTab.value?.webEngine?.isVirtualCursorMode() == false) {
-            tabsModel.currentTab.value?.webEngine?.setVirtualCursorMode(true)
+        if (tabsModel.currentTab.value
+                ?.webEngine
+                ?.isVirtualCursorMode() == false
+        ) {
+            tabsModel.currentTab.value
+                ?.webEngine
+                ?.setVirtualCursorMode(true)
             backNavigationEventsAdapter.gameControllersLongPressBForBackNavigation = false
             return
         }
@@ -893,14 +1069,16 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
         } else if (vb.flWebViewContainer.cursorDrawerDelegate.canHandleBackNavigation()) {
             vb.flWebViewContainer.cursorDrawerDelegate.handleBackNavigation()
         } else if (toolbarController.isFullscreen) {
-            tabsModel.currentTab.value?.webEngine?.hideFullscreenView()
+            tabsModel.currentTab.value
+                ?.webEngine
+                ?.hideFullscreenView()
         } else if (panelController.isBookmarksPanelVisible) {
             bookmarksController.hide()
         } else if (panelController.isTabsPanelVisible) {
             panelController.hideTabsPanel()
         } else if (vb.flWebViewContainer.hasFocus()) {
-            //Focus is on the page: BACK must give the remote a way back to the UI,
-            //otherwise the user is stuck in the WebView with no focused control.
+            // Focus is on the page: BACK must give the remote a way back to the UI,
+            // otherwise the user is stuck in the WebView with no focused control.
             toolbarController.showMenuOverlay()
         } else {
             toolbarController.toggleMenu()
@@ -910,9 +1088,11 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     private fun syncTabWithTitles() {
         val tab = tabByTitleIndex(vb.vTabs.current)
         if (tab == null) {
-            openInNewTab(settingsModel.homePage, if (vb.vTabs.current < 0) 0 else tabsModel.tabsStates.size,
+            openInNewTab(
+                settingsModel.homePage,
+                if (vb.vTabs.current < 0) 0 else tabsModel.tabsStates.size,
                 needToHideMenuOverlay = true,
-                navigateImmediately = true
+                navigateImmediately = true,
             )
         } else if (!tab.selected) {
             changeTab(tab)
@@ -920,29 +1100,39 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     }
 
     private fun onDownloadStarted(fileName: String) {
-        Utils.showToast(this, getString(R.string.download_started,
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).toString() + File.separator + fileName))
+        Utils.showToast(
+            this,
+            getString(
+                R.string.download_started,
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).toString() + File.separator + fileName,
+            ),
+        )
         toolbarController.showMenuOverlay()
     }
 
     override fun initiateVoiceSearch() {
         toolbarController.autoHideMenuOverlay()
-        voiceSearchHelper.initiateVoiceSearch(object : VoiceSearchHelper.Callback {
-            override fun onResult(text: String?) {
-                if (text == null) {
-                    Utils.showToast(this@MainActivity, getString(R.string.can_not_recognize))
-                    return
+        voiceSearchHelper.initiateVoiceSearch(
+            object : VoiceSearchHelper.Callback {
+                override fun onResult(text: String?) {
+                    if (text == null) {
+                        Utils.showToast(this@MainActivity, getString(R.string.can_not_recognize))
+                        return
+                    }
+                    search(text)
+                    toolbarController.autoHideMenuOverlay()
                 }
-                search(text)
-                toolbarController.autoHideMenuOverlay()
-            }
-        })
+            },
+        )
     }
 
     // ---- WebEngineCallbackHost: the view side of the per-tab engine callback -----------------
 
-    override fun openInNewTabAt(url: String, index: Int, navigateImmediately: Boolean): WebEngine? =
-        openInNewTab(url, index, needToHideMenuOverlay = true, navigateImmediately = navigateImmediately)
+    override fun openInNewTabAt(
+        url: String,
+        index: Int,
+        navigateImmediately: Boolean,
+    ): WebEngine? = openInNewTab(url, index, needToHideMenuOverlay = true, navigateImmediately = navigateImmediately)
 
     override fun showLoadingProgress(progress: Int) {
         vb.progressBar.visibility = View.VISIBLE
@@ -1000,7 +1190,8 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
             startActivityForResult(intent, PICK_FILE_REQUEST_CODE)
         } catch (e: ActivityNotFoundException) {
             try {
-                //trying again with type */* (seems file pickers usually doesn't support specific types in intent filters but still can do the job)
+                // trying again with type */* (seems file pickers usually doesn't support specific types
+                // in intent filters but still can do the job)
                 intent.type = "*/*"
                 startActivityForResult(intent, PICK_FILE_REQUEST_CODE)
             } catch (e: ActivityNotFoundException) {
@@ -1013,11 +1204,15 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
 
     override fun downloadRequested(request: DownloadRequest) {
         downloadCoordinator.requestDownload(
-            url = request.url, referer = request.referer,
+            url = request.url,
+            referer = request.referer,
             originalDownloadFileName = request.fileName,
-            userAgent = request.userAgent, mimeType = request.mimeType,
+            userAgent = request.userAgent,
+            mimeType = request.mimeType,
             operationAfterDownload = request.operationAfterDownload,
-            base64BlobData = request.base64BlobData, stream = request.stream, size = request.size,
+            base64BlobData = request.base64BlobData,
+            stream = request.stream,
+            size = request.size,
         )
     }
 
@@ -1077,26 +1272,63 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
     }
 
     override fun showCursorMenu(
-        tab: WebTabState, callback: WebEngineWindowProviderCallback, cursorDrawer: CursorDrawerDelegate,
-        baseUri: String?, linkUri: String?, srcUri: String?, title: String?, altText: String?,
-        textContent: String?, x: Int, y: Int
+        tab: WebTabState,
+        callback: WebEngineWindowProviderCallback,
+        cursorDrawer: CursorDrawerDelegate,
+        baseUri: String?,
+        linkUri: String?,
+        srcUri: String?,
+        title: String?,
+        altText: String?,
+        textContent: String?,
+        x: Int,
+        y: Int,
     ) {
         cursorMenuController.showCursorMenu(
-            tab, callback, cursorDrawer,
-            baseUri, linkUri, srcUri, title, altText, textContent, x, y
+            tab,
+            callback,
+            cursorDrawer,
+            baseUri,
+            linkUri,
+            srcUri,
+            title,
+            altText,
+            textContent,
+            x,
+            y,
         )
     }
 
     override fun suggestActionsForLink(
-        tab: WebTabState, callback: WebEngineWindowProviderCallback, baseUri: String?, linkUri: String?,
-        srcUri: String?, title: String?, altText: String?, textContent: String?, x: Int, y: Int
+        tab: WebTabState,
+        callback: WebEngineWindowProviderCallback,
+        baseUri: String?,
+        linkUri: String?,
+        srcUri: String?,
+        title: String?,
+        altText: String?,
+        textContent: String?,
+        x: Int,
+        y: Int,
     ) {
         cursorMenuController.suggestActionsForLink(
-            tab, callback, baseUri, linkUri, srcUri, title, altText, textContent, x, y
+            tab,
+            callback,
+            baseUri,
+            linkUri,
+            srcUri,
+            title,
+            altText,
+            textContent,
+            x,
+            y,
         )
     }
 
-    override fun askUserAndOpenInExternalApp(url: String, intent: Intent) {
+    override fun askUserAndOpenInExternalApp(
+        url: String,
+        intent: Intent,
+    ) {
         cursorMenuController.askUserAndOpenInExternalApp(url, intent)
     }
 }

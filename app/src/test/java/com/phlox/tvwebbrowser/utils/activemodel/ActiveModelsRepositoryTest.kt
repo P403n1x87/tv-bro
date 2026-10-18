@@ -15,9 +15,10 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [26])
 class ActiveModelsRepositoryTest {
-
     /** Stand-in for a model with an injectable (but defaulted) dependency. */
-    class ModelWithInjectedDependency(val label: String = "production-default") : ActiveModel()
+    class ModelWithInjectedDependency(
+        val label: String = "production-default",
+    ) : ActiveModel()
 
     @Test
     fun modelsWithDefaultedDependenciesAreBuiltFromTheirNoArgumentConstructor() {

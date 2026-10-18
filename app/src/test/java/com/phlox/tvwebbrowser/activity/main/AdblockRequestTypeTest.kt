@@ -16,9 +16,10 @@ import org.robolectric.annotation.Config as RobolectricConfig
 @RunWith(RobolectricTestRunner::class)
 @RobolectricConfig(sdk = [26], application = Application::class)
 class AdblockRequestTypeTest {
-
-    private fun option(url: String?, type: String?) =
-        AdblockRequestType.filterOptionFor(url?.let { Uri.parse(it) }, type)
+    private fun option(
+        url: String?,
+        type: String?,
+    ) = AdblockRequestType.filterOptionFor(url?.let { Uri.parse(it) }, type)
 
     @Test
     fun imageContentTypesAreImages() {

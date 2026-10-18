@@ -28,9 +28,7 @@ import java.util.*
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 
-
 object Utils {
-
     /**
      * Returns the screen/display size
      */
@@ -45,18 +43,27 @@ object Utils {
     /**
      * Shows a (long) toast
      */
-    fun showToast(context: Context, msg: String) {
+    fun showToast(
+        context: Context,
+        msg: String,
+    ) {
         Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
     }
 
     /**
      * Shows a (long) toast.
      */
-    fun showToast(context: Context, resourceId: Int) {
+    fun showToast(
+        context: Context,
+        resourceId: Int,
+    ) {
         Toast.makeText(context, context.getString(resourceId), Toast.LENGTH_LONG).show()
     }
 
-    fun D2P(ctx: Context, dp: Float): Float {
+    fun dpToPx(
+        ctx: Context,
+        dp: Float,
+    ): Float {
         val density = ctx.resources.displayMetrics.density
         return dp * density
     }
@@ -90,7 +97,7 @@ object Utils {
         return result
     }
 
-    fun MD5_Hash(bytes: ByteArray): String? {
+    fun md5Hash(bytes: ByteArray): String? {
         try {
             val m = MessageDigest.getInstance("MD5")
             m.update(bytes, 0, bytes.size)
@@ -108,7 +115,10 @@ object Utils {
         return activeNetwork != null && activeNetwork.isConnectedOrConnecting
     }
 
-    fun isSameDate(date: Long, other: Long): Boolean {
+    fun isSameDate(
+        date: Long,
+        other: Long,
+    ): Boolean {
         if (other == -1L) return false
         val c1 = Calendar.getInstance()
         c1.timeInMillis = date
@@ -117,7 +127,10 @@ object Utils {
         return c1.get(Calendar.DAY_OF_YEAR) == c2.get(Calendar.DAY_OF_YEAR) && c1.get(Calendar.YEAR) == c2.get(Calendar.YEAR)
     }
 
-    fun createTempFile(context: Context, fileName: String): File {
+    fun createTempFile(
+        context: Context,
+        fileName: String,
+    ): File {
         val externalCacheDir = context.externalCacheDir
         val internalCacheDir = context.cacheDir
         val cacheDir: File
@@ -129,10 +142,12 @@ object Utils {
         } else if (internalCacheDir == null) {
             cacheDir = externalCacheDir
         } else {
-            cacheDir = if (externalCacheDir.freeSpace > internalCacheDir.freeSpace)
-                externalCacheDir
-            else
-                internalCacheDir
+            cacheDir =
+                if (externalCacheDir.freeSpace > internalCacheDir.freeSpace) {
+                    externalCacheDir
+                } else {
+                    internalCacheDir
+                }
         }
         return File(cacheDir, fileName)
     }
@@ -142,9 +157,7 @@ object Utils {
         return uiModeManager.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION
     }
 
-    fun isFireTV(context: Context): Boolean {
-        return context.packageManager.hasSystemFeature("amazon.hardware.fire_tv")
-    }
+    fun isFireTV(context: Context): Boolean = context.packageManager.hasSystemFeature("amazon.hardware.fire_tv")
 
     fun isInstalledByGooglePlay(context: Context): Boolean {
         // A list with valid installers package name
@@ -166,40 +179,99 @@ object Utils {
                 val key = iterator.next() as String
                 val value = json[key]
                 when (value.javaClass.simpleName) {
-                    "String" -> bundle.putString(key, value as String)
-                    "Integer" -> bundle.putInt(key, (value as Int))
-                    "Long" -> bundle.putLong(key, (value as Long))
-                    "Boolean" -> bundle.putBoolean(key, (value as Boolean))
-                    "JSONObject" -> bundle.putBundle(key, convertJsonToBundle(value as JSONObject))
-                    "Float" -> bundle.putFloat(key, (value as Float))
-                    "Double" -> bundle.putDouble(key, (value as Double))
+                    "String" -> {
+                        bundle.putString(key, value as String)
+                    }
+
+                    "Integer" -> {
+                        bundle.putInt(key, (value as Int))
+                    }
+
+                    "Long" -> {
+                        bundle.putLong(key, (value as Long))
+                    }
+
+                    "Boolean" -> {
+                        bundle.putBoolean(key, (value as Boolean))
+                    }
+
+                    "JSONObject" -> {
+                        bundle.putBundle(key, convertJsonToBundle(value as JSONObject))
+                    }
+
+                    "Float" -> {
+                        bundle.putFloat(key, (value as Float))
+                    }
+
+                    "Double" -> {
+                        bundle.putDouble(key, (value as Double))
+                    }
+
                     "JSONArray" -> {
                         val jsArr = value as JSONArray
                         if (jsArr.length() == 0) continue@loop
                         val first = jsArr.get(0)
                         when (first.javaClass.simpleName) {
-                            "String" -> bundle.putStringArray(key, Array<String>(jsArr.length()) {
-                                jsArr.getString(it)
-                            })
-                            //IntArray is more suitable but in our case (storing webview state) we need bytes
-                            "Integer" -> bundle.putByteArray(key, ByteArray(jsArr.length()) {
-                                jsArr.getInt(it).toByte()
-                            })
-                            "Long" -> bundle.putLongArray(key, LongArray(jsArr.length()) {
-                                jsArr.getLong(it)
-                            })
-                            "Boolean" -> bundle.putBooleanArray(key, BooleanArray(jsArr.length()) {
-                                jsArr.getBoolean(it)
-                            })
-                            "Float" -> bundle.putFloatArray(key, FloatArray(jsArr.length()) {
-                                jsArr.getDouble(it).toFloat()
-                            })
-                            "Double" -> bundle.putDoubleArray(key, DoubleArray(jsArr.length()) {
-                                jsArr.getDouble(it)
-                            })
+                            "String" -> {
+                                bundle.putStringArray(
+                                    key,
+                                    Array<String>(jsArr.length()) {
+                                        jsArr.getString(it)
+                                    },
+                                )
+                            }
+
+                            // IntArray is more suitable but in our case (storing webview state) we need bytes
+                            "Integer" -> {
+                                bundle.putByteArray(
+                                    key,
+                                    ByteArray(jsArr.length()) {
+                                        jsArr.getInt(it).toByte()
+                                    },
+                                )
+                            }
+
+                            "Long" -> {
+                                bundle.putLongArray(
+                                    key,
+                                    LongArray(jsArr.length()) {
+                                        jsArr.getLong(it)
+                                    },
+                                )
+                            }
+
+                            "Boolean" -> {
+                                bundle.putBooleanArray(
+                                    key,
+                                    BooleanArray(jsArr.length()) {
+                                        jsArr.getBoolean(it)
+                                    },
+                                )
+                            }
+
+                            "Float" -> {
+                                bundle.putFloatArray(
+                                    key,
+                                    FloatArray(jsArr.length()) {
+                                        jsArr.getDouble(it).toFloat()
+                                    },
+                                )
+                            }
+
+                            "Double" -> {
+                                bundle.putDoubleArray(
+                                    key,
+                                    DoubleArray(jsArr.length()) {
+                                        jsArr.getDouble(it)
+                                    },
+                                )
+                            }
                         }
                     }
-                    else -> bundle.putString(key, value.javaClass.simpleName)
+
+                    else -> {
+                        bundle.putString(key, value.javaClass.simpleName)
+                    }
                 }
             }
             return bundle
@@ -217,8 +289,8 @@ object Utils {
         return bytes
     }
 
-    fun bytesToBundle(bytes: ByteArray): Bundle? {
-        return try {
+    fun bytesToBundle(bytes: ByteArray): Bundle? =
+        try {
             val parcel = Parcel.obtain()
             parcel.unmarshall(bytes, 0, bytes.size)
             parcel.setDataPosition(0)
@@ -228,9 +300,12 @@ object Utils {
         } catch (e: Exception) {
             null
         }
-    }
 
-    fun unzipFile(zipFile: File, targetDirectory: File, progress: (progress: Int, fileName: String) -> Unit) {
+    fun unzipFile(
+        zipFile: File,
+        targetDirectory: File,
+        progress: (progress: Int, fileName: String) -> Unit,
+    ) {
         val totalLen = zipFile.length()
         var alreadyUncompressed: Long = 0
         val zis = ZipInputStream(BufferedInputStream(FileInputStream(zipFile)))
@@ -247,7 +322,11 @@ object Utils {
                     throw SecurityException("Zip Path Traversal attack!")
                 }
                 val dir = if (ze.isDirectory) file else file.parentFile
-                if (!dir.isDirectory && !dir.mkdirs()) throw FileSystemException(dir, null, "Failed to ensure directory: " + dir.absolutePath)
+                if (!dir.isDirectory &&
+                    !dir.mkdirs()
+                ) {
+                    throw FileSystemException(dir, null, "Failed to ensure directory: " + dir.absolutePath)
+                }
                 if (ze.isDirectory) continue
                 var readen = 0
                 FileOutputStream(file).use {
@@ -278,8 +357,10 @@ object Utils {
     fun isForeground(): Boolean {
         val appProcessInfo = RunningAppProcessInfo()
         ActivityManager.getMyMemoryState(appProcessInfo)
-        return (appProcessInfo.importance == RunningAppProcessInfo.IMPORTANCE_FOREGROUND
-                || appProcessInfo.importance == RunningAppProcessInfo.IMPORTANCE_VISIBLE)
+        return (
+            appProcessInfo.importance == RunningAppProcessInfo.IMPORTANCE_FOREGROUND ||
+                appProcessInfo.importance == RunningAppProcessInfo.IMPORTANCE_VISIBLE
+        )
     }
 
     fun memInfo(ctx: Context): ActivityManager.MemoryInfo {
@@ -329,13 +410,15 @@ object Utils {
         return list
     }
 
-    fun getWebResourceResponseFromAssets(context: Context, path: String): WebResourceResponse? {
-        return try {
+    fun getWebResourceResponseFromAssets(
+        context: Context,
+        path: String,
+    ): WebResourceResponse? =
+        try {
             val inputStream = context.assets.open(path)
             val mimeType = URLConnection.guessContentTypeFromName(path) ?: "application/octet-stream"
             WebResourceResponse(mimeType, "UTF-8", inputStream)
         } catch (e: IOException) {
             null
         }
-    }
 }

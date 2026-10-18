@@ -8,19 +8,25 @@ import com.phlox.tvwebbrowser.model.WebTabState
 import com.phlox.tvwebbrowser.widgets.cursor.CursorLayout
 
 interface WebEngineProviderCallback {
-    suspend fun initialize(context: Context, config: Config, webViewContainer: CursorLayout)
+    suspend fun initialize(
+        context: Context,
+        config: Config,
+        webViewContainer: CursorLayout,
+    )
+
     fun createWebEngine(tab: WebTabState): WebEngine
+
     suspend fun clearCache(ctx: Context)
+
     fun onThemeSettingUpdated(value: Config.Theme)
+
     fun getWebEngineVersionString(): String
 }
 
 data class WebEngineProvider(
     val name: String,
-    val callback: WebEngineProviderCallback
+    val callback: WebEngineProviderCallback,
 )
-
-
 
 object WebEngineFactory {
     const val TAG = "WebEngineFactory"
@@ -31,12 +37,14 @@ object WebEngineFactory {
         engineProviders.add(provider)
     }
 
-    fun getProviders(): List<WebEngineProvider> {
-        return engineProviders
-    }
+    fun getProviders(): List<WebEngineProvider> = engineProviders
 
     @UiThread
-    suspend fun initialize(context: Context, config: Config, webViewContainer: CursorLayout) {
+    suspend fun initialize(
+        context: Context,
+        config: Config,
+        webViewContainer: CursorLayout,
+    ) {
         var webEngineProvider = engineProviders.find { it.name == config.webEngine }
         if (webEngineProvider == null && engineProviders.isNotEmpty()) {
             webEngineProvider = engineProviders[0]
@@ -51,9 +59,7 @@ object WebEngineFactory {
         }
     }
 
-    fun createWebEngine(tab: WebTabState): WebEngine {
-        return initializedProvider.callback.createWebEngine(tab)
-    }
+    fun createWebEngine(tab: WebTabState): WebEngine = initializedProvider.callback.createWebEngine(tab)
 
     suspend fun clearCache(ctx: Context) {
         initializedProvider.callback.clearCache(ctx)
@@ -63,11 +69,7 @@ object WebEngineFactory {
         initializedProvider.callback.onThemeSettingUpdated(value)
     }
 
-    fun getWebEngineVersionString(): String {
-        return initializedProvider.callback.getWebEngineVersionString()
-    }
+    fun getWebEngineVersionString(): String = initializedProvider.callback.getWebEngineVersionString()
 }
 
-fun WebEngine.isGecko(): Boolean {
-    return this.getWebEngineName() == Config.ENGINE_GECKO_VIEW
-}
+fun WebEngine.isGecko(): Boolean = this.getWebEngineName() == Config.ENGINE_GECKO_VIEW

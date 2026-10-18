@@ -24,7 +24,10 @@ interface TabsDao {
     suspend fun unselectAll(incognito: Boolean = false)
 
     @Query("UPDATE tabs SET position = :position WHERE id = :id")
-    suspend fun updatePosition(position: Int, id: Long)
+    suspend fun updatePosition(
+        position: Int,
+        id: Long,
+    )
 
     @Transaction
     suspend fun updatePositions(tabs: List<WebTabState>) {

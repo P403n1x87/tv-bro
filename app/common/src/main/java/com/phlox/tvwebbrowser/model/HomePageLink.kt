@@ -12,7 +12,7 @@ class HomePageLink(
     val order: Int? = null,
     val dest_url: String? = null,
     val description: String? = null,
-    var validUntil: Date? = null
+    var validUntil: Date? = null,
 ) {
     fun toJsonObj(): JSONObject {
         val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
@@ -24,17 +24,23 @@ class HomePageLink(
             put("order", order)
             put("dest_url", dest_url)
             put("description", description)
-            put("validUntil", dateFormat.format(validUntil?: Date()))
+            put("validUntil", dateFormat.format(validUntil ?: Date()))
         }
     }
 
     companion object {
-        fun fromHistoryItem(item: HistoryItem): HomePageLink {
-            return HomePageLink(item.title, item.url)
-        }
+        fun fromHistoryItem(item: HistoryItem): HomePageLink = HomePageLink(item.title, item.url)
 
-        fun fromBookmarkItem(item: FavoriteItem): HomePageLink {
-            return HomePageLink(item.title?: "", item.url?: "", item.favicon, item.id, item.order, item.destUrl, item.description, item.validUntil)
-        }
+        fun fromBookmarkItem(item: FavoriteItem): HomePageLink =
+            HomePageLink(
+                item.title ?: "",
+                item.url ?: "",
+                item.favicon,
+                item.id,
+                item.order,
+                item.destUrl,
+                item.description,
+                item.validUntil,
+            )
     }
 }

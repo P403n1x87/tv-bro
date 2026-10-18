@@ -20,9 +20,9 @@ import org.robolectric.annotation.Config as RobolectricConfig
 @RunWith(RobolectricTestRunner::class)
 @RobolectricConfig(sdk = [26], application = Application::class)
 class BackNavigationEventsAdapterTest {
-
     private class Counter {
         var count = 0
+
         fun inc() {
             count++
         }
@@ -33,15 +33,33 @@ class BackNavigationEventsAdapterTest {
         return KeyEvent(now, now, action, KeyEvent.KEYCODE_BACK, 0, 0, 0, 0, 0, InputDevice.SOURCE_KEYBOARD)
     }
 
-    private fun gamepadKeyDown(repeat: Int = 0): KeyEvent {
-        return KeyEvent(0, 0, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BACK, repeat, 0,
-            KeyEvent.META_ALT_ON, 0, 0, InputDevice.SOURCE_GAMEPAD)
-    }
+    private fun gamepadKeyDown(repeat: Int = 0): KeyEvent =
+        KeyEvent(
+            0,
+            0,
+            KeyEvent.ACTION_DOWN,
+            KeyEvent.KEYCODE_BACK,
+            repeat,
+            0,
+            KeyEvent.META_ALT_ON,
+            0,
+            0,
+            InputDevice.SOURCE_GAMEPAD,
+        )
 
-    private fun gamepadKeyUp(): KeyEvent {
-        return KeyEvent(0, 0, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_BACK, 0, 0,
-            KeyEvent.META_ALT_ON, 0, 0, InputDevice.SOURCE_GAMEPAD)
-    }
+    private fun gamepadKeyUp(): KeyEvent =
+        KeyEvent(
+            0,
+            0,
+            KeyEvent.ACTION_UP,
+            KeyEvent.KEYCODE_BACK,
+            0,
+            0,
+            KeyEvent.META_ALT_ON,
+            0,
+            0,
+            InputDevice.SOURCE_GAMEPAD,
+        )
 
     @Test
     fun nonControllerBackPressesAndReleasesFireOnce() {

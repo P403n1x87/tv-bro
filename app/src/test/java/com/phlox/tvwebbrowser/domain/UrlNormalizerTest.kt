@@ -7,7 +7,6 @@ import org.junit.Test
  * Unit tests for [UrlNormalizer], the rule the bookmark editor applies to the url field.
  */
 class UrlNormalizerTest {
-
     @Test
     fun schemelessInputGetsHttps() {
         assertEquals("https://example.com", UrlNormalizer.withAbsoluteScheme("example.com"))

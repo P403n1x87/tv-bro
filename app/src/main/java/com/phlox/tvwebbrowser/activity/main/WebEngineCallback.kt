@@ -43,16 +43,18 @@ class WebEngineCallback(
     private val settingsModel: SettingsModel,
     private val viewModel: MainActivityViewModel,
 ) : WebEngineWindowProviderCallback {
-
     companion object {
         private val TAG = WebEngineCallback::class.java.simpleName
     }
 
     override fun getActivity(): Activity = host.activity
 
-    override fun onOpenInNewTabRequested(url: String, navigateImmediately: Boolean): WebEngine? {
-        val index = NewTabPositionPolicy.insertIndexAfter(
-            tabsModel.tabsStates.indexOf(tabsModel.currentTab.value), tabsModel.tabsStates.size)
+    override fun onOpenInNewTabRequested(
+        url: String,
+        navigateImmediately: Boolean,
+    ): WebEngine? {
+        val index =
+            NewTabPositionPolicy.insertIndexAfter(tabsModel.tabsStates.indexOf(tabsModel.currentTab.value), tabsModel.tabsStates.size)
         return host.openInNewTabAt(url, index, navigateImmediately)
     }
 
@@ -60,29 +62,61 @@ class WebEngineCallback(
         Log.i(TAG, "onDownloadRequested url: $url")
         val fileName = Uri.parse(url).lastPathSegment
         val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(MimeTypeMap.getFileExtensionFromUrl(url))
-        onDownloadRequested(url, tab.url,
-            fileName, tab.webEngine.userAgentString, mimeType)
+        onDownloadRequested(
+            url,
+            tab.url,
+            fileName,
+            tab.webEngine.userAgentString,
+            mimeType,
+        )
     }
 
-    override fun onDownloadRequested(url: String, referer: String,
-                                     originalDownloadFileName: String?, userAgent: String?, mimeType: String?,
-                                     operationAfterDownload: Download.OperationAfterDownload,
-                                     base64BlobData: String?, stream: InputStream?, size: Long, contentDisposition: String?) {
+    override fun onDownloadRequested(
+        url: String,
+        referer: String,
+        originalDownloadFileName: String?,
+        userAgent: String?,
+        mimeType: String?,
+        operationAfterDownload: Download.OperationAfterDownload,
+        base64BlobData: String?,
+        stream: InputStream?,
+        size: Long,
+        contentDisposition: String?,
+    ) {
         val fileName = DownloadUtils.guessFileName(url, contentDisposition, mimeType)
 
-        host.downloadRequested(DownloadRequest(
-            url = url, referer = referer, fileName = fileName,
-            userAgent = userAgent, mimeType = mimeType,
-            operationAfterDownload = operationAfterDownload,
-            base64BlobData = base64BlobData, stream = stream, size = size,
-        ))
+        host.downloadRequested(
+            DownloadRequest(
+                url = url,
+                referer = referer,
+                fileName = fileName,
+                userAgent = userAgent,
+                mimeType = mimeType,
+                operationAfterDownload = operationAfterDownload,
+                base64BlobData = base64BlobData,
+                stream = stream,
+                size = size,
+            ),
+        )
     }
 
-    override fun onDownloadRequested(url: String, userAgent: String?, contentDisposition: String,
-                                     mimetype: String?, contentLength: Long ) {
+    override fun onDownloadRequested(
+        url: String,
+        userAgent: String?,
+        contentDisposition: String,
+        mimetype: String?,
+        contentLength: Long,
+    ) {
         Log.i(TAG, "DownloadListener.onDownloadStart url: $url")
-        onDownloadRequested(url= url, referer = tab.url, originalDownloadFileName = null,
-            userAgent = userAgent, mimeType = mimetype, size = contentLength, contentDisposition = contentDisposition)
+        onDownloadRequested(
+            url = url,
+            referer = tab.url,
+            originalDownloadFileName = null,
+            userAgent = userAgent,
+            mimeType = mimetype,
+            size = contentLength,
+            contentDisposition = contentDisposition,
+        )
     }
 
     override fun onProgressChanged(newProgress: Int) {
@@ -95,27 +129,27 @@ class WebEngineCallback(
         viewModel.onTabTitleUpdated(tab)
     }
 
-    override fun requestPermissions(array: Array<String>): Int {
-        return host.requestPermissionsOnHost(array)
-    }
+    override fun requestPermissions(array: Array<String>): Int = host.requestPermissionsOnHost(array)
 
-    override fun onShowFileChooser(intent: Intent): Boolean {
-        return host.showFileChooser(intent)
-    }
+    override fun onShowFileChooser(intent: Intent): Boolean = host.showFileChooser(intent)
 
     override fun onReceivedIcon(icon: Bitmap) {
         host.onTabIconUpdated(tab)
     }
 
-    override fun shouldOverrideUrlLoading(url: String, isAutomaticRedirect: Boolean): Boolean {
+    override fun shouldOverrideUrlLoading(
+        url: String,
+        isAutomaticRedirect: Boolean,
+    ): Boolean {
         tabsModel.onNavigationRequested(tab, url)
 
-        val uri = try {
-            Uri.parse(url)
-        } catch (e: Exception) {
-            Log.e(TAG, "shouldOverrideUrlLoading: ", e)
-            return true
-        }
+        val uri =
+            try {
+                Uri.parse(url)
+            } catch (e: Exception) {
+                Log.e(TAG, "shouldOverrideUrlLoading: ", e)
+                return true
+            }
 
         if (uri.scheme == null) {
             Log.d(TAG, "shouldOverrideUrlLoading: no scheme: $url")
@@ -136,8 +170,8 @@ class WebEngineCallback(
             return true
         }
 
-        //try to handle intent for non-network urls by external apps
-        //TODO: ask user if he wants to open this url in external app
+        // try to handle intent for non-network urls by external apps
+        // TODO: ask user if he wants to open this url in external app
         return try {
             Log.d(TAG, "shouldOverrideUrlLoading: non-network url: $url")
             val intent = Intent(Intent.ACTION_VIEW, uri)
@@ -161,14 +195,15 @@ class WebEngineCallback(
     }
 
     private fun shouldBlockAutomaticRedirect(url: String): Boolean {
-        val blocked = NavigationPolicy.shouldBlockAutomaticRedirect(
-            requestedUrl = url,
-            currentUrl = tab.url,
-            lastLoadingUrl = tab.lastLoadingUrl,
-            blockAutomaticRedirects = adblockModel.blockAutomaticRedirects,
-            adBlockEnabled = adblockModel.adBlockEnabled,
-            hostOf = { u -> Uri.parse(u).host }
-        )
+        val blocked =
+            NavigationPolicy.shouldBlockAutomaticRedirect(
+                requestedUrl = url,
+                currentUrl = tab.url,
+                lastLoadingUrl = tab.lastLoadingUrl,
+                blockAutomaticRedirects = adblockModel.blockAutomaticRedirects,
+                adBlockEnabled = adblockModel.adBlockEnabled,
+                hostOf = { u -> Uri.parse(u).host },
+            )
         if (blocked) {
             Log.i(TAG, "blockAutomaticRedirect: $url -> blocked")
             onBlockedAd(url)
@@ -196,9 +231,11 @@ class WebEngineCallback(
         host.onCertificateError()
     }
 
-    override fun isAd(url: Uri, acceptHeader: String?, baseUri: Uri): Boolean? {
-        return adblockModel.isAd(url, acceptHeader, baseUri)
-    }
+    override fun isAd(
+        url: Uri,
+        acceptHeader: String?,
+        baseUri: Uri,
+    ): Boolean? = adblockModel.isAd(url, acceptHeader, baseUri)
 
     override fun isAdBlockingEnabled(): Boolean {
         // Use this callback's own tab, not whichever tab happens to be current: the WebView
@@ -211,7 +248,10 @@ class WebEngineCallback(
         return shouldBlockNewWindow(dialog = true, userGesture = false)
     }
 
-    override fun shouldBlockNewWindow(dialog: Boolean, userGesture: Boolean): Boolean {
+    override fun shouldBlockNewWindow(
+        dialog: Boolean,
+        userGesture: Boolean,
+    ): Boolean {
         // Synchronous callback: the popup decision has to be returned now. TabsModel warms the
         // tab's host config on page start, so findHostConfig normally resolves from memory and this
         // bridge touches no I/O; the runBlocking is only the fallback for a popup that fires before
@@ -235,7 +275,10 @@ class WebEngineCallback(
         host.showBlockedDialogNotification(newTab)
     }
 
-    override fun onCreateWindow(dialog: Boolean, userGesture: Boolean): View? {
+    override fun onCreateWindow(
+        dialog: Boolean,
+        userGesture: Boolean,
+    ): View? {
         if (shouldBlockNewWindow(dialog, userGesture)) {
             onBlockedDialog(!dialog)
             return null
@@ -243,8 +286,8 @@ class WebEngineCallback(
         val tab = WebTabState(incognito = settingsModel.incognitoMode)
         val webView = host.createWebView(tab) ?: return null
         val currentTab = tabsModel.currentTab.value ?: return null
-        val index = NewTabPositionPolicy.insertIndexAfter(
-            tabsModel.tabsStates.indexOf(currentTab), tabsModel.tabsStates.size)
+        val index =
+            NewTabPositionPolicy.insertIndexAfter(tabsModel.tabsStates.indexOf(currentTab), tabsModel.tabsStates.size)
         tabsModel.onOpenTab(tab, index)
         host.changeTab(tab)
         return webView
@@ -259,7 +302,10 @@ class WebEngineCallback(
         }
     }
 
-    override fun onScaleChanged(oldScale: Float, newScale: Float) {
+    override fun onScaleChanged(
+        oldScale: Float,
+        newScale: Float,
+    ) {
         Log.d(TAG, "onScaleChanged: oldScale: $oldScale newScale: $newScale")
         tabsModel.onScaleChanged(tab, newScale)
     }
@@ -284,13 +330,9 @@ class WebEngineCallback(
         host.onEditHomePageBookmarkSelected(favoriteId)
     }
 
-    override fun getHomePageLinks(): List<HomePageLink> {
-        return viewModel.homePageLinks
-    }
+    override fun getHomePageLinks(): List<HomePageLink> = viewModel.homePageLinks
 
-    override fun getHomePageHistoryLinks(): List<HomePageLink> {
-        return viewModel.homePageHistoryLinks
-    }
+    override fun getHomePageHistoryLinks(): List<HomePageLink> = viewModel.homePageHistoryLinks
 
     override fun onPrepareForFullscreen() {
         host.onPrepareForFullscreen()
@@ -317,17 +359,45 @@ class WebEngineCallback(
         altText: String?,
         textContent: String?,
         x: Int,
-        y: Int
+        y: Int,
     ) {
-        host.showCursorMenu(tab, this, cursorDrawer, baseUri, linkUri, srcUri,
-            title, altText, textContent, x, y)
+        host.showCursorMenu(
+            tab,
+            this,
+            cursorDrawer,
+            baseUri,
+            linkUri,
+            srcUri,
+            title,
+            altText,
+            textContent,
+            x,
+            y,
+        )
     }
 
-    override fun suggestActionsForLink(baseUri: String?, linkUri: String?, srcUri: String?,
-                                       title: String?, altText: String?, textContent: String?,
-                                       x: Int, y: Int) {
-        host.suggestActionsForLink(tab, this, baseUri, linkUri, srcUri,
-            title, altText, textContent, x, y)
+    override fun suggestActionsForLink(
+        baseUri: String?,
+        linkUri: String?,
+        srcUri: String?,
+        title: String?,
+        altText: String?,
+        textContent: String?,
+        x: Int,
+        y: Int,
+    ) {
+        host.suggestActionsForLink(
+            tab,
+            this,
+            baseUri,
+            linkUri,
+            srcUri,
+            title,
+            altText,
+            textContent,
+            x,
+            y,
+        )
     }
 
     override fun markBookmarkRecommendationAsUseful(bookmarkOrder: Int) {

@@ -1,0 +1,19 @@
+#!/bin/sh
+# tv-bro pre-commit: ktlint format gate. Seconds only — skips entirely unless staged Kotlin
+# changed, and spotlessCheck on a warm build is a ~1s task (it never compiles).
+#
+# Enable once per clone:   git config core.hooksPath .githooks
+# Skip one commit:         git commit --no-verify
+# Auto-fix instead:        ./gradlew spotlessApply   (then re-stage and commit)
+
+if ! git diff --cached --name-only --diff-filter=ACMR | grep -qE '\.(kt|kts)$'; then
+    exit 0
+fi
+
+if ! output=$(./gradlew -q spotlessCheck 2>&1); then
+    echo "$output"
+    echo "" >&2
+    echo "spotlessCheck failed. Run './gradlew spotlessApply', review the diff, re-stage, and" >&2
+    echo "commit again (or use 'git commit --no-verify' to bypass this gate)." >&2
+    exit 1
+fi

@@ -24,11 +24,12 @@ class AdblockModel(
         val TAG: String = AdblockModel::class.java.simpleName
 
         const val SERIALIZED_LIST_FILE = "adblock_ser.dat"
-        const val AUTO_UPDATE_INTERVAL_MINUTES = 60 * 24 * 30 //30 days
+        const val AUTO_UPDATE_INTERVAL_MINUTES = 60 * 24 * 30 // 30 days
     }
 
     private var client: AdBlockClient? = null
     val clientLoading = ObservableValue(false)
+
     /**
      * Set when a list load fails, so the host can surface it (the model shows no UI itself); the
      * host resets it once it has shown the message.
@@ -40,63 +41,78 @@ class AdblockModel(
     }
 
     @Suppress("BlockingMethodInNonBlockingContext")
-    fun loadAdBlockList(forceReload: Boolean) = modelScope.launch {
-        if (clientLoading.value) return@launch
-        val checkDate = Calendar.getInstance()
-        checkDate.timeInMillis = config.adBlockListLastUpdate
-        checkDate.add(Calendar.MINUTE, AUTO_UPDATE_INTERVAL_MINUTES)
-        val now = Calendar.getInstance()
-        val needUpdate = forceReload || checkDate.before(now)
-        clientLoading.value = true
-        val client = AdBlockClient()
-        var success = false
-        withContext(Dispatchers.IO) ioContext@ {
-            val serializedFile = File(filesDir(), SERIALIZED_LIST_FILE)
-            if ((!needUpdate) && serializedFile.exists() && client.deserialize(serializedFile.absolutePath)) {
-                success = true
-                return@ioContext
+    fun loadAdBlockList(forceReload: Boolean) =
+        modelScope.launch {
+            if (clientLoading.value) return@launch
+            val checkDate = Calendar.getInstance()
+            checkDate.timeInMillis = config.adBlockListLastUpdate
+            checkDate.add(Calendar.MINUTE, AUTO_UPDATE_INTERVAL_MINUTES)
+            val now = Calendar.getInstance()
+            val needUpdate = forceReload || checkDate.before(now)
+            clientLoading.value = true
+            val client = AdBlockClient()
+            var success = false
+            withContext(Dispatchers.IO) ioContext@{
+                val serializedFile = File(filesDir(), SERIALIZED_LIST_FILE)
+                if ((!needUpdate) && serializedFile.exists() && client.deserialize(serializedFile.absolutePath)) {
+                    success = true
+                    return@ioContext
+                }
+                try {
+                    val easyList =
+                        URL(config.adBlockListURL.value)
+                            .openConnection()
+                            .inputStream
+                            .bufferedReader()
+                            .use { it.readText() }
+                    success = client.parse(easyList)
+                    client.serialize(serializedFile.absolutePath)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
-            try {
-                val easyList = URL(config.adBlockListURL.value).openConnection().inputStream.bufferedReader()
-                  .use { it.readText() }
-                success = client.parse(easyList)
-                client.serialize(serializedFile.absolutePath)
-            } catch (e: Exception) {
-                e.printStackTrace()
+            this@AdblockModel.client = client
+            config.adBlockListLastUpdate = now.timeInMillis
+            if (!success) {
+                loadError.value = true
             }
+            clientLoading.value = false
         }
-        this@AdblockModel.client = client
-        config.adBlockListLastUpdate = now.timeInMillis
-        if (!success) {
-            loadError.value = true
-        }
-        clientLoading.value = false
-    }
 
-    fun isAd(url: Uri, type: String?, baseUri: Uri): Boolean {
+    fun isAd(
+        url: Uri,
+        type: String?,
+        baseUri: Uri,
+    ): Boolean {
         val client = client ?: return false
         val baseHost = baseUri.host
-        val filterOption = try {
-            mapRequestToFilterOption(url, type)
-        } catch (e: Exception) {
-            return false
-        }
-        val result = try {
-            baseHost != null && client.matches(url.toString(), filterOption, baseHost)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            false
-        }
+        val filterOption =
+            try {
+                mapRequestToFilterOption(url, type)
+            } catch (e: Exception) {
+                return false
+            }
+        val result =
+            try {
+                baseHost != null && client.matches(url.toString(), filterOption, baseHost)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                false
+            }
         return result
     }
 
-    private fun mapRequestToFilterOption(url: Uri?, type: String?): FilterOption? =
-        AdblockRequestType.filterOptionFor(url, type)
+    private fun mapRequestToFilterOption(
+        url: Uri?,
+        type: String?,
+    ): FilterOption? = AdblockRequestType.filterOptionFor(url, type)
 
-    //Protection settings (the Ads & privacy settings page renders and writes these)
+    // Protection settings (the Ads & privacy settings page renders and writes these)
     var adBlockEnabled: Boolean
         get() = config.adBlockEnabled
-        set(value) { config.adBlockEnabled = value }
+        set(value) {
+            config.adBlockEnabled = value
+        }
 
     val adBlockListUrl: String get() = config.adBlockListURL.value
 
@@ -108,7 +124,9 @@ class AdblockModel(
 
     var blockAutomaticRedirects: Boolean
         get() = config.blockAutomaticRedirects
-        set(value) { config.blockAutomaticRedirects = value }
+        set(value) {
+            config.blockAutomaticRedirects = value
+        }
 }
 
 /**
@@ -117,7 +135,10 @@ class AdblockModel(
  * native client.
  */
 internal object AdblockRequestType {
-    fun filterOptionFor(url: Uri?, type: String?): FilterOption {
+    fun filterOptionFor(
+        url: Uri?,
+        type: String?,
+    ): FilterOption {
         if (type != null) {
             if (type == "image" || type.contains("image/")) {
                 return FilterOption.IMAGE

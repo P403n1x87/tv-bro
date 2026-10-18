@@ -11,10 +11,14 @@ import java.io.IOException
 object MediaManifestReader {
     const val DEFAULT_LIMIT = 256 * 1024
 
-    //The transport surface is Media3's unstable API; the opt-in is kept inside this function so
-    //callers (lint-checked in the app module) see a stable signature.
+    // The transport surface is Media3's unstable API; the opt-in is kept inside this function so
+    // callers (lint-checked in the app module) see a stable signature.
     @OptIn(markerClass = [UnstableApi::class])
-    fun read(url: String, context: MediaRequestContext, limit: Int = DEFAULT_LIMIT): Pair<String, String> {
+    fun read(
+        url: String,
+        context: MediaRequestContext,
+        limit: Int = DEFAULT_LIMIT,
+    ): Pair<String, String> {
         val source = ScopedMediaDataSource(context)
         try {
             source.open(DataSpec.Builder().setUri(Uri.parse(url)).build())

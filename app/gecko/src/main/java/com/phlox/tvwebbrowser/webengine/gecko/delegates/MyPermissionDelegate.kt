@@ -11,11 +11,16 @@ import org.mozilla.geckoview.GeckoSession
 import org.mozilla.geckoview.GeckoSession.PermissionDelegate
 import org.mozilla.geckoview.GeckoSession.PermissionDelegate.ContentPermission
 
-class MyPermissionDelegate(private val webEngine: GeckoWebEngine): PermissionDelegate {
-    private val permissionsRequests = HashMap<Int, PermissionDelegate.Callback>()//request code, callback
+class MyPermissionDelegate(
+    private val webEngine: GeckoWebEngine,
+) : PermissionDelegate {
+    private val permissionsRequests = HashMap<Int, PermissionDelegate.Callback>() // request code, callback
 
-    override fun onAndroidPermissionsRequest(session: GeckoSession, permissions: Array<String>?,
-        callback: PermissionDelegate.Callback) {
+    override fun onAndroidPermissionsRequest(
+        session: GeckoSession,
+        permissions: Array<String>?,
+        callback: PermissionDelegate.Callback,
+    ) {
         if (permissions == null) {
             callback.reject()
             return
@@ -24,24 +29,49 @@ class MyPermissionDelegate(private val webEngine: GeckoWebEngine): PermissionDel
         permissionsRequests[requestCode] = callback
     }
 
-    override fun onContentPermissionRequest(session: GeckoSession,
-        perm: ContentPermission): GeckoResult<Int>? {
+    override fun onContentPermissionRequest(
+        session: GeckoSession,
+        perm: ContentPermission,
+    ): GeckoResult<Int>? {
         val activity = webEngine.callback?.getActivity() ?: return GeckoResult.fromValue(ContentPermission.VALUE_DENY)
-        val resId: Int = when (perm.permission) {
-            PermissionDelegate.PERMISSION_GEOLOCATION -> R.string.request_geolocation
-            PermissionDelegate.PERMISSION_DESKTOP_NOTIFICATION -> R.string.request_notification
-            PermissionDelegate.PERMISSION_PERSISTENT_STORAGE -> R.string.request_storage
-            PermissionDelegate.PERMISSION_XR -> R.string.request_xr
-            PermissionDelegate.PERMISSION_AUTOPLAY_AUDIBLE, PermissionDelegate.PERMISSION_AUTOPLAY_INAUDIBLE ->
-                return if (!webEngine.config.allowAutoplayMedia) {
-                GeckoResult.fromValue(ContentPermission.VALUE_DENY)
-            } else {
-                GeckoResult.fromValue(ContentPermission.VALUE_ALLOW)
+        val resId: Int =
+            when (perm.permission) {
+                PermissionDelegate.PERMISSION_GEOLOCATION -> {
+                    R.string.request_geolocation
+                }
+
+                PermissionDelegate.PERMISSION_DESKTOP_NOTIFICATION -> {
+                    R.string.request_notification
+                }
+
+                PermissionDelegate.PERMISSION_PERSISTENT_STORAGE -> {
+                    R.string.request_storage
+                }
+
+                PermissionDelegate.PERMISSION_XR -> {
+                    R.string.request_xr
+                }
+
+                PermissionDelegate.PERMISSION_AUTOPLAY_AUDIBLE, PermissionDelegate.PERMISSION_AUTOPLAY_INAUDIBLE -> {
+                    return if (!webEngine.config.allowAutoplayMedia) {
+                        GeckoResult.fromValue(ContentPermission.VALUE_DENY)
+                    } else {
+                        GeckoResult.fromValue(ContentPermission.VALUE_ALLOW)
+                    }
+                }
+
+                PermissionDelegate.PERMISSION_MEDIA_KEY_SYSTEM_ACCESS -> {
+                    R.string.request_media_key_system_access
+                }
+
+                PermissionDelegate.PERMISSION_STORAGE_ACCESS -> {
+                    R.string.request_storage_access
+                }
+
+                else -> {
+                    return GeckoResult.fromValue(ContentPermission.VALUE_DENY)
+                }
             }
-            PermissionDelegate.PERMISSION_MEDIA_KEY_SYSTEM_ACCESS -> R.string.request_media_key_system_access
-            PermissionDelegate.PERMISSION_STORAGE_ACCESS -> R.string.request_storage_access
-            else -> return GeckoResult.fromValue(ContentPermission.VALUE_DENY)
-        }
 
         val title: String = activity.getString(resId, Uri.parse(perm.uri).authority)
         return webEngine.promptDelegate.onPermissionPrompt(session, title, perm)
@@ -52,7 +82,7 @@ class MyPermissionDelegate(private val webEngine: GeckoWebEngine): PermissionDel
         uri: String,
         video: Array<PermissionDelegate.MediaSource>?,
         audio: Array<PermissionDelegate.MediaSource>?,
-        callback: PermissionDelegate.MediaCallback
+        callback: PermissionDelegate.MediaCallback,
     ) {
         // If we don't have device permissions at this point, just automatically reject the request
         // as we will have already have requested device permissions before getting to this point
@@ -63,25 +93,32 @@ class MyPermissionDelegate(private val webEngine: GeckoWebEngine): PermissionDel
             callback.reject()
             return
         }
-        if ((audio != null && ContextCompat.checkSelfPermission(
-                activity, Manifest.permission.RECORD_AUDIO
-            ) != PackageManager.PERMISSION_GRANTED)
-            || (video != null && ContextCompat.checkSelfPermission(
-                activity, Manifest.permission.CAMERA
-            ) != PackageManager.PERMISSION_GRANTED)
+        if ((
+                audio != null && ContextCompat.checkSelfPermission(
+                    activity,
+                    Manifest.permission.RECORD_AUDIO,
+                ) != PackageManager.PERMISSION_GRANTED
+            ) ||
+            (
+                video != null && ContextCompat.checkSelfPermission(
+                    activity,
+                    Manifest.permission.CAMERA,
+                ) != PackageManager.PERMISSION_GRANTED
+            )
         ) {
             callback.reject()
             return
         }
 
         val host = Uri.parse(uri).authority
-        val title: String = if (audio == null) {
-            activity.getString(R.string.request_video, host)
-        } else if (video == null) {
-            activity.getString(R.string.request_audio, host)
-        } else {
-            activity.getString(R.string.request_media, host)
-        }
+        val title: String =
+            if (audio == null) {
+                activity.getString(R.string.request_video, host)
+            } else if (video == null) {
+                activity.getString(R.string.request_audio, host)
+            } else {
+                activity.getString(R.string.request_media, host)
+            }
 
         val videoNames = normalizeMediaName(video)
         val audioNames = normalizeMediaName(audio)
@@ -89,7 +126,11 @@ class MyPermissionDelegate(private val webEngine: GeckoWebEngine): PermissionDel
         webEngine.promptDelegate.onMediaPrompt(session, title, video, audio, videoNames, audioNames, callback)
     }
 
-    fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray): Boolean {
+    fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray,
+    ): Boolean {
         val cb = permissionsRequests.remove(requestCode) ?: return false
         for (result in grantResults) {
             if (result != PackageManager.PERMISSION_GRANTED) {

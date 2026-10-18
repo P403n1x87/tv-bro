@@ -22,9 +22,9 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
-import org.robolectric.annotation.Config as RobolectricConfig
 import java.time.Duration
 import java.util.concurrent.Executor
+import org.robolectric.annotation.Config as RobolectricConfig
 
 /**
  * Tests for [MainActivityViewModel]'s history-logging intent: the 5 second debounce, the
@@ -37,7 +37,6 @@ import java.util.concurrent.Executor
 @RunWith(RobolectricTestRunner::class)
 @RobolectricConfig(sdk = [26], application = Application::class)
 class MainActivityViewModelTest {
-
     private lateinit var db: AppDatabase
     private lateinit var favorites: FavoritesRepository
     private lateinit var history: HistoryRepository
@@ -57,19 +56,22 @@ class MainActivityViewModelTest {
         // The incognito tests only exercise the WebView branch; pin the engine so the outcome does
         // not depend on what the host recommends.
         config.webEngine = Config.ENGINE_WEB_VIEW
-        db = Room.inMemoryDatabaseBuilder(app, AppDatabase::class.java)
-            .allowMainThreadQueries()
-            .setQueryExecutor(directExecutor)
-            .setTransactionExecutor(directExecutor)
-            .build()
+        db =
+            Room
+                .inMemoryDatabaseBuilder(app, AppDatabase::class.java)
+                .allowMainThreadQueries()
+                .setQueryExecutor(directExecutor)
+                .setTransactionExecutor(directExecutor)
+                .build()
         history = HistoryRepository(db.historyDao())
         favorites = FavoritesRepository(db.favoritesDao())
-        viewModel = MainActivityViewModel(
-            favorites = favorites,
-            history = history,
-            webViewDataDirs = webViewDataDirs,
-            config = config,
-        )
+        viewModel =
+            MainActivityViewModel(
+                favorites = favorites,
+                history = history,
+                webViewDataDirs = webViewDataDirs,
+                config = config,
+            )
     }
 
     @After
@@ -169,7 +171,7 @@ class MainActivityViewModelTest {
         assertEquals("the generated id is handed back", stored.id, item.id)
         assertEquals(
             listOf("https://edited.example/"),
-            viewModel.homePageLinks.map { it.url }
+            viewModel.homePageLinks.map { it.url },
         )
     }
 
@@ -192,36 +194,40 @@ class MainActivityViewModelTest {
     // ---- incognito mode: the cleanup order and the WebView data-dir seam ----------------------
 
     @Test
-    fun leavingIncognitoClearsTheEngineThenTabsThenTheIsolatedData() = runBlocking {
-        config.incognitoMode = true
-        val closed = mutableListOf<String>()
+    fun leavingIncognitoClearsTheEngineThenTabsThenTheIsolatedData() =
+        runBlocking {
+            config.incognitoMode = true
+            val closed = mutableListOf<String>()
 
-        val becomingIncognitoMode = viewModel.toggleIncognitoMode(
-            clearEngineSession = { closed += "engine" },
-            clearOpenTabs = { closed += "tabs" },
-        )
+            val becomingIncognitoMode =
+                viewModel.toggleIncognitoMode(
+                    clearEngineSession = { closed += "engine" },
+                    clearOpenTabs = { closed += "tabs" },
+                )
 
-        assertFalse(becomingIncognitoMode)
-        assertEquals(listOf("engine", "tabs"), closed)
-        assertEquals("the isolated WebView directories are wiped last", 1, webViewDataDirs.cleared)
-        assertFalse(config.incognitoMode)
-    }
+            assertFalse(becomingIncognitoMode)
+            assertEquals(listOf("engine", "tabs"), closed)
+            assertEquals("the isolated WebView directories are wiped last", 1, webViewDataDirs.cleared)
+            assertFalse(config.incognitoMode)
+        }
 
     @Test
-    fun enteringIncognitoOnlyFlipsTheMode() = runBlocking {
-        config.incognitoMode = false
-        val closed = mutableListOf<String>()
+    fun enteringIncognitoOnlyFlipsTheMode() =
+        runBlocking {
+            config.incognitoMode = false
+            val closed = mutableListOf<String>()
 
-        val becomingIncognitoMode = viewModel.toggleIncognitoMode(
-            clearEngineSession = { closed += "engine" },
-            clearOpenTabs = { closed += "tabs" },
-        )
+            val becomingIncognitoMode =
+                viewModel.toggleIncognitoMode(
+                    clearEngineSession = { closed += "engine" },
+                    clearOpenTabs = { closed += "tabs" },
+                )
 
-        assertTrue(becomingIncognitoMode)
-        assertTrue("entering the mode closes nothing", closed.isEmpty())
-        assertEquals(0, webViewDataDirs.cleared)
-        assertTrue(config.incognitoMode)
-    }
+            assertTrue(becomingIncognitoMode)
+            assertTrue("entering the mode closes nothing", closed.isEmpty())
+            assertEquals(0, webViewDataDirs.cleared)
+            assertTrue(config.incognitoMode)
+        }
 
     @Test
     fun prepareSwitchToIncognitoMovesTheWebViewDataAside() {
@@ -231,22 +237,23 @@ class MainActivityViewModelTest {
     }
 
     @Test
-    fun geckoNeedsNeitherTheWebViewDataDirsNorAnEngineClear() = runBlocking {
-        config.webEngine = Config.ENGINE_GECKO_VIEW
-        config.incognitoMode = true
-        val closed = mutableListOf<String>()
+    fun geckoNeedsNeitherTheWebViewDataDirsNorAnEngineClear() =
+        runBlocking {
+            config.webEngine = Config.ENGINE_GECKO_VIEW
+            config.incognitoMode = true
+            val closed = mutableListOf<String>()
 
-        viewModel.toggleIncognitoMode(
-            clearEngineSession = { closed += "engine" },
-            clearOpenTabs = { closed += "tabs" },
-        )
+            viewModel.toggleIncognitoMode(
+                clearEngineSession = { closed += "engine" },
+                clearOpenTabs = { closed += "tabs" },
+            )
 
-        assertEquals("only the open tabs are closed", listOf("tabs"), closed)
-        assertEquals(0, webViewDataDirs.cleared)
+            assertEquals("only the open tabs are closed", listOf("tabs"), closed)
+            assertEquals(0, webViewDataDirs.cleared)
 
-        viewModel.prepareSwitchToIncognito()
-        assertEquals(0, webViewDataDirs.prepared)
-    }
+            viewModel.prepareSwitchToIncognito()
+            assertEquals(0, webViewDataDirs.prepared)
+        }
 
     private class FakeWebViewDataDirManager : WebViewDataDirManager {
         var prepared = 0

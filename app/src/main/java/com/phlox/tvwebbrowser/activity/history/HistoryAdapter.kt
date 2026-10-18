@@ -3,19 +3,18 @@ package com.phlox.tvwebbrowser.activity.history
 import android.view.View
 import android.view.ViewGroup
 import android.widget.BaseAdapter
-
 import com.phlox.tvwebbrowser.model.HistoryItem
 import com.phlox.tvwebbrowser.utils.Utils
-
-import java.util.ArrayList
-
 import de.halfbit.pinnedsection.PinnedSectionListView
+import java.util.ArrayList
 
 /**
  * Created by fedex on 29.12.16.
  */
 
-class HistoryAdapter : BaseAdapter(), PinnedSectionListView.PinnedSectionListAdapter {
+class HistoryAdapter :
+    BaseAdapter(),
+    PinnedSectionListView.PinnedSectionListAdapter {
     val items = ArrayList<HistoryItem>()
     private var lastHeaderDate: Long = -1
     var realCount: Long = 0
@@ -30,17 +29,17 @@ class HistoryAdapter : BaseAdapter(), PinnedSectionListView.PinnedSectionListAda
             }
             notifyDataSetChanged()
         }
-    private val _tmpSelected = ArrayList<HistoryItem>()
+    private val tmpSelected = ArrayList<HistoryItem>()
 
     val selectedItems: List<HistoryItem>
         get() {
-            _tmpSelected.clear()
+            tmpSelected.clear()
             for (hi in items) {
                 if (hi.selected) {
-                    _tmpSelected.add(hi)
+                    tmpSelected.add(hi)
                 }
             }
-            return _tmpSelected
+            return tmpSelected
         }
 
     fun addItems(items: List<HistoryItem>) {
@@ -58,19 +57,17 @@ class HistoryAdapter : BaseAdapter(), PinnedSectionListView.PinnedSectionListAda
         notifyDataSetChanged()
     }
 
-    override fun getCount(): Int {
-        return items.size
-    }
+    override fun getCount(): Int = items.size
 
-    override fun getItem(position: Int): Any {
-        return items[position]
-    }
+    override fun getItem(position: Int): Any = items[position]
 
-    override fun getItemId(position: Int): Long {
-        return position.toLong()
-    }
+    override fun getItemId(position: Int): Long = position.toLong()
 
-    override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+    override fun getView(
+        position: Int,
+        convertView: View?,
+        parent: ViewGroup,
+    ): View {
         val hiv: HistoryItemView
         if (convertView != null) {
             hiv = convertView as HistoryItemView
@@ -81,17 +78,11 @@ class HistoryAdapter : BaseAdapter(), PinnedSectionListView.PinnedSectionListAda
         return hiv
     }
 
-    override fun getViewTypeCount(): Int {
-        return 2
-    }
+    override fun getViewTypeCount(): Int = 2
 
-    override fun getItemViewType(position: Int): Int {
-        return if (items[position].isDateHeader) VIEW_TYPE_HEADER else VIEW_TYPE_HISTORY_ITEM
-    }
+    override fun getItemViewType(position: Int): Int = if (items[position].isDateHeader) VIEW_TYPE_HEADER else VIEW_TYPE_HISTORY_ITEM
 
-    override fun isItemViewTypePinned(viewType: Int): Boolean {
-        return viewType == VIEW_TYPE_HEADER
-    }
+    override fun isItemViewTypePinned(viewType: Int): Boolean = viewType == VIEW_TYPE_HEADER
 
     fun erase() {
         items.clear()

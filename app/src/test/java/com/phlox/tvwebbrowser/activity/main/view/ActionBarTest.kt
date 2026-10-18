@@ -30,7 +30,6 @@ import org.robolectric.annotation.Config as RobolectricConfig
 @RunWith(RobolectricTestRunner::class)
 @RobolectricConfig(sdk = [26], application = Application::class)
 class ActionBarTest {
-
     private lateinit var activity: Activity
     private lateinit var actionBar: ActionBar
     private lateinit var etUrl: EditText
@@ -43,11 +42,17 @@ class ActionBarTest {
         var inputDoneCalls = 0
 
         override fun closeWindow() {}
+
         override fun showDownloads() {}
+
         override fun showFavorites() {}
+
         override fun showHistory() {}
+
         override fun showSettings() {}
+
         override fun initiateVoiceSearch() {}
+
         override fun search(text: String) {
             searched.add(text)
         }
@@ -61,14 +66,19 @@ class ActionBarTest {
         }
 
         override fun toggleIncognitoMode() {}
+
         override fun onNavigateBack() {
             backNavigations++
         }
 
         override fun onNavigateForward() {}
+
         override fun onReload() {}
+
         override fun onShowStreams() {}
+
         override fun onToggleTabPanel() {}
+
         override fun onShowMenu() {}
     }
 
@@ -163,8 +173,10 @@ class ActionBarTest {
         actionBar.setBackEnabled(false)
 
         assertFalse(button(R.id.ibBack).isEnabled)
-        assertFalse("a disabled view is still focusable, the flag has to be cleared too",
-            button(R.id.ibBack).isFocusable)
+        assertFalse(
+            "a disabled view is still focusable, the flag has to be cleared too",
+            button(R.id.ibBack).isFocusable,
+        )
 
         actionBar.setBackEnabled(true)
 

@@ -12,7 +12,6 @@ package com.phlox.tvwebbrowser.domain
  * JUnit.
  */
 object SiteDomains {
-
     /** `scheme://authority` of a URL; the authority runs until the first path/query/fragment. */
     private val HOST_PATTERN = Regex("^[a-zA-Z][a-zA-Z0-9+.\\-]*://([^/?#]+)")
 
@@ -26,12 +25,65 @@ object SiteDomains {
     fun domainFromUrl(url: String?): String? = siteDomain(hostFromUrl(url))
 
     /** Suffixes that, in a two-label host, indicate the registrable domain needs a third label. */
-    private val MULTI_LABEL_SUFFIXES = setOf(
-        "co", "com", "org", "net", "edu", "gov", "ac", "ne", "or", "nom", "uk", "ca",
-        "us", "au", "nz", "jp", "in", "za", "br", "ar", "mx", "tr", "cn", "sg", "hk", "tw", "kr",
-        "it", "fr", "de", "es", "pl", "ru", "se", "no", "fi", "dk", "nl", "be", "ch", "at", "ie",
-        "pt", "gr", "il", "cz", "sk", "hu", "ro", "bg", "hr", "rs", "ua", "dev", "io", "app"
-    )
+    private val MULTI_LABEL_SUFFIXES =
+        setOf(
+            "co",
+            "com",
+            "org",
+            "net",
+            "edu",
+            "gov",
+            "ac",
+            "ne",
+            "or",
+            "nom",
+            "uk",
+            "ca",
+            "us",
+            "au",
+            "nz",
+            "jp",
+            "in",
+            "za",
+            "br",
+            "ar",
+            "mx",
+            "tr",
+            "cn",
+            "sg",
+            "hk",
+            "tw",
+            "kr",
+            "it",
+            "fr",
+            "de",
+            "es",
+            "pl",
+            "ru",
+            "se",
+            "no",
+            "fi",
+            "dk",
+            "nl",
+            "be",
+            "ch",
+            "at",
+            "ie",
+            "pt",
+            "gr",
+            "il",
+            "cz",
+            "sk",
+            "hu",
+            "ro",
+            "bg",
+            "hr",
+            "rs",
+            "ua",
+            "dev",
+            "io",
+            "app",
+        )
 
     /**
      * Best-effort registrable domain of [host]: lower-cased, "www." stripped, keeping the last two
@@ -51,7 +103,10 @@ object SiteDomains {
      * Unknown hosts on either side are treated as "not different", so a redirect is only flagged
      * when both domains can be established.
      */
-    fun isDifferentSite(hostA: String?, hostB: String?): Boolean {
+    fun isDifferentSite(
+        hostA: String?,
+        hostB: String?,
+    ): Boolean {
         val a = siteDomain(hostA) ?: return false
         val b = siteDomain(hostB) ?: return false
         return a != b

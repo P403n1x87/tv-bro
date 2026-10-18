@@ -37,12 +37,17 @@ class IntentHandler(
         }
 
         openInNewTab(
-            intent.data.toString(), tabsModel.tabsStates.size, true
+            intent.data.toString(),
+            tabsModel.tabsStates.size,
+            true,
         )
     }
 
     /** Handles the History activity result. Called only for [REQUEST_CODE_HISTORY_ACTIVITY]. */
-    fun handleHistoryResult(resultCode: Int, data: Intent?) {
+    fun handleHistoryResult(
+        resultCode: Int,
+        data: Intent?,
+    ) {
         if (resultCode == Activity.RESULT_OK) {
             val url = data?.getStringExtra(HistoryActivity.KEY_URL)
             if (url != null) {

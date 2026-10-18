@@ -57,7 +57,10 @@ class PanelController(
      * again for the home page), are final by then, so the hand-off needs at most the one layout pass
      * that creates them.
      */
-    fun showBookmarksPanel(scope: CoroutineScope, onContentReady: suspend () -> Unit) {
+    fun showBookmarksPanel(
+        scope: CoroutineScope,
+        onContentReady: suspend () -> Unit,
+    ) {
         vb.llTabPanel.visibility = View.GONE
         vb.rlBookmarksPanel.visibility = View.VISIBLE
         focusPanel(vb.vBookmarks)

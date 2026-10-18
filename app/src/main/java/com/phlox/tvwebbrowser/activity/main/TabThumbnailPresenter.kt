@@ -30,16 +30,18 @@ class TabThumbnailPresenter(
         private const val REPAINT_DELAY_MS = 200L
     }
 
-    private val runnable = object : Runnable {
-        var tabState: WebTabState? = null
-        override fun run() {
-            tabState?.let {
-                scope.launch(Dispatchers.Main) {
-                    display(it)
+    private val runnable =
+        object : Runnable {
+            var tabState: WebTabState? = null
+
+            override fun run() {
+                tabState?.let {
+                    scope.launch(Dispatchers.Main) {
+                        display(it)
+                    }
                 }
             }
         }
-    }
 
     /** Schedules a (debounced) repaint of [tab]'s thumbnail. */
     fun schedule(tab: WebTabState?) {

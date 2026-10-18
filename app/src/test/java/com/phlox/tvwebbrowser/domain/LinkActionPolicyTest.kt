@@ -10,12 +10,11 @@ import org.junit.Test
  * Unit tests for [LinkActionPolicy], the rule behind the cursor's link menu.
  */
 class LinkActionPolicyTest {
-
     @Test
     fun theLinkIsPreferredOverTheElementSource() {
         assertEquals(
             "https://link.example/",
-            LinkActionPolicy.targetUrl("https://link.example/", "https://image.example/pic.png")
+            LinkActionPolicy.targetUrl("https://link.example/", "https://image.example/pic.png"),
         )
     }
 
@@ -23,7 +22,7 @@ class LinkActionPolicyTest {
     fun theElementSourceIsTheFallback() {
         assertEquals(
             "https://image.example/pic.png",
-            LinkActionPolicy.targetUrl(null, "https://image.example/pic.png")
+            LinkActionPolicy.targetUrl(null, "https://image.example/pic.png"),
         )
     }
 

@@ -11,9 +11,12 @@ import com.fedir.segmentedbutton.SegmentedButton
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.widgets.SegmentedButtonTabsAdapter
 
-class SettingsDialog(context: Context, val deps: SettingsDeps) :
-    Dialog(context, R.style.SettingsDialog),
-    DialogInterface.OnDismissListener, VersionSettingsView.Callback {
+class SettingsDialog(
+    context: Context,
+    val deps: SettingsDeps,
+) : Dialog(context, R.style.SettingsDialog),
+    DialogInterface.OnDismissListener,
+    VersionSettingsView.Callback {
     private var sbTabs: SegmentedButton
     private val btnVersionTab: Button
     private val autoUpdateModel = deps.autoUpdate
@@ -28,23 +31,41 @@ class SettingsDialog(context: Context, val deps: SettingsDeps) :
         sbTabs = findViewById(R.id.sbTabs)
         btnVersionTab = findViewById(R.id.btnVersionTab)
 
-        val tabContentAdapter = object : SegmentedButtonTabsAdapter(sbTabs, findViewById(R.id.flTabsContent)) {
-            override fun createContentViewForSegmentButtonId(id: Int): View {
-                return when (id) {
-                    R.id.btnGeneralTab -> GeneralSettingsView(context, deps)
-                    R.id.btnAdsTab -> AdsSettingsView(context, deps)
-                    R.id.btnAppearanceTab -> AppearanceSettingsView(context, deps)
-                    R.id.btnPlaybackTab -> PlaybackSettingsView(context, deps)
-                    R.id.btnControlsTab -> ControlsSettingsView(context, deps)
-                    R.id.btnAdvancedTab -> AdvancedSettingsView(context, deps)
-                    else -> {
-                        val view = VersionSettingsView(context, deps)
-                        view.callback = this@SettingsDialog
-                        view
+        val tabContentAdapter =
+            object : SegmentedButtonTabsAdapter(sbTabs, findViewById(R.id.flTabsContent)) {
+                override fun createContentViewForSegmentButtonId(id: Int): View =
+                    when (id) {
+                        R.id.btnGeneralTab -> {
+                            GeneralSettingsView(context, deps)
+                        }
+
+                        R.id.btnAdsTab -> {
+                            AdsSettingsView(context, deps)
+                        }
+
+                        R.id.btnAppearanceTab -> {
+                            AppearanceSettingsView(context, deps)
+                        }
+
+                        R.id.btnPlaybackTab -> {
+                            PlaybackSettingsView(context, deps)
+                        }
+
+                        R.id.btnControlsTab -> {
+                            ControlsSettingsView(context, deps)
+                        }
+
+                        R.id.btnAdvancedTab -> {
+                            AdvancedSettingsView(context, deps)
+                        }
+
+                        else -> {
+                            val view = VersionSettingsView(context, deps)
+                            view.callback = this@SettingsDialog
+                            view
+                        }
                     }
-                }
             }
-        }
 
         setOnDismissListener(this)
         refreshAboutTab()
@@ -54,7 +75,8 @@ class SettingsDialog(context: Context, val deps: SettingsDeps) :
         super.onCreate(savedInstanceState)
         window?.setLayout(
             WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT)
+            WindowManager.LayoutParams.MATCH_PARENT,
+        )
     }
 
     override fun onDismiss(dialog: DialogInterface?) {
@@ -77,7 +99,10 @@ class SettingsDialog(context: Context, val deps: SettingsDeps) :
         val available = autoUpdateModel.isUpdateAvailable()
         btnVersionTab.text = context.getString(R.string.settings_category_about)
         btnVersionTab.setCompoundDrawablesWithIntrinsicBounds(
-            0, 0, if (available) R.drawable.ic_update_badge_circle else 0, 0
+            0,
+            0,
+            if (available) R.drawable.ic_update_badge_circle else 0,
+            0,
         )
     }
 }

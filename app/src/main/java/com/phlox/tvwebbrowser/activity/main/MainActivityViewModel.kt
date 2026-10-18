@@ -41,9 +41,9 @@ class MainActivityViewModel(
     private val webViewDataDirs: WebViewDataDirManager = DefaultWebViewDataDirManager(),
     val config: Config = AppContext.provideConfig(),
     private val appContext: () -> Context = { AppContext.get() },
-): ActiveModel() {
+) : ActiveModel() {
     companion object {
-        var TAG: String = MainActivityViewModel::class.java.simpleName
+        val TAG: String = MainActivityViewModel::class.java.simpleName
     }
 
     var loaded = false
@@ -54,22 +54,24 @@ class MainActivityViewModel(
 
     /** Stored bookmarks, owned here so the view only renders them. */
     val bookmarks = ObservableList<FavoriteItem>()
+
     /** Whether the current page is bookmarked; drives the toolbar star and the panel's first row. */
     val currentPageBookmarked = ObservableValue(false)
 
-    fun loadState() = modelScope.launch(Dispatchers.Main) {
-        Log.d(TAG, "loadState")
-        if (loaded) return@launch
-        // Purge any update APK left in the cache by a previous session (after a download, the file
-        // has to linger until the installer has read it, so we clean up on the next launch).
-        withContext(Dispatchers.IO) {
-            UpdateChecker.clearTempFilesIfAny(appContext())
+    fun loadState() =
+        modelScope.launch(Dispatchers.Main) {
+            Log.d(TAG, "loadState")
+            if (loaded) return@launch
+            // Purge any update APK left in the cache by a previous session (after a download, the file
+            // has to linger until the installer has read it, so we clean up on the next launch).
+            withContext(Dispatchers.IO) {
+                UpdateChecker.clearTempFilesIfAny(appContext())
+            }
+            checkVersionCodeAndRunMigrations()
+            initHistory()
+            loadHomePageLinks()
+            loaded = true
         }
-        checkVersionCodeAndRunMigrations()
-        initHistory()
-        loadHomePageLinks()
-        loaded = true
-    }
 
     private suspend fun checkVersionCodeAndRunMigrations() {
         Log.d(TAG, "checkVersionCodeAndRunMigrations")
@@ -104,22 +106,30 @@ class MainActivityViewModel(
         Log.d(TAG, "loadHomePageLinks")
         if (HomePagePolicy.usesBuiltInHomePage(config.homePageMode)) {
             homePageLinks.replaceAll(
-                favorites.allBookmarks()
-                    .map { HomePageLink.fromBookmarkItem(it) })
+                favorites
+                    .allBookmarks()
+                    .map { HomePageLink.fromBookmarkItem(it) },
+            )
             homePageHistoryLinks.replaceAll(
-                history.latest(8)
-                    .map { HomePageLink.fromHistoryItem(it) })
+                history
+                    .latest(8)
+                    .map { HomePageLink.fromHistoryItem(it) },
+            )
         }
     }
 
-    fun logVisitedHistory(title: String?, url: String, faviconHash: String?) {
+    fun logVisitedHistory(
+        title: String?,
+        url: String,
+        faviconHash: String?,
+    ) {
         Log.d(TAG, "logVisitedHistory: $url")
         if ((url == lastHistoryItem?.url) || HomePagePolicy.isHomePageUrl(url, Config.localHomePageUrl) || !url.startsWith("http", true)) {
             return
         }
 
         val now = System.currentTimeMillis()
-        val minVisitedInterval = 5000L //5 seconds
+        val minVisitedInterval = 5000L // 5 seconds
 
         lastHistoryItem?.let {
             if ((!it.saved) && (it.time + minVisitedInterval) > now) {
@@ -133,16 +143,17 @@ class MainActivityViewModel(
         item.time = now
         item.favicon = faviconHash
         lastHistoryItem = item
-        lastHistoryItemSaveJob = modelScope.launch(Dispatchers.Main) {
-            delay(minVisitedInterval)
-            // Replace any older entry for the same URL instead of appending a duplicate, so a site
-            // shows up once in history with its latest visit time (and storage stays bounded by
-            // distinct URLs rather than repeat visits). Done inside the debounced job so a cancelled
-            // visit never deletes the previously saved row.
-            history.deleteByUrl(item.url)
-            item.id = history.add(item)
-            item.saved = true
-        }
+        lastHistoryItemSaveJob =
+            modelScope.launch(Dispatchers.Main) {
+                delay(minVisitedInterval)
+                // Replace any older entry for the same URL instead of appending a duplicate, so a site
+                // shows up once in history with its latest visit time (and storage stays bounded by
+                // distinct URLs rather than repeat visits). Done inside the debounced job so a cancelled
+                // visit never deletes the previously saved row.
+                history.deleteByUrl(item.url)
+                item.id = history.add(item)
+                item.saved = true
+            }
     }
 
     fun onTabTitleUpdated(tab: WebTabState) {
@@ -204,23 +215,24 @@ class MainActivityViewModel(
     }
 
     override fun onClear() {
-
     }
 
-    fun removeHomePageLink(bookmark: HomePageLink) = modelScope.launch {
-        homePageLinks.remove(bookmark)
-        bookmark.favoriteId?.let {
-            favorites.delete(it)
+    fun removeHomePageLink(bookmark: HomePageLink) =
+        modelScope.launch {
+            homePageLinks.remove(bookmark)
+            bookmark.favoriteId?.let {
+                favorites.delete(it)
+            }
         }
-    }
 
-    fun deleteBookmark(favoriteId: Long) = modelScope.launch {
-        favorites.delete(favoriteId)
-        val index = homePageLinks.indexOfFirst { it.favoriteId == favoriteId }
-        if (index != -1) {
-            homePageLinks.removeAt(index)
+    fun deleteBookmark(favoriteId: Long) =
+        modelScope.launch {
+            favorites.delete(favoriteId)
+            val index = homePageLinks.indexOfFirst { it.favoriteId == favoriteId }
+            if (index != -1) {
+                homePageLinks.removeAt(index)
+            }
         }
-    }
 
     /**
      * Reads the stored bookmarks into [bookmarks]; the view reacts to the observable, so it never
@@ -247,7 +259,11 @@ class MainActivityViewModel(
      * otherwise) is saved with the values the editor reported, and the observable home-page links
      * are kept in sync.
      */
-    fun onHomePageLinkEdited(item: FavoriteItem, title: String, url: String) = modelScope.launch {
+    fun onHomePageLinkEdited(
+        item: FavoriteItem,
+        title: String,
+        url: String,
+    ) = modelScope.launch {
         item.title = title
         item.url = url
         if (item.id == 0L) {

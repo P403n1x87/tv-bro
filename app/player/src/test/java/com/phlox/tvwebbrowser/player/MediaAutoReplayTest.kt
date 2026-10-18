@@ -10,11 +10,19 @@ class MediaAutoReplayTest {
     private class FakeScheduler : MediaAutoReplay.Scheduler {
         val pending = ArrayDeque<Runnable>()
         var lastDelayMs = -1L
-        override fun postDelayed(delayMs: Long, task: Runnable) {
+
+        override fun postDelayed(
+            delayMs: Long,
+            task: Runnable,
+        ) {
             lastDelayMs = delayMs
             pending.addLast(task)
         }
-        override fun removeCallbacks(task: Runnable) { pending.remove(task) }
+
+        override fun removeCallbacks(task: Runnable) {
+            pending.remove(task)
+        }
+
         fun runNext(): Boolean = pending.removeFirstOrNull()?.also { it.run() } != null
     }
 
@@ -22,13 +30,14 @@ class MediaAutoReplayTest {
         val scheduler = FakeScheduler()
         var reloads = 0
         var replayed: String? = null
-        val replay = MediaAutoReplay(
-            scheduler = scheduler,
-            onReload = { reloads++ },
-            findReplayUrl = { key -> "https://cdn/$key.m3u8" },
-            onReplay = { replayed = it },
-            initialDelayMs = 123L,
-        )
+        val replay =
+            MediaAutoReplay(
+                scheduler = scheduler,
+                onReload = { reloads++ },
+                findReplayUrl = { key -> "https://cdn/$key.m3u8" },
+                onReplay = { replayed = it },
+                initialDelayMs = 123L,
+            )
 
         assertTrue(replay.canStart())
         replay.start("stream")
@@ -44,13 +53,14 @@ class MediaAutoReplayTest {
     @Test fun givesUpAfterMaxAttemptsWhenTheStreamNeverReappears() {
         val scheduler = FakeScheduler()
         var replayed: String? = null
-        val replay = MediaAutoReplay(
-            scheduler = scheduler,
-            onReload = {},
-            findReplayUrl = { null },
-            onReplay = { replayed = it },
-            maxAttempts = 3,
-        )
+        val replay =
+            MediaAutoReplay(
+                scheduler = scheduler,
+                onReload = {},
+                findReplayUrl = { null },
+                onReplay = { replayed = it },
+                maxAttempts = 3,
+            )
 
         replay.start("k")
         var ticks = 0
@@ -62,12 +72,13 @@ class MediaAutoReplayTest {
 
     @Test fun userPlaybackResetsTheOneShotGuardAndCancelsPending() {
         val scheduler = FakeScheduler()
-        val replay = MediaAutoReplay(
-            scheduler = scheduler,
-            onReload = {},
-            findReplayUrl = { null },
-            onReplay = {},
-        )
+        val replay =
+            MediaAutoReplay(
+                scheduler = scheduler,
+                onReload = {},
+                findReplayUrl = { null },
+                onReplay = {},
+            )
 
         replay.start("k")
         assertFalse(replay.canStart())

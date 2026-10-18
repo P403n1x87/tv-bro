@@ -13,7 +13,6 @@ import java.util.Locale
  * match is passed in as [looksLikeWebUrl] so this object stays free of Android types.
  */
 object AddressInputPolicy {
-
     /**
      * The url to load for [input]:
      *
@@ -30,10 +29,11 @@ object AddressInputPolicy {
     fun resolveUrl(
         input: String,
         searchEngineUrlTemplate: String,
-        looksLikeWebUrl: (String) -> Boolean
+        looksLikeWebUrl: (String) -> Boolean,
     ): String? {
         val trimmedLowercased = input.trim { it <= ' ' }.lowercase(Locale.ROOT)
-        val isAddress = looksLikeWebUrl(input) ||
+        val isAddress =
+            looksLikeWebUrl(input) ||
                 trimmedLowercased.startsWith("http://") ||
                 trimmedLowercased.startsWith("https://")
         if (isAddress) {
@@ -43,12 +43,13 @@ object AddressInputPolicy {
                 input
             }
         }
-        val query = try {
-            URLEncoder.encode(input, "utf-8")
-        } catch (e: UnsupportedEncodingException) {
-            e.printStackTrace()
-            return null
-        }
+        val query =
+            try {
+                URLEncoder.encode(input, "utf-8")
+            } catch (e: UnsupportedEncodingException) {
+                e.printStackTrace()
+                return null
+            }
         return searchEngineUrlTemplate.replace("[query]", query)
     }
 }

@@ -15,84 +15,97 @@ import com.phlox.tvwebbrowser.utils.dip2px
 import com.phlox.tvwebbrowser.widgets.cursor.CursorDrawerDelegate
 import org.mozilla.geckoview.ScreenLength
 
-
-class GeckoViewWithVirtualCursor @JvmOverloads constructor(
-    context: Context,
-    private val config: Config,
-    attrs: AttributeSet? = null,
-):
-    GeckoViewEx(context, attrs) {
-    var virtualCursorMode: Boolean = true
-        set(value) {
-            field = value
-            dpadNavigationEventsAdapter.resetState()
-        }
-    lateinit var cursorDrawerDelegate: CursorDrawerDelegate
-
-    private var inputMethodManager: InputMethodManager? = null
-    private val dpadNavigationEventsAdapter = DPADNavigationEventsAdapter(
-        onEmulatedKeyEvent = { keyEvent ->
-            cursorDrawerDelegate.dispatchKeyEvent(keyEvent)
-        },
-        motionAxesTranslationEnabled = { !config.cursorConfig.disableMotionAxesDpadNavigation },
-        isSoftwareKeyboardVisible = {
-            ViewCompat.getRootWindowInsets(rootView)?.isVisible(WindowInsetsCompat.Type.ime()) == true
-        },
-    )
-
-    init {
-        init()
-    }
-
-    private fun init() {
-        if (isInEditMode) {
-            return
-        }
-        setWillNotDraw(false)
-        overScrollMode = OVER_SCROLL_NEVER
-        inputMethodManager = context.getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager?
-        cursorDrawerDelegate = CursorDrawerDelegate(context, this, config)
-        cursorDrawerDelegate.customScrollCallback = object : CursorDrawerDelegate.CustomScrollCallback {
-            override fun onScroll(scrollX: Int, scrollY: Int): Boolean {
-                return session?.let {
-                    it.panZoomController.scrollBy(ScreenLength.fromPixels(scrollX.dip2px(context).toDouble()), ScreenLength.fromPixels(scrollY.dip2px(context).toDouble()))
-                    true
-                } ?: false
+class GeckoViewWithVirtualCursor
+    @JvmOverloads
+    constructor(
+        context: Context,
+        private val config: Config,
+        attrs: AttributeSet? = null,
+    ) : GeckoViewEx(context, attrs) {
+        var virtualCursorMode: Boolean = true
+            set(value) {
+                field = value
+                dpadNavigationEventsAdapter.resetState()
             }
-        }
-        cursorDrawerDelegate.init()
-    }
+        lateinit var cursorDrawerDelegate: CursorDrawerDelegate
 
-    override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
-        super.onSizeChanged(w, h, ow, oh)
-        if (isInEditMode) {
-            return
-        }
-        cursorDrawerDelegate.onSizeChanged(w, h, ow, oh)
-    }
+        private var inputMethodManager: InputMethodManager? = null
+        private val dpadNavigationEventsAdapter =
+            DPADNavigationEventsAdapter(
+                onEmulatedKeyEvent = { keyEvent ->
+                    cursorDrawerDelegate.dispatchKeyEvent(keyEvent)
+                },
+                motionAxesTranslationEnabled = { !config.cursorConfig.disableMotionAxesDpadNavigation },
+                isSoftwareKeyboardVisible = {
+                    ViewCompat.getRootWindowInsets(rootView)?.isVisible(WindowInsetsCompat.Type.ime()) == true
+                },
+            )
 
-    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
-        if (virtualCursorMode && DPADNavigationEventsAdapter.isNavigationGenericMotionSource(event.source)) {
-            return dpadNavigationEventsAdapter.dispatchGenericMotionEvent(event)
-        }
-        return super.dispatchGenericMotionEvent(event)
-    }
-
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (virtualCursorMode) {
-            if (dpadNavigationEventsAdapter.dispatchKeyEvent(event))
-                return true
+        init {
+            init()
         }
 
-        return super.dispatchKeyEvent(event)
-    }
-
-    override fun dispatchDraw(canvas: Canvas) {
-        super.dispatchDraw(canvas)
-        if (isInEditMode) {
-            return
+        private fun init() {
+            if (isInEditMode) {
+                return
+            }
+            setWillNotDraw(false)
+            overScrollMode = OVER_SCROLL_NEVER
+            inputMethodManager = context.getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager?
+            cursorDrawerDelegate = CursorDrawerDelegate(context, this, config)
+            cursorDrawerDelegate.customScrollCallback =
+                object : CursorDrawerDelegate.CustomScrollCallback {
+                    override fun onScroll(
+                        scrollX: Int,
+                        scrollY: Int,
+                    ): Boolean =
+                        session?.let {
+                            it.panZoomController.scrollBy(
+                                ScreenLength.fromPixels(scrollX.dip2px(context).toDouble()),
+                                ScreenLength.fromPixels(scrollY.dip2px(context).toDouble()),
+                            )
+                            true
+                        } ?: false
+                }
+            cursorDrawerDelegate.init()
         }
 
-        cursorDrawerDelegate.dispatchDraw(canvas)
+        override fun onSizeChanged(
+            w: Int,
+            h: Int,
+            ow: Int,
+            oh: Int,
+        ) {
+            super.onSizeChanged(w, h, ow, oh)
+            if (isInEditMode) {
+                return
+            }
+            cursorDrawerDelegate.onSizeChanged(w, h, ow, oh)
+        }
+
+        override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+            if (virtualCursorMode && DPADNavigationEventsAdapter.isNavigationGenericMotionSource(event.source)) {
+                return dpadNavigationEventsAdapter.dispatchGenericMotionEvent(event)
+            }
+            return super.dispatchGenericMotionEvent(event)
+        }
+
+        override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+            if (virtualCursorMode) {
+                if (dpadNavigationEventsAdapter.dispatchKeyEvent(event)) {
+                    return true
+                }
+            }
+
+            return super.dispatchKeyEvent(event)
+        }
+
+        override fun dispatchDraw(canvas: Canvas) {
+            super.dispatchDraw(canvas)
+            if (isInEditMode) {
+                return
+            }
+
+            cursorDrawerDelegate.dispatchDraw(canvas)
+        }
     }
-}

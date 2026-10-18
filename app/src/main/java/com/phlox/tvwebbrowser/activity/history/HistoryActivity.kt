@@ -28,26 +28,40 @@ import kotlinx.coroutines.launch
  * Created by fedex on 29.12.16.
  */
 
-class HistoryActivity : AppCompatActivity(), AdapterView.OnItemClickListener, AdapterView.OnItemLongClickListener{
-
+class HistoryActivity :
+    AppCompatActivity(),
+    AdapterView.OnItemClickListener,
+    AdapterView.OnItemLongClickListener {
     private lateinit var vb: ActivityHistoryBinding
     private var ibDelete: ImageButton? = null
     private var adapter: HistoryAdapter? = null
     private lateinit var historyModel: HistoryModel
-    private val voiceSearchHelper = VoiceSearchHelper(this, VOICE_SEARCH_REQUEST_CODE,
-        VOICE_SEARCH_PERMISSIONS_REQUEST_CODE)
+    private val voiceSearchHelper =
+        VoiceSearchHelper(
+            this,
+            VOICE_SEARCH_REQUEST_CODE,
+            VOICE_SEARCH_PERMISSIONS_REQUEST_CODE,
+        )
 
-    internal var onListScrollListener: AbsListView.OnScrollListener = object : AbsListView.OnScrollListener {
-        override fun onScrollStateChanged(view: AbsListView, scrollState: Int) {
+    internal var onListScrollListener: AbsListView.OnScrollListener =
+        object : AbsListView.OnScrollListener {
+            override fun onScrollStateChanged(
+                view: AbsListView,
+                scrollState: Int,
+            ) {
+            }
 
-        }
-
-        override fun onScroll(view: AbsListView, firstVisibleItem: Int, visibleItemCount: Int, totalItemCount: Int) {
-            if (totalItemCount != 0 && firstVisibleItem + visibleItemCount >= totalItemCount - 1 && "" == historyModel.searchQuery) {
-                historyModel.loadItems(adapter!!.realCount)
+            override fun onScroll(
+                view: AbsListView,
+                firstVisibleItem: Int,
+                visibleItemCount: Int,
+                totalItemCount: Int,
+            ) {
+                if (totalItemCount != 0 && firstVisibleItem + visibleItemCount >= totalItemCount - 1 && "" == historyModel.searchQuery) {
+                    historyModel.loadItems(adapter!!.realCount)
+                }
             }
         }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,20 +79,23 @@ class HistoryActivity : AppCompatActivity(), AdapterView.OnItemClickListener, Ad
         vb.listView.onItemClickListener = this
         vb.listView.onItemLongClickListener = this
 
-        //Back first exits multi-select; otherwise the dispatcher falls through to the default
-        //behavior. Predictive-back gestures never reach an onBackPressed() override, so this
-        //lives on the dispatcher instead.
-        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                if (adapter!!.isMultiselectMode) {
-                    adapter!!.isMultiselectMode = false
-                    updateMenu()
-                } else {
-                    isEnabled = false
-                    onBackPressedDispatcher.onBackPressed()
+        // Back first exits multi-select; otherwise the dispatcher falls through to the default
+        // behavior. Predictive-back gestures never reach an onBackPressed() override, so this
+        // lives on the dispatcher instead.
+        onBackPressedDispatcher.addCallback(
+            this,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    if (adapter!!.isMultiselectMode) {
+                        adapter!!.isMultiselectMode = false
+                        updateMenu()
+                    } else {
+                        isEnabled = false
+                        onBackPressedDispatcher.onBackPressed()
+                    }
                 }
-            }
-        })
+            },
+        )
 
         historyModel.lastLoadedItems.subscribe(this, false) {
             if (it.isEmpty()) return@subscribe
@@ -91,41 +108,43 @@ class HistoryActivity : AppCompatActivity(), AdapterView.OnItemClickListener, Ad
 
     private fun showDeleteDialog(deleteAll: Boolean) {
         if (adapter!!.items.isEmpty() || (adapter!!.selectedItems.isEmpty() && !deleteAll)) return
-        AlertDialog.Builder(this)
-                .setTitle(R.string.delete)
-                .setMessage(if (deleteAll) R.string.msg_delete_history_all else R.string.msg_delete_history)
-                .setPositiveButton(android.R.string.ok) { _, _ ->
-                    lifecycleScope.launch(Dispatchers.Main) {
-                        if (deleteAll) {
-                            historyModel.deleteAll()
-                            adapter!!.erase()
-                        } else {
-                            historyModel.delete(adapter!!.selectedItems)
-                            adapter!!.remove(adapter!!.selectedItems)
-                        }
+        AlertDialog
+            .Builder(this)
+            .setTitle(R.string.delete)
+            .setMessage(if (deleteAll) R.string.msg_delete_history_all else R.string.msg_delete_history)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                lifecycleScope.launch(Dispatchers.Main) {
+                    if (deleteAll) {
+                        historyModel.deleteAll()
+                        adapter!!.erase()
+                    } else {
+                        historyModel.delete(adapter!!.selectedItems)
+                        adapter!!.remove(adapter!!.selectedItems)
                     }
                 }
-                .setNeutralButton(android.R.string.cancel) { dialogInterface, i -> }
-                .show()
+            }.setNeutralButton(android.R.string.cancel) { dialogInterface, i -> }
+            .show()
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         when (event.keyCode) {
             KeyEvent.KEYCODE_SEARCH -> {
                 if (event.action == KeyEvent.ACTION_DOWN) {
-                    //nop
+                    // nop
                 } else if (event.action == KeyEvent.ACTION_UP) {
-                    voiceSearchHelper.initiateVoiceSearch(object : VoiceSearchHelper.Callback {
-                        override fun onResult(text: String?) {
-                            if (text == null) {
-                                Utils.showToast(this@HistoryActivity, getString(R.string.can_not_recognize))
-                                return
+                    voiceSearchHelper.initiateVoiceSearch(
+                        object : VoiceSearchHelper.Callback {
+                            override fun onResult(text: String?) {
+                                if (text == null) {
+                                    Utils.showToast(this@HistoryActivity, getString(R.string.can_not_recognize))
+                                    return
+                                }
+                                adapter!!.erase()
+                                historyModel.searchQuery = text
+                                historyModel.loadItems()
                             }
-                            adapter!!.erase()
-                            historyModel.searchQuery = text
-                            historyModel.loadItems()
-                        }
-                    })
+                        },
+                    )
                 }
                 return true
             }
@@ -134,20 +153,32 @@ class HistoryActivity : AppCompatActivity(), AdapterView.OnItemClickListener, Ad
     }
 
     @Deprecated("Deprecated in Java")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+    override fun onActivityResult(
+        requestCode: Int,
+        resultCode: Int,
+        data: Intent?,
+    ) {
         if (!voiceSearchHelper.processActivityResult(requestCode, resultCode, data)) {
             super.onActivityResult(requestCode, resultCode, data)
         }
     }
 
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>,
-        grantResults: IntArray) {
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray,
+    ) {
         if (!voiceSearchHelper.processPermissionsResult(requestCode, permissions, grantResults)) {
             super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         }
     }
 
-    override fun onItemClick(parent: AdapterView<*>, view: View, position: Int, id: Long) {
+    override fun onItemClick(
+        parent: AdapterView<*>,
+        view: View,
+        position: Int,
+        id: Long,
+    ) {
         val hi = (view as HistoryItemView).historyItem
         if (hi!!.isDateHeader) return
         if (adapter!!.isMultiselectMode) {
@@ -161,7 +192,12 @@ class HistoryActivity : AppCompatActivity(), AdapterView.OnItemClickListener, Ad
         }
     }
 
-    override fun onItemLongClick(adapterView: AdapterView<*>, view: View, i: Int, l: Long): Boolean {
+    override fun onItemLongClick(
+        adapterView: AdapterView<*>,
+        view: View,
+        i: Int,
+        l: Long,
+    ): Boolean {
         if (adapter!!.isMultiselectMode) return false
         adapter!!.isMultiselectMode = true
         val v = view as HistoryItemView
@@ -175,11 +211,13 @@ class HistoryActivity : AppCompatActivity(), AdapterView.OnItemClickListener, Ad
         if (selection.isEmpty()) {
             if (ibDelete!!.visibility == View.GONE) return
             val anim = AnimationUtils.loadAnimation(this, R.anim.right_menu_out_anim)
-            anim.setAnimationListener(object : BaseAnimationListener() {
-                override fun onAnimationEnd(animation: Animation) {
-                    ibDelete!!.visibility = View.GONE
-                }
-            })
+            anim.setAnimationListener(
+                object : BaseAnimationListener() {
+                    override fun onAnimationEnd(animation: Animation) {
+                        ibDelete!!.visibility = View.GONE
+                    }
+                },
+            )
             ibDelete!!.startAnimation(anim)
         } else {
             if (ibDelete!!.visibility == View.VISIBLE) return
