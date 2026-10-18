@@ -12,6 +12,7 @@ import android.widget.AbsListView
 import android.widget.AdapterView
 import android.widget.ImageButton
 import android.widget.PopupMenu
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.phlox.tvwebbrowser.R
@@ -63,6 +64,21 @@ class HistoryActivity : AppCompatActivity(), AdapterView.OnItemClickListener, Ad
         vb.listView.setOnScrollListener(onListScrollListener)
         vb.listView.onItemClickListener = this
         vb.listView.onItemLongClickListener = this
+
+        //Back first exits multi-select; otherwise the dispatcher falls through to the default
+        //behavior. Predictive-back gestures never reach an onBackPressed() override, so this
+        //lives on the dispatcher instead.
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (adapter!!.isMultiselectMode) {
+                    adapter!!.isMultiselectMode = false
+                    updateMenu()
+                } else {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                }
+            }
+        })
 
         historyModel.lastLoadedItems.subscribe(this, false) {
             if (it.isEmpty()) return@subscribe
@@ -170,15 +186,6 @@ class HistoryActivity : AppCompatActivity(), AdapterView.OnItemClickListener, Ad
             ibDelete!!.visibility = View.VISIBLE
             ibDelete!!.startAnimation(AnimationUtils.loadAnimation(this, R.anim.right_menu_in_anim))
         }
-    }
-
-    override fun onBackPressed() {
-        if (adapter!!.isMultiselectMode) {
-            adapter!!.isMultiselectMode = false
-            updateMenu()
-            return
-        }
-        super.onBackPressed()
     }
 
     private fun showItemOptionsPopup(v: HistoryItemView) {

@@ -13,6 +13,7 @@ import android.view.View
 import android.widget.AbsListView
 import android.widget.AdapterView
 import android.widget.PopupMenu
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
@@ -70,6 +71,21 @@ class DownloadsActivity : AppCompatActivity(), AdapterView.OnItemClickListener, 
         vb.btnDeleteAll.setOnClickListener { showDeleteDialog(deleteAll = true) }
         vb.btnDeleteSelected.setOnClickListener { showDeleteDialog(deleteAll = false) }
         vb.cbSelectAll.setOnClickListener { adapter.setAllSelected(vb.cbSelectAll.isChecked); updateControls() }
+
+        //Back first exits multi-select; otherwise the dispatcher falls through to the default
+        //behavior. Predictive-back gestures never reach an onBackPressed() override, so this
+        //lives on the dispatcher instead.
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (adapter.isMultiselectMode) {
+                    adapter.isMultiselectMode = false
+                    updateControls()
+                } else {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                }
+            }
+        })
 
         storageModel.location.subscribe(this, false) { updateStorageSummary() }
         storageModel.freeSpace.subscribe(this, false) { updateStorageSummary() }
@@ -330,16 +346,6 @@ class DownloadsActivity : AppCompatActivity(), AdapterView.OnItemClickListener, 
 
     fun unregisterListener(listener: ActiveDownloadsModel.Listener) {
         listeners.remove(listener)
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        if (adapter.isMultiselectMode) {
-            adapter.isMultiselectMode = false
-            updateControls()
-            return
-        }
-        super.onBackPressed()
     }
 
     companion object {
