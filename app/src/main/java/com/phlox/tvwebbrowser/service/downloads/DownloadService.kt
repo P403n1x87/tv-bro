@@ -5,7 +5,12 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.os.*
+import android.os.Binder
+import android.os.Build
+import android.os.Environment
+import android.os.Handler
+import android.os.IBinder
+import android.os.Looper
 import android.text.format.Formatter
 import android.util.Log
 import android.widget.Toast
@@ -19,7 +24,7 @@ import com.phlox.tvwebbrowser.utils.InstallPermissionHelper
 import com.phlox.tvwebbrowser.utils.activemodel.ActiveModelsRepository
 import kotlinx.coroutines.runBlocking
 import java.io.File
-import java.util.*
+import java.util.Date
 import java.util.concurrent.Executors
 
 /**

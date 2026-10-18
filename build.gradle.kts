@@ -11,9 +11,8 @@ plugins {
 
 // Spotless + ktlint over every Kotlin source and Gradle script in the repo. `spotlessApply` is the
 // fixer; `spotlessCheck` gates CI (lint job) and the optional `.githooks/` pre-commit hook. Rule-set
-// decisions (currently: wildcard imports tolerated, see the follow-up note there) live in
-// .editorconfig. buildSrc is a separate build whose tasks no root invocation can reach, so its
-// sources are outside this surface.
+// decisions live in .editorconfig. buildSrc is a separate build whose tasks no root invocation can
+// reach, so its sources are outside this surface.
 fun Project.spotlessKotlinSources() {
     extensions.configure<SpotlessExtension> {
         kotlin {

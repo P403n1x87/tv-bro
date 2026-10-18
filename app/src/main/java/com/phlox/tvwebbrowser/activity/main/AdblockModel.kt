@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.net.URL
-import java.util.*
+import java.util.Calendar
 
 class AdblockModel(
     val config: Config = AppContext.provideConfig(),

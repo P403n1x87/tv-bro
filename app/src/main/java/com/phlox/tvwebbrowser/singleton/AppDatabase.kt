@@ -7,8 +7,16 @@ import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.phlox.tvwebbrowser.TVBro
-import com.phlox.tvwebbrowser.model.*
-import com.phlox.tvwebbrowser.model.dao.*
+import com.phlox.tvwebbrowser.model.Download
+import com.phlox.tvwebbrowser.model.FavoriteItem
+import com.phlox.tvwebbrowser.model.HistoryItem
+import com.phlox.tvwebbrowser.model.HostConfig
+import com.phlox.tvwebbrowser.model.WebTabState
+import com.phlox.tvwebbrowser.model.dao.DownloadDao
+import com.phlox.tvwebbrowser.model.dao.FavoritesDao
+import com.phlox.tvwebbrowser.model.dao.HistoryDao
+import com.phlox.tvwebbrowser.model.dao.HostsDao
+import com.phlox.tvwebbrowser.model.dao.TabsDao
 import com.phlox.tvwebbrowser.model.util.Converters
 
 @Database(
