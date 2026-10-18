@@ -7,6 +7,7 @@ import com.brave.adblock.Utils
 import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.TVBro
+import com.phlox.tvwebbrowser.config.AdblockConfig
 import com.phlox.tvwebbrowser.utils.activemodel.ActiveModel
 import com.phlox.tvwebbrowser.utils.observable.ObservableValue
 import kotlinx.coroutines.Dispatchers
@@ -45,7 +46,7 @@ class AdblockModel(
         modelScope.launch {
             if (clientLoading.value) return@launch
             val checkDate = Calendar.getInstance()
-            checkDate.timeInMillis = config.adBlockListLastUpdate
+            checkDate.timeInMillis = config.adblockConfig.adBlockListLastUpdate
             checkDate.add(Calendar.MINUTE, AUTO_UPDATE_INTERVAL_MINUTES)
             val now = Calendar.getInstance()
             val needUpdate = forceReload || checkDate.before(now)
@@ -60,7 +61,7 @@ class AdblockModel(
                 }
                 try {
                     val easyList =
-                        URL(config.adBlockListURL.value)
+                        URL(config.adblockConfig.adBlockListURL.value)
                             .openConnection()
                             .inputStream
                             .bufferedReader()
@@ -72,7 +73,7 @@ class AdblockModel(
                 }
             }
             this@AdblockModel.client = client
-            config.adBlockListLastUpdate = now.timeInMillis
+            config.adblockConfig.adBlockListLastUpdate = now.timeInMillis
             if (!success) {
                 loadError.value = true
             }
@@ -109,18 +110,18 @@ class AdblockModel(
 
     // Protection settings (the Ads & privacy settings page renders and writes these)
     var adBlockEnabled: Boolean
-        get() = config.adBlockEnabled
+        get() = config.adblockConfig.adBlockEnabled
         set(value) {
-            config.adBlockEnabled = value
+            config.adblockConfig.adBlockEnabled = value
         }
 
-    val adBlockListUrl: String get() = config.adBlockListURL.value
+    val adBlockListUrl: String get() = config.adblockConfig.adBlockListURL.value
 
     fun setAdBlockListUrl(url: String) {
-        config.adBlockListURL.value = url.trim().ifEmpty { Config.DEFAULT_ADBLOCK_LIST_URL }
+        config.adblockConfig.adBlockListURL.value = url.trim().ifEmpty { AdblockConfig.DEFAULT_ADBLOCK_LIST_URL }
     }
 
-    val adBlockListLastUpdate: Long get() = config.adBlockListLastUpdate
+    val adBlockListLastUpdate: Long get() = config.adblockConfig.adBlockListLastUpdate
 
     var blockAutomaticRedirects: Boolean
         get() = config.blockAutomaticRedirects

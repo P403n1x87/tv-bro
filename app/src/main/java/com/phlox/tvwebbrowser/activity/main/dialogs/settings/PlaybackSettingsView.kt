@@ -1,8 +1,8 @@
 package com.phlox.tvwebbrowser.activity.main.dialogs.settings
 
 import android.content.Context
-import com.phlox.tvwebbrowser.Config.PlayerKind
 import com.phlox.tvwebbrowser.R
+import com.phlox.tvwebbrowser.config.PlaybackConfig.PlayerKind
 
 class PlaybackSettingsView(
     context: Context,

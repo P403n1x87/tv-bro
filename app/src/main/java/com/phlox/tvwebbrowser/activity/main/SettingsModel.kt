@@ -2,6 +2,7 @@ package com.phlox.tvwebbrowser.activity.main
 
 import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.Config
+import com.phlox.tvwebbrowser.config.PlaybackConfig
 import com.phlox.tvwebbrowser.domain.HomePagePolicy
 import com.phlox.tvwebbrowser.utils.activemodel.ActiveModel
 import com.phlox.tvwebbrowser.utils.observable.ObservableValue
@@ -98,9 +99,9 @@ class SettingsModel(
     }
 
     var algorithmicDarkening: Boolean
-        get() = config.webviewUseAlgorithmicDarkeningWithDarkUiMode
+        get() = config.engineTuningConfig.webviewUseAlgorithmicDarkeningWithDarkUiMode
         set(value) {
-            config.webviewUseAlgorithmicDarkeningWithDarkUiMode = value
+            config.engineTuningConfig.webviewUseAlgorithmicDarkeningWithDarkUiMode = value
         }
 
     /** Observable because the changed value restyles the toolbar the host is showing right now. */
@@ -117,15 +118,15 @@ class SettingsModel(
 
     // Playback
     var allowAutoplayMedia: Boolean
-        get() = config.allowAutoplayMedia
+        get() = config.playbackConfig.allowAutoplayMedia
         set(value) {
-            config.allowAutoplayMedia = value
+            config.playbackConfig.allowAutoplayMedia = value
         }
 
-    var playerKind: Config.PlayerKind
-        get() = config.playerKind
+    var playerKind: PlaybackConfig.PlayerKind
+        get() = config.playbackConfig.playerKind
         set(value) {
-            config.playerKind = value
+            config.playbackConfig.playerKind = value
         }
 
     // Controls
@@ -155,9 +156,9 @@ class SettingsModel(
         }
 
     var webEngineDebug: Boolean
-        get() = config.webEngineDebug
+        get() = config.engineTuningConfig.webEngineDebug
         set(value) {
-            config.webEngineDebug = value
+            config.engineTuningConfig.webEngineDebug = value
         }
 
     // About

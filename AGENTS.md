@@ -47,8 +47,10 @@ the model/host seam polish. Work on a feature branch; **open a PR only when aske
 - First architecture margin is closed, and so are its two follow-ups (the `MainActivity.onCreate` body
   now delegates to `SessionObservers`/`SessionStartup`, and the four flagged screen areas — toolbar
   URL box, panel focus, D-pad chain, back handling — have Robolectric screen tests); the next margin
-  is the remaining structural items (`Config` grab-bag, wide `WebEngineCallbackHost`, `:app:common`
-  packaging). The global `TVBro.instance`/`AppContext.get()` coupling is now gone from models,
+  is the remaining structural items (wide `WebEngineCallbackHost`, `:app:common`
+  packaging); `Config`'s cohesive slices already moved to `config/` (`AdblockConfig`, `UpdatesConfig`,
+  `PlaybackConfig`, `EngineTuningConfig` next to `CursorConfig`). The global
+  `TVBro.instance`/`AppContext.get()` coupling is now gone from models,
   engines, adapters, widgets and download tasks; what is left is process-level state (singletons,
   restart flags) plus a few inert mentions in comments. Details/evidence:
   `docs/architecture/ARCHITECTURE-REVIEW.md`.

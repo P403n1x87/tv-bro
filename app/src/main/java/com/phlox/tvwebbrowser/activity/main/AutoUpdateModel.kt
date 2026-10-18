@@ -52,13 +52,13 @@ class AutoUpdateModel(
     val updateChecker = UpdateChecker(BuildConfig.VERSION_NAME)
     var lastUpdateNotificationTime: Calendar
     var needAutoCheckUpdates: Boolean
-        get() = config.autoCheckUpdates && BuildConfig.BUILT_IN_AUTO_UPDATE
+        get() = config.updatesConfig.autoCheckUpdates && BuildConfig.BUILT_IN_AUTO_UPDATE
         set(value) {
-            config.autoCheckUpdates = value
+            config.updatesConfig.autoCheckUpdates = value
         }
 
     init {
-        lastUpdateNotificationTime = config.lastUpdateUserNotificationTime
+        lastUpdateNotificationTime = config.updatesConfig.lastUpdateUserNotificationTime
             ?.let { stored -> Calendar.getInstance().apply { timeInMillis = stored } }
             ?: Calendar.getInstance()
     }
@@ -72,7 +72,7 @@ class AutoUpdateModel(
                 try {
                     updateChecker.checkGitHubReleases(
                         BuildConfig.UPDATE_REPO,
-                        arrayOf(config.updateChannel),
+                        arrayOf(config.updatesConfig.updateChannel),
                         BuildConfig.FLAVOR_appstore,
                         BuildConfig.FLAVOR_webengine,
                         Build.SUPPORTED_ABIS[0],
@@ -101,7 +101,7 @@ class AutoUpdateModel(
             throw IllegalStateException()
         }
         lastUpdateNotificationTime = now
-        config.lastUpdateUserNotificationTime = lastUpdateNotificationTime.timeInMillis
+        config.updatesConfig.lastUpdateUserNotificationTime = lastUpdateNotificationTime.timeInMillis
 
         host.showUpdateDialog(
             onDownload = download@{
@@ -127,7 +127,7 @@ class AutoUpdateModel(
     }
 
     fun saveAutoCheckUpdates(need: Boolean) {
-        config.autoCheckUpdates = need
+        config.updatesConfig.autoCheckUpdates = need
     }
 
     /**
