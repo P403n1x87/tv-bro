@@ -113,6 +113,8 @@ jobs:
   #group-restricted — the udev rule below makes /dev/kvm writable or the emulator never boots.
   instrumented:
     runs-on: ubuntu-latest
+    #A wedged emulator or step must never hold the pipeline for hours (the GitHub default is 6).
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -132,7 +134,11 @@ jobs:
 
       #One invocation, and the connected task itself installs/boots the emulator first. The tests
       #are written state-independent (no `pm clear`: the instrumentation runs inside the app
-      #process and a wipe would kill the run), so a reused or cold AVD behaves the same.
+      #process and a wipe would kill the run), so a reused or cold AVD behaves the same. On
+      #failure, capture the artifacts that made the phone-image failure diagnosable — logcat, the
+      #UI tree, the focused window — *inside* this step, while the emulator is still alive: the
+      #action tears it down before any later step, which is what wedged a standalone logcat step
+      #once. The gradle exit code is preserved via the last line.
       - name: Run instrumented smoke tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -141,13 +147,15 @@ jobs:
           profile: tv_1080p
           arch: x86_64
           disable-animations: true
-          script: ./gradlew :app:connectedP403n1x87GeckoIncludedDebugAndroidTest
-
-      #A red run must be diagnosable from the artifacts alone: the logcat (a first-launch dialog
-      #or a FATAL EXCEPTION shows up there) plus the instrumentation reports.
-      - name: Capture logcat on failure
-        if: failure()
-        run: adb logcat -d > instrumented-logcat.txt || true
+          script: |
+            ./gradlew :app:connectedP403n1x87GeckoIncludedDebugAndroidTest && test_ok=1 || test_ok=0
+            if [ "$test_ok" = 0 ]; then
+              adb logcat -d > instrumented-logcat.txt || true
+              adb shell uiautomator dump /sdcard/ci-ui.xml > /dev/null 2>&1 || true
+              adb pull /sdcard/ci-ui.xml instrumented-ui.xml > /dev/null 2>&1 || true
+              adb shell dumpsys window | grep mCurrentFocus > instrumented-window.txt || true
+            fi
+            [ "$test_ok" = 1 ]
 
       - name: Upload failure diagnostics
         if: failure()
@@ -156,6 +164,8 @@ jobs:
           name: instrumented-diagnostics
           path: |
             instrumented-logcat.txt
+            instrumented-ui.xml
+            instrumented-window.txt
             app/build/outputs/androidTest-results/**
             app/build/reports/androidTests/**
           if-no-files-found: ignore
