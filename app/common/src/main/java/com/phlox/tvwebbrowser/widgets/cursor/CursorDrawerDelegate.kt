@@ -20,10 +20,15 @@ import android.view.WindowManager
 import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.utils.Utils
 
-class CursorDrawerDelegate(val context: Context, val surface: View, val config: Config) {
+class CursorDrawerDelegate(
+    val context: Context,
+    val surface: View,
+    val config: Config,
+) {
     private var cursorRadius: Int = 0
     private var cursorRadiusPressed: Int = 0
     private var cursorRadiusAnimationMultiplier: Float = 1f
+
     /** Pixels/sec cap baseline from display width (see [init]); scaled by [Config.cursorMaxSpeedPercent]. */
     private var maxSpeedBaselinePx: Float = 0f
     private var scrollStartPadding = 100
@@ -45,19 +50,20 @@ class CursorDrawerDelegate(val context: Context, val surface: View, val config: 
     private var grabMode = false
     private var downTime: Long = 0L
 
-    //handle long press
-    private val longPressRunnable = Runnable {
-        // End the synthetic finger stream before clearing state. Otherwise WebView still has an
-        // active pointer while dpadCenterPressed is false — scroll-hack or the next frame can inject
-        // another ACTION_DOWN, which yields ACTION_CANCEL + ACTION_DOWN and a spurious tap.
-        if (dpadCenterPressed) {
-            dispatchMotionEvent(cursorPosition.x, cursorPosition.y, MotionEvent.ACTION_CANCEL)
-            dpadCenterPressed = false
+    // handle long press
+    private val longPressRunnable =
+        Runnable {
+            // End the synthetic finger stream before clearing state. Otherwise WebView still has an
+            // active pointer while dpadCenterPressed is false — scroll-hack or the next frame can inject
+            // another ACTION_DOWN, which yields ACTION_CANCEL + ACTION_DOWN and a spurious tap.
+            if (dpadCenterPressed) {
+                dispatchMotionEvent(cursorPosition.x, cursorPosition.y, MotionEvent.ACTION_CANCEL)
+                dpadCenterPressed = false
+            }
+            surface.keyDispatcherState.reset(this@CursorDrawerDelegate)
+            grabMode = false
+            callback?.onLongPress(cursorPosition.x.toInt(), cursorPosition.y.toInt())
         }
-        surface.keyDispatcherState.reset(this@CursorDrawerDelegate)
-        grabMode = false
-        callback?.onLongPress(cursorPosition.x.toInt(), cursorPosition.y.toInt())
-    }
 
     private val isCursorDisappear: Boolean
         get() {
@@ -71,11 +77,17 @@ class CursorDrawerDelegate(val context: Context, val surface: View, val config: 
     }
 
     interface Callback {
-        fun onLongPress(x: Int, y: Int)
+        fun onLongPress(
+            x: Int,
+            y: Int,
+        )
     }
 
     interface CustomScrollCallback {
-        fun onScroll(scrollX: Int, scrollY: Int): Boolean
+        fun onScroll(
+            scrollX: Int,
+            scrollY: Int,
+        ): Boolean
     }
 
     fun init() {
@@ -86,21 +98,24 @@ class CursorDrawerDelegate(val context: Context, val surface: View, val config: 
         display.getSize(displaySize)
         cursorStrokeWidth = (displaySize.x / 400).toFloat()
         cursorRadius = displaySize.x / 100
-        cursorRadiusPressed = cursorRadius - Utils.D2P(context, 5f).toInt()
+        cursorRadiusPressed = cursorRadius - Utils.dpToPx(context, 5f).toInt()
         maxSpeedBaselinePx = (displaySize.x / 25).toFloat()
         scrollStartPadding = displaySize.x / 15
     }
 
-    fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
+    fun onSizeChanged(
+        w: Int,
+        h: Int,
+        ow: Int,
+        oh: Int,
+    ) {
         cursorPosition.set(w / 2.0f, h / 2.0f)
         scrollHackActiveRect.set(0, 0, surface.width, surface.height)
         scrollHackActiveRect.inset(SCROLL_HACK_PADDING, SCROLL_HACK_PADDING)
         scheduleCursorHide()
     }
 
-    fun canHandleBackNavigation(): Boolean {
-        return grabMode
-    }
+    fun canHandleBackNavigation(): Boolean = grabMode
 
     fun handleBackNavigation() {
         if (grabMode) {
@@ -109,7 +124,7 @@ class CursorDrawerDelegate(val context: Context, val surface: View, val config: 
     }
 
     fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        //Log.d(TAG, "dispatchKeyEvent: $event")
+        // Log.d(TAG, "dispatchKeyEvent: $event")
         when (event.keyCode) {
             KeyEvent.KEYCODE_DPAD_LEFT -> {
                 if (event.action == KeyEvent.ACTION_DOWN) {
@@ -119,6 +134,7 @@ class CursorDrawerDelegate(val context: Context, val surface: View, val config: 
                 }
                 return true
             }
+
             KeyEvent.KEYCODE_DPAD_RIGHT -> {
                 if (event.action == KeyEvent.ACTION_DOWN) {
                     handleDirectionKeyEvent(event, 1, UNCHANGED, true)
@@ -127,6 +143,7 @@ class CursorDrawerDelegate(val context: Context, val surface: View, val config: 
                 }
                 return true
             }
+
             KeyEvent.KEYCODE_DPAD_UP -> {
                 if (event.action == KeyEvent.ACTION_DOWN) {
                     handleDirectionKeyEvent(event, UNCHANGED, -1, true)
@@ -135,6 +152,7 @@ class CursorDrawerDelegate(val context: Context, val surface: View, val config: 
                 }
                 return true
             }
+
             KeyEvent.KEYCODE_DPAD_DOWN -> {
                 if (event.action == KeyEvent.ACTION_DOWN) {
                     handleDirectionKeyEvent(event, UNCHANGED, 1, true)
@@ -179,6 +197,7 @@ class CursorDrawerDelegate(val context: Context, val surface: View, val config: 
                 }
                 return true
             }
+
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_BUTTON_A -> {
                 // [DPADNavigationEventsAdapter] may emit several selection key codes for one physical
                 // click; each is a distinct KeyEvent so keyDispatcherState.isTracking is per-key.
@@ -203,7 +222,7 @@ class CursorDrawerDelegate(val context: Context, val surface: View, val config: 
                     surface.keyDispatcherState.handleUpEvent(event)
                     surface.removeCallbacks(longPressRunnable)
                     if (grabMode) {
-                        //nop
+                        // nop
                     } else if (isCursorDisappear) {
                         lastCursorUpdate = System.currentTimeMillis()
                         surface.postInvalidate()
@@ -223,7 +242,12 @@ class CursorDrawerDelegate(val context: Context, val surface: View, val config: 
         return false
     }
 
-    private fun dispatchMotionEvent(x: Float, y: Float, action: Int, pointerId: Int = 0) {
+    private fun dispatchMotionEvent(
+        x: Float,
+        y: Float,
+        action: Int,
+        pointerId: Int = 0,
+    ) {
         if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
             downTime = SystemClock.uptimeMillis()
         }
@@ -240,9 +264,23 @@ class CursorDrawerDelegate(val context: Context, val surface: View, val config: 
         pc1.pressure = 1f
         pc1.size = 1f
         pointerCoords[0] = pc1
-        val motionEvent = MotionEvent.obtain(downTime, eventTime,
-            action, 1, properties,
-            pointerCoords, 0, 0, 1f, 1f, 0, 0, 0, 0)
+        val motionEvent =
+            MotionEvent.obtain(
+                downTime,
+                eventTime,
+                action,
+                1,
+                properties,
+                pointerCoords,
+                0,
+                0,
+                1f,
+                1f,
+                0,
+                0,
+                0,
+                0,
+            )
         try {
             surface.dispatchTouchEvent(motionEvent)
         } finally {
@@ -250,7 +288,12 @@ class CursorDrawerDelegate(val context: Context, val surface: View, val config: 
         }
     }
 
-    private fun handleDirectionKeyEvent(event: KeyEvent, x: Int, y: Int, keyDown: Boolean) {
+    private fun handleDirectionKeyEvent(
+        event: KeyEvent,
+        x: Int,
+        y: Int,
+        keyDown: Boolean,
+    ) {
         lastCursorUpdate = System.currentTimeMillis()
         if (keyDown) {
             if (surface.keyDispatcherState.isTracking(event)) {
@@ -271,7 +314,10 @@ class CursorDrawerDelegate(val context: Context, val surface: View, val config: 
         cursorDirection.set(if (x == UNCHANGED) cursorDirection.x else x, if (y == UNCHANGED) cursorDirection.y else y)
     }
 
-    private fun scrollWebViewBy(scrollX: Int, scrollY: Int) {
+    private fun scrollWebViewBy(
+        scrollX: Int,
+        scrollY: Int,
+    ) {
         if (scrollX == 0 && scrollY == 0) {
             return
         }
@@ -285,7 +331,8 @@ class CursorDrawerDelegate(val context: Context, val surface: View, val config: 
             if (!scrollHackStarted) {
                 scrollHackCoords.set(
                     bound(cursorPosition.x, scrollHackActiveRect.left.toFloat(), scrollHackActiveRect.right.toFloat()),
-                    bound(cursorPosition.y, scrollHackActiveRect.top.toFloat(), scrollHackActiveRect.bottom.toFloat()))
+                    bound(cursorPosition.y, scrollHackActiveRect.top.toFloat(), scrollHackActiveRect.bottom.toFloat()),
+                )
                 dispatchMotionEvent(scrollHackCoords.x, scrollHackCoords.y, MotionEvent.ACTION_DOWN)
                 scrollHackStarted = true
                 justStarted = true
@@ -293,7 +340,8 @@ class CursorDrawerDelegate(val context: Context, val surface: View, val config: 
             scrollHackCoords.x -= scrollX
             scrollHackCoords.y -= scrollY
             if (scrollHackCoords.x < scrollHackActiveRect.left || scrollHackCoords.x >= scrollHackActiveRect.right ||
-                scrollHackCoords.y < scrollHackActiveRect.top || scrollHackCoords.y >= scrollHackActiveRect.bottom) {
+                scrollHackCoords.y < scrollHackActiveRect.top || scrollHackCoords.y >= scrollHackActiveRect.bottom
+            ) {
                 scrollHackCoords.x += scrollX
                 scrollHackCoords.y += scrollY
                 dispatchMotionEvent(scrollHackCoords.x, scrollHackCoords.y, MotionEvent.ACTION_CANCEL)
@@ -307,38 +355,47 @@ class CursorDrawerDelegate(val context: Context, val surface: View, val config: 
         }
     }
 
-
-    private fun bound(value: Float, max: Float): Float {
-        return if (value > max) {
+    private fun bound(
+        value: Float,
+        max: Float,
+    ): Float =
+        if (value > max) {
             max
         } else if (value < -max) {
             -max
         } else {
             value
         }
-    }
 
-    private fun bound(value: Float, min: Float, max: Float): Float {
-        return if (value > max) {
+    private fun bound(
+        value: Float,
+        min: Float,
+        max: Float,
+    ): Float =
+        if (value > max) {
             max
         } else if (value < min) {
             min
         } else {
             value
         }
-    }
 
     fun dispatchDraw(canvas: Canvas) {
         if (grabMode || !isCursorDisappear) {
             val cx = cursorPosition.x
             val cy = cursorPosition.y
-            val radius = if (dpadCenterPressed) cursorRadiusPressed else
+            val radius =
+                if (dpadCenterPressed) {
+                    cursorRadiusPressed
+                } else {
                     (cursorRadius * cursorRadiusAnimationMultiplier)
+                }
 
-            paint.color = when {
-                grabMode -> Color.argb(128, 200, 200, 255)
-                else -> Color . argb (128, 255, 255, 255)
-            }
+            paint.color =
+                when {
+                    grabMode -> Color.argb(128, 200, 200, 255)
+                    else -> Color.argb(128, 255, 255, 255)
+                }
             paint.style = Paint.Style.FILL
             canvas.drawCircle(cx, cy, radius.toFloat(), paint)
 
@@ -367,77 +424,80 @@ class CursorDrawerDelegate(val context: Context, val surface: View, val config: 
         surface.postInvalidate()
     }
 
-    private val cursorUpdateRunnable = object : Runnable {
-        override fun run() {
-            mainHandler.removeCallbacks(cursorHideRunnable)
+    private val cursorUpdateRunnable =
+        object : Runnable {
+            override fun run() {
+                mainHandler.removeCallbacks(cursorHideRunnable)
 
-            val newTime = System.currentTimeMillis()
-            val dTime = newTime - lastCursorUpdate
-            lastCursorUpdate = newTime
+                val newTime = System.currentTimeMillis()
+                val dTime = newTime - lastCursorUpdate
+                lastCursorUpdate = newTime
 
-            val cfg = config.cursorConfig
-            val speedCap = maxSpeedBaselinePx * (cfg.cursorMaxSpeedPercent / 100f)
-            val accelerationFactor = 0.05f * (cfg.cursorAccelerationPercent / 100f) * dTime
-            //float decelerationFactor = 1 - Math.min(0.5f, 0.005f * dTime);
-            cursorSpeed.set(bound(cursorSpeed.x/* * decelerationFactor*/ + bound(cursorDirection.x.toFloat(), 1f) * accelerationFactor, speedCap),
-                bound(cursorSpeed.y/* * decelerationFactor*/ + bound(cursorDirection.y.toFloat(), 1f) * accelerationFactor, speedCap))
-            if (Math.abs(cursorSpeed.x) < 0.1f) cursorSpeed.x = 0f
-            if (Math.abs(cursorSpeed.y) < 0.1f) cursorSpeed.y = 0f
-            if (cursorDirection.x == 0 && cursorDirection.y == 0 && cursorSpeed.x == 0f && cursorSpeed.y == 0f) {
-                if (scrollHackStarted) {
-                    dispatchMotionEvent(scrollHackCoords.x, scrollHackCoords.y, MotionEvent.ACTION_CANCEL)
-                    scrollHackStarted = false
+                val cfg = config.cursorConfig
+                val speedCap = maxSpeedBaselinePx * (cfg.cursorMaxSpeedPercent / 100f)
+                val accelerationFactor = 0.05f * (cfg.cursorAccelerationPercent / 100f) * dTime
+                // float decelerationFactor = 1 - Math.min(0.5f, 0.005f * dTime);
+                cursorSpeed.set(
+                    bound(cursorSpeed.x + bound(cursorDirection.x.toFloat(), 1f) * accelerationFactor, speedCap),
+                    bound(cursorSpeed.y + bound(cursorDirection.y.toFloat(), 1f) * accelerationFactor, speedCap),
+                )
+                if (Math.abs(cursorSpeed.x) < 0.1f) cursorSpeed.x = 0f
+                if (Math.abs(cursorSpeed.y) < 0.1f) cursorSpeed.y = 0f
+                if (cursorDirection.x == 0 && cursorDirection.y == 0 && cursorSpeed.x == 0f && cursorSpeed.y == 0f) {
+                    if (scrollHackStarted) {
+                        dispatchMotionEvent(scrollHackCoords.x, scrollHackCoords.y, MotionEvent.ACTION_CANCEL)
+                        scrollHackStarted = false
+                    }
+                    scheduleCursorHide()
+                    return
                 }
-                scheduleCursorHide()
-                return
-            }
-            tmpPointF.set(cursorPosition)
-            cursorPosition.offset(cursorSpeed.x, cursorSpeed.y)
-            surface.removeCallbacks(longPressRunnable)
-            if (cursorPosition.x < 0) {
-                cursorPosition.x = 0f
-            } else if (cursorPosition.x > surface.width - 1) {
-                cursorPosition.x = (surface.width - 1).toFloat()
-            }
-            if (cursorPosition.y < 0) {
-                cursorPosition.y = 0f
-            } else if (cursorPosition.y > surface.height - 1) {
-                cursorPosition.y = (surface.height - 1).toFloat()
-            }
-            var dx = 0
-            var dy = 0
-            if (cursorPosition.y > surface.height - scrollStartPadding) {
-                if (cursorSpeed.y > 0) {
-                    dy = cursorSpeed.y.toInt()
+                tmpPointF.set(cursorPosition)
+                cursorPosition.offset(cursorSpeed.x, cursorSpeed.y)
+                surface.removeCallbacks(longPressRunnable)
+                if (cursorPosition.x < 0) {
+                    cursorPosition.x = 0f
+                } else if (cursorPosition.x > surface.width - 1) {
+                    cursorPosition.x = (surface.width - 1).toFloat()
                 }
-            } else if (cursorPosition.y < scrollStartPadding) {
-                if (cursorSpeed.y < 0) {
-                    dy = cursorSpeed.y.toInt()
+                if (cursorPosition.y < 0) {
+                    cursorPosition.y = 0f
+                } else if (cursorPosition.y > surface.height - 1) {
+                    cursorPosition.y = (surface.height - 1).toFloat()
                 }
-            }
-            if (cursorPosition.x > surface.width - scrollStartPadding) {
-                if (cursorSpeed.x > 0) {
-                    dx = cursorSpeed.x.toInt()
+                var dx = 0
+                var dy = 0
+                if (cursorPosition.y > surface.height - scrollStartPadding) {
+                    if (cursorSpeed.y > 0) {
+                        dy = cursorSpeed.y.toInt()
+                    }
+                } else if (cursorPosition.y < scrollStartPadding) {
+                    if (cursorSpeed.y < 0) {
+                        dy = cursorSpeed.y.toInt()
+                    }
                 }
-            } else if (cursorPosition.x < scrollStartPadding) {
-                if (cursorSpeed.x < 0) {
-                    dx = cursorSpeed.x.toInt()
+                if (cursorPosition.x > surface.width - scrollStartPadding) {
+                    if (cursorSpeed.x > 0) {
+                        dx = cursorSpeed.x.toInt()
+                    }
+                } else if (cursorPosition.x < scrollStartPadding) {
+                    if (cursorSpeed.x < 0) {
+                        dx = cursorSpeed.x.toInt()
+                    }
                 }
-            }
-            if (dx != 0 || dy != 0) {
-                scrollWebViewBy(dx, dy)
-            }
-            // Touch MOVE only while "click" is held (scroll-hack uses its own touch at scrollHackCoords).
-            if (dpadCenterPressed &&
-                (tmpPointF.x != cursorPosition.x || tmpPointF.y != cursorPosition.y)
-            ) {
-                dispatchMotionEvent(cursorPosition.x, cursorPosition.y, MotionEvent.ACTION_MOVE)
-            }
+                if (dx != 0 || dy != 0) {
+                    scrollWebViewBy(dx, dy)
+                }
+                // Touch MOVE only while "click" is held (scroll-hack uses its own touch at scrollHackCoords).
+                if (dpadCenterPressed &&
+                    (tmpPointF.x != cursorPosition.x || tmpPointF.y != cursorPosition.y)
+                ) {
+                    dispatchMotionEvent(cursorPosition.x, cursorPosition.y, MotionEvent.ACTION_MOVE)
+                }
 
-            surface.invalidate()
-            surface.post(this)
+                surface.invalidate()
+                surface.post(this)
+            }
         }
-    }
 
     fun tryZoomIn() {
         generateZoomGesture(true)
@@ -460,11 +520,12 @@ class CursorDrawerDelegate(val context: Context, val surface: View, val config: 
         animator.start()
     }
 
-    //https://stackoverflow.com/questions/11523423/how-to-generate-zoom-pinch-gesture-for-testing-for-android
+    // https://stackoverflow.com/questions/11523423/how-to-generate-zoom-pinch-gesture-for-testing-for-android
     var pinchZoomStartTime = 0L
     val pinchZoomDuration = 1000
     var pinchZoomIn = true
     val zoomFactor = 0.1f
+
     private fun generateZoomGesture(pinchZoomIn: Boolean) {
         if (pinchZoomStartTime != 0L) {
             return
@@ -475,16 +536,18 @@ class CursorDrawerDelegate(val context: Context, val surface: View, val config: 
         val deltaY = zoomFactor / 2f * surface.height
         val deltaX2 = deltaX / 2f
         val deltaY2 = deltaY / 2f
-        val startPoint1: PointF = if (pinchZoomIn) {
-            PointF(surface.width / 2f - deltaX2, surface.height / 2f - deltaY2)
-        } else {
-            PointF(surface.width / 2f - deltaX, surface.height / 2f - deltaY)
-        }
-        val startPoint2: PointF = if (pinchZoomIn) {
-            PointF(surface.width / 2f + deltaX2, surface.height / 2f + deltaY2)
-        } else {
-            PointF(surface.width / 2f + deltaX, surface.height / 2f + deltaY)
-        }
+        val startPoint1: PointF =
+            if (pinchZoomIn) {
+                PointF(surface.width / 2f - deltaX2, surface.height / 2f - deltaY2)
+            } else {
+                PointF(surface.width / 2f - deltaX, surface.height / 2f - deltaY)
+            }
+        val startPoint2: PointF =
+            if (pinchZoomIn) {
+                PointF(surface.width / 2f + deltaX2, surface.height / 2f + deltaY2)
+            } else {
+                PointF(surface.width / 2f + deltaX, surface.height / 2f + deltaY)
+            }
         var event: MotionEvent?
         val eventX1: Float = startPoint1.x
         val eventY1: Float = startPoint1.y
@@ -502,8 +565,8 @@ class CursorDrawerDelegate(val context: Context, val surface: View, val config: 
         properties[0] = pp1
         properties[1] = pp2
 
-        //specify the coordinations of the two touch points
-        //NOTE: you MUST set the pressure and size value, or it doesn't work
+        // specify the coordinations of the two touch points
+        // NOTE: you MUST set the pressure and size value, or it doesn't work
         val pointerCoords = arrayOfNulls<MotionEvent.PointerCoords>(2)
         val pc1 = MotionEvent.PointerCoords()
         pc1.x = eventX1
@@ -518,7 +581,7 @@ class CursorDrawerDelegate(val context: Context, val surface: View, val config: 
         pointerCoords[0] = pc1
         pointerCoords[1] = pc2
 
-        //////////////////////////////////////////////////////////////
+        // ////////////////////////////////////////////////////////////
         // events sequence of zoom gesture
         // 1. send ACTION_DOWN event of one start point
         // 2. send ACTION_POINTER_2_DOWN of two start points
@@ -527,22 +590,46 @@ class CursorDrawerDelegate(val context: Context, val surface: View, val config: 
         //      until reach the end points
         // 5. send ACTION_POINTER_2_UP of two end points
         // 6. send ACTION_UP of one end point
-        //////////////////////////////////////////////////////////////
+        // ////////////////////////////////////////////////////////////
 
         // step 1
-        event = MotionEvent.obtain(
-            pinchZoomStartTime, pinchZoomStartTime,
-            MotionEvent.ACTION_DOWN, 1, properties,
-            pointerCoords, 0, 0, 1f, 1f, 0, 0, 0, 0
-        )
+        event =
+            MotionEvent.obtain(
+                pinchZoomStartTime,
+                pinchZoomStartTime,
+                MotionEvent.ACTION_DOWN,
+                1,
+                properties,
+                pointerCoords,
+                0,
+                0,
+                1f,
+                1f,
+                0,
+                0,
+                0,
+                0,
+            )
         surface.dispatchTouchEvent(event)
 
-        //step 2
-        event = MotionEvent.obtain(
-            pinchZoomStartTime, pinchZoomStartTime,
-            MotionEvent.ACTION_POINTER_2_DOWN, 2,
-            properties, pointerCoords, 0, 0, 1f, 1f, 0, 0, 0, 0
-        )
+        // step 2
+        event =
+            MotionEvent.obtain(
+                pinchZoomStartTime,
+                pinchZoomStartTime,
+                MotionEvent.ACTION_POINTER_2_DOWN,
+                2,
+                properties,
+                pointerCoords,
+                0,
+                0,
+                1f,
+                1f,
+                0,
+                0,
+                0,
+                0,
+            )
         surface.dispatchTouchEvent(event)
 
         surface.post(pinchZoomRunnable)
@@ -568,26 +655,30 @@ class CursorDrawerDelegate(val context: Context, val surface: View, val config: 
                 val deltaY = zoomFactor / 2 * surface.height
                 val deltaX2 = deltaX / 2
                 val deltaY2 = deltaY / 2
-                val startPoint1: PointF = if (pinchZoomIn) {
-                    PointF(surface.width / 2f - deltaX2, surface.height / 2f - deltaY2)
-                } else {
-                    PointF(surface.width / 2f - deltaX, surface.height / 2f - deltaY)
-                }
-                val startPoint2: PointF = if (pinchZoomIn) {
-                    PointF(surface.width / 2f + deltaX2, surface.height / 2f + deltaY2)
-                } else {
-                    PointF(surface.width / 2f + deltaX, surface.height / 2f + deltaY)
-                }
-                val endPoint1: PointF = if (pinchZoomIn) {
-                    PointF(surface.width / 2f - deltaX, surface.height / 2f - deltaY)
-                } else {
-                    PointF(surface.width / 2f - deltaX2, surface.height / 2f - deltaY2)
-                }
-                val endPoint2: PointF = if (pinchZoomIn) {
-                    PointF(surface.width / 2f + deltaX, surface.height / 2f + deltaY)
-                } else {
-                    PointF(surface.width / 2f + deltaX2, surface.height / 2f + deltaY2)
-                }
+                val startPoint1: PointF =
+                    if (pinchZoomIn) {
+                        PointF(surface.width / 2f - deltaX2, surface.height / 2f - deltaY2)
+                    } else {
+                        PointF(surface.width / 2f - deltaX, surface.height / 2f - deltaY)
+                    }
+                val startPoint2: PointF =
+                    if (pinchZoomIn) {
+                        PointF(surface.width / 2f + deltaX2, surface.height / 2f + deltaY2)
+                    } else {
+                        PointF(surface.width / 2f + deltaX, surface.height / 2f + deltaY)
+                    }
+                val endPoint1: PointF =
+                    if (pinchZoomIn) {
+                        PointF(surface.width / 2f - deltaX, surface.height / 2f - deltaY)
+                    } else {
+                        PointF(surface.width / 2f - deltaX2, surface.height / 2f - deltaY2)
+                    }
+                val endPoint2: PointF =
+                    if (pinchZoomIn) {
+                        PointF(surface.width / 2f + deltaX, surface.height / 2f + deltaY)
+                    } else {
+                        PointF(surface.width / 2f + deltaX2, surface.height / 2f + deltaY2)
+                    }
 
                 val properties = arrayOfNulls<MotionEvent.PointerProperties>(2)
                 val pp1 = MotionEvent.PointerProperties()
@@ -604,7 +695,7 @@ class CursorDrawerDelegate(val context: Context, val surface: View, val config: 
                 val now = System.currentTimeMillis()
                 if (now - pinchZoomStartTime < pinchZoomDuration) {
                     val progress = (now - pinchZoomStartTime).toFloat() / pinchZoomDuration
-                    //step 3, 4
+                    // step 3, 4
                     // update the move events
                     pc1.x = startPoint1.x + (endPoint1.x - startPoint1.x) * progress
                     pc1.y = startPoint1.y + (endPoint1.y - startPoint1.y) * progress
@@ -612,34 +703,70 @@ class CursorDrawerDelegate(val context: Context, val surface: View, val config: 
                     pc2.y = startPoint2.y + (endPoint2.y - startPoint2.y) * progress
                     pointerCoords[0] = pc1
                     pointerCoords[1] = pc2
-                    val event = MotionEvent.obtain(
-                        pinchZoomStartTime, now,
-                        MotionEvent.ACTION_MOVE, 2, properties,
-                        pointerCoords, 0, 0, 1f, 1f, 0, 0, 0, 0
-                    )
+                    val event =
+                        MotionEvent.obtain(
+                            pinchZoomStartTime,
+                            now,
+                            MotionEvent.ACTION_MOVE,
+                            2,
+                            properties,
+                            pointerCoords,
+                            0,
+                            0,
+                            1f,
+                            1f,
+                            0,
+                            0,
+                            0,
+                            0,
+                        )
                     surface.dispatchTouchEvent(event)
                     surface.post(pinchZoomRunnable)
                 } else {
-                    //step 5
+                    // step 5
                     pc1.x = endPoint1.x
                     pc1.y = endPoint1.y
                     pc2.x = endPoint2.x
                     pc2.y = endPoint2.y
                     pointerCoords[0] = pc1
                     pointerCoords[1] = pc2
-                    var event = MotionEvent.obtain(
-                        pinchZoomStartTime, now,
-                        MotionEvent.ACTION_POINTER_2_UP, 2, properties,
-                        pointerCoords, 0, 0, 1f, 1f, 0, 0, 0, 0
-                    )
+                    var event =
+                        MotionEvent.obtain(
+                            pinchZoomStartTime,
+                            now,
+                            MotionEvent.ACTION_POINTER_2_UP,
+                            2,
+                            properties,
+                            pointerCoords,
+                            0,
+                            0,
+                            1f,
+                            1f,
+                            0,
+                            0,
+                            0,
+                            0,
+                        )
                     surface.dispatchTouchEvent(event)
 
                     // step 6
-                    event = MotionEvent.obtain(
-                        pinchZoomStartTime, now,
-                        MotionEvent.ACTION_UP, 1, properties,
-                        pointerCoords, 0, 0, 1f, 1f, 0, 0, 0, 0
-                    )
+                    event =
+                        MotionEvent.obtain(
+                            pinchZoomStartTime,
+                            now,
+                            MotionEvent.ACTION_UP,
+                            1,
+                            properties,
+                            pointerCoords,
+                            0,
+                            0,
+                            1f,
+                            1f,
+                            0,
+                            0,
+                            0,
+                            0,
+                        )
                     surface.dispatchTouchEvent(event)
                     pinchZoomStartTime = 0
                 }
@@ -653,9 +780,10 @@ class CursorDrawerDelegate(val context: Context, val surface: View, val config: 
         private const val CURSOR_DISAPPEAR_TIMEOUT = 5000
         private const val USE_SCROLL_HACK = true
         private const val SCROLL_HACK_PADDING = 300
-        //100ms more to let underlying view handle long press first
-        //idea to let geckoview handle long press first (and receive ContentDelegate.onContextMenu callback)
-        //and if it doesn't handle it, then we handle it as long press
+
+        // 100ms more to let underlying view handle long press first
+        // idea to let geckoview handle long press first (and receive ContentDelegate.onContextMenu callback)
+        // and if it doesn't handle it, then we handle it as long press
         private val LONG_PRESS_TIMEOUT = ViewConfiguration.getLongPressTimeout() + 100L
     }
 }
