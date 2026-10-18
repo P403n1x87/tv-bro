@@ -20,6 +20,7 @@ import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
 import android.os.Process
+import android.text.format.Formatter
 import android.util.Log
 import android.util.Patterns
 import android.view.KeyEvent
@@ -532,6 +533,23 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback, WebEngineCall
 
     override fun requestPermission(permission: String, requestCode: Int) {
         requestPermissions(arrayOf(permission), requestCode)
+    }
+
+    override fun downloadFreeSpaceBytes(): Long =
+        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).freeSpace
+
+    override fun onDownloadNoSpace(fileName: String, neededBytes: Long, freeBytes: Long) {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.download)
+            .setMessage(
+                getString(
+                    R.string.msg_not_enough_space, fileName,
+                    Formatter.formatFileSize(this, neededBytes),
+                    Formatter.formatFileSize(this, freeBytes),
+                )
+            )
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
     }
 
     private fun handleIntent(intent: Intent) {

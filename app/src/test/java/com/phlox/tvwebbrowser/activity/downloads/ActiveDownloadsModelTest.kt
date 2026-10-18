@@ -145,6 +145,32 @@ class ActiveDownloadsModelTest {
         assertTrue(downloads.all().isEmpty())
     }
 
+    @Test
+    fun deletingASelectionRemovesOnlyThoseRows() = runBlocking {
+        downloads.add(Download("https://example.com/a.apk", "a.apk", "/tmp/a.apk",
+            Download.OperationAfterDownload.NOP, null, null, null, null, null))
+        downloads.add(Download("https://example.com/b.apk", "b.apk", "/tmp/b.apk",
+            Download.OperationAfterDownload.NOP, null, null, null, null, null))
+        val stored = downloads.all()
+        val selected = stored.first { it.filename == "a.apk" }
+
+        model.deleteItems(listOf(selected))
+
+        assertEquals(listOf("b.apk"), downloads.all().map { it.filename })
+    }
+
+    @Test
+    fun deletingAllEmptiesTheLog() = runBlocking {
+        downloads.add(Download("https://example.com/a.apk", "a.apk", "/tmp/a.apk",
+            Download.OperationAfterDownload.NOP, null, null, null, null, null))
+        downloads.add(Download("https://example.com/b.apk", "b.apk", "/tmp/b.apk",
+            Download.OperationAfterDownload.NOP, null, null, null, null, null))
+
+        model.deleteAll()
+
+        assertTrue(downloads.all().isEmpty())
+    }
+
     private class FakeListener : ActiveDownloadsModel.Listener {
         val updated = mutableListOf<Download>()
         val errors = mutableListOf<Triple<Download, Int, String>>()

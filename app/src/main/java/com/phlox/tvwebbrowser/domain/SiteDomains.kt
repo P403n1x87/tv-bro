@@ -13,6 +13,18 @@ package com.phlox.tvwebbrowser.domain
  */
 object SiteDomains {
 
+    /** `scheme://authority` of a URL; the authority runs until the first path/query/fragment. */
+    private val HOST_PATTERN = Regex("^[a-zA-Z][a-zA-Z0-9+.\\-]*://([^/?#]+)")
+
+    /** The host of [url] — userinfo and port stripped — or null when there is no authority. */
+    fun hostFromUrl(url: String?): String? {
+        val authority = HOST_PATTERN.find(url ?: return null)?.groupValues?.get(1) ?: return null
+        return authority.substringAfterLast('@').substringBefore(':').ifBlank { null }
+    }
+
+    /** The registrable domain of [url]'s host, for the compact "site" label. */
+    fun domainFromUrl(url: String?): String? = siteDomain(hostFromUrl(url))
+
     /** Suffixes that, in a two-label host, indicate the registrable domain needs a third label. */
     private val MULTI_LABEL_SUFFIXES = setOf(
         "co", "com", "org", "net", "edu", "gov", "ac", "ne", "or", "nom", "uk", "ca",

@@ -27,7 +27,29 @@ class ActiveDownloadsModel(
         fun onAllDownloadsComplete()
     }
 
+    /** Deletes one logged download: its file first, then its row. */
     suspend fun deleteItem(download: Download) {
+        deleteFile(download)
+        downloads.delete(download)
+    }
+
+    /** Deletes a multi-selected set of downloads. */
+    suspend fun deleteItems(items: List<Download>) {
+        for (item in items) {
+            deleteFile(item)
+            downloads.delete(item)
+        }
+    }
+
+    /** Empties the download log, removing every file it references. */
+    suspend fun deleteAll() {
+        for (download in downloads.all()) {
+            deleteFile(download)
+        }
+        downloads.deleteAll()
+    }
+
+    private fun deleteFile(download: Download) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val contentResolver = contentResolver()
             val rowsDeleted = try {
@@ -42,7 +64,6 @@ class ActiveDownloadsModel(
         } else {
             File(download.filepath).delete()
         }
-        downloads.delete(download)
     }
 
     fun registerListener(listener: Listener) {

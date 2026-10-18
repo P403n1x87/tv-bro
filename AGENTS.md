@@ -14,7 +14,7 @@ the model/host seam polish. Work on a feature branch; **open a PR only when aske
   `ActiveModelsRepository` (reflection → every primary-ctor param needs a default).
 - Layers: views → presentation models (`MainActivityViewModel`, `TabsModel`, `SettingsModel`,
   `AdblockModel`, `AutoUpdateModel`, `HistoryModel`, `DownloadsHistoryModel`,
-  `ActiveDownloadsModel`) → repositories → Room. Views never touch `AppDatabase`/`Repositories`
+  `ActiveDownloadsModel`, `DownloadStorageModel`) → repositories → Room. Views never touch `AppDatabase`/`Repositories`
   (only the service layer may).
 - `WebEngineCallback` is a plain per-tab engine adapter; all UI access goes through the
   `WebEngineCallbackHost` interface (`MainActivity` is the only host). Pure policy in `domain/`

@@ -12,6 +12,7 @@ import com.phlox.tvwebbrowser.singleton.AppDatabase
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -105,5 +106,30 @@ class DownloadsHistoryModelTest {
         advance(1)
 
         assertEquals(listOf("a.bin"), model.allItems.map { it.filename })
+    }
+
+    @Test
+    fun removedItemsLeaveTheCachedWindow() {
+        insert("a.bin", time = 1)
+        insert("b.bin", time = 2)
+        model.loadNextItems()
+        advance(1)
+        val removed = model.allItems.first { it.filename == "a.bin" }
+
+        model.remove(listOf(removed))
+
+        assertEquals(listOf("b.bin"), model.allItems.map { it.filename })
+    }
+
+    @Test
+    fun resetForgetsTheCachedWindow() {
+        insert("a.bin", time = 1)
+        model.loadNextItems()
+        advance(1)
+
+        model.reset()
+
+        assertTrue(model.allItems.isEmpty())
+        assertTrue(model.lastLoadedItems.value.isEmpty())
     }
 }

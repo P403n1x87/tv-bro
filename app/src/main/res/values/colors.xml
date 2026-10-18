@@ -33,6 +33,9 @@
     <!-- "Update available" circle badge; matches the accent so it feels native. -->
     <color name="update_badge_bg">#006EC5</color>
 
+    <!-- Borderless action labels (e.g. "Delete all") use the app accent like a link. -->
+    <color name="action_label_color">#006EC5</color>
+
     <color name="progressbar_tint">#75D5FA</color>
 
     <color name="web_tab_text_color">#000</color>
