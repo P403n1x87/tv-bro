@@ -90,12 +90,14 @@ the model/host seam polish. Work on a feature branch; **open a PR only when aske
 
 ## Releasing
 - Version comes from git tags (`vX.Y.Z`), never hardcoded; `./gradlew` derives it.
-- CI `.github/workflows/release.yml`: `tests` (the three unit suites) and `lint` (Android lint on
+- CI `.github/workflows/release.yml`: `tests` (the three unit suites), `lint` (Android lint on
   both app flavors + player + common, zero-baseline; `MissingTranslation` is the one global
-  exemption, disabled in buildSrc) run as separate jobs and `build` depends on both
-  (`needs: [tests, lint]`), so neither an APK build nor a release happens on red tests or a new
-  lint error; runs on every PR that touches code or the build harness; a docs-only PR (`docs/**`,
-  `*.md`, repo metadata) runs no CI at all; publish only from a tag.
+  exemption, disabled in buildSrc) and `instrumented` (the UiAutomator smoke suite on an API 26
+  emulator, KVM-enable step included) run as separate jobs and `build` depends on all three
+  (`needs: [tests, lint, instrumented]`), so neither an APK build nor a release happens on red
+  tests, a new lint error or a broken device flow; runs on every PR that touches code or the build
+  harness; a docs-only PR (`docs/**`, `*.md`, repo metadata) runs no CI at all; publish only from a
+  tag.
 - `gh release create vX.Y.Z --target <ref>` creates the tag → workflow attaches signed APKs and sets
   the body from `RELEASE_NOTES.md`. Keystore: copy of the debug keystore under `secrets`
   (fallback `signing.keystore`); **never regenerate** (it is what upgrades installs in place).
