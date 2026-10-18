@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!--Declared here because Utils' connectivity check reads ConnectivityManager state; the
+    manifest merger folds it into every consumer (the app manifest already declares it too).-->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
 </manifest>
