@@ -68,14 +68,20 @@ the model/host seam polish. Work on a feature branch; **open a PR only when aske
   `ktlint --format <file>` (ktlint 1.8 CLI) writes it anyway; afterwards the reports are stable
   and any hit is a real violation.
 - Tests: `:app:player:testDebugUnitTest` (`:app:testDebugUnitTest`), `:app:testP403n1x87GeckoIncludedDebugUnitTest`
-  (192: model/repository units + the Robolectric screen tests — `ActionBarTest`,
+  (216: model/repository units + the Robolectric screen tests — `ActionBarTest`,
   `PanelControllerTest`, `PanelRowFocusDelegateTest`, `BackNavigationEventsAdapterTest`, over real
   inflated layouts, `sdk = 26`, plain `Application`). Screen-test gotchas: hand
   `binding.flWebViewContainer.config` its `Config` after inflate (as `MainActivity.onCreate` does,
   else `CursorLayout.onSizeChanged` throws); build `KeyEvent`s with real `downTime`/`eventTime`
   (`KeyEvent(action, code)` carries 0, so time-window logic never matches); the URL box enters edit
   mode on key **ACTION_UP**, not down. A full `MainActivity` launch is not possible on the JVM
-  (ad-block native lib, null `ComponentName` from the binding shadow) → that needs `androidTest`.
+  (ad-block native lib, null `ComponentName` from the binding shadow) → that level is covered by
+  the instrumented smoke suite: `:app:connectedP403n1x87GeckoIncludedDebugAndroidTest`
+  (`MainScreenSmokeTest`, UiAutomator, needs a booted device/emulator; ~25s of tests). Its gotchas:
+  the instrumentation runs inside the app process, so a `pm clear` in `@Before` kills the run —
+  write tests state-independent instead; a VIEW intent opens a **new tab** (single-entry history,
+  back is a no-op) unless the intent carries `com.phlox.tvwebbrowser.EXTRA_OPEN_IN_SAME_TAB`; the
+  bookmarks panel's "Add this page" row is hidden on the home page (assert `vBookmarks` instead).
 - Debug APK: `./gradlew :app:assembleP403n1x87GeckoIncludedDebug -PenableAbiSplits`.
 - Launch a URL: `am start -a android.intent.action.VIEW -d "http://example.com" -p <appId>`; click
   `input tap <x> <y>`. `p403n1x87` → `com.phlox.tvwebbrowser.p403n1x87`, else `…webbrowser`.

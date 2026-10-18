@@ -19,6 +19,9 @@ media3 = "1.9.3"
 
 junit = "4.13.2"
 robolectric = "4.16.1"
+androidx-test-ext-junit = "1.2.1"
+androidx-test-runner = "1.6.2"
+androidx-test-uiautomator = "2.3.0"
 geckoview = "147.0.20260212191108"
 ad-block = "0.0.4"
 segmented-button = "v1.0.0"
@@ -64,6 +67,9 @@ geckoview = { group = "org.mozilla.geckoview", name = "geckoview", version.ref =
 # Test
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
+androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidx-test-ext-junit" }
+androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidx-test-runner" }
+androidx-test-uiautomator = { group = "androidx.test.uiautomator", name = "uiautomator", version.ref = "androidx-test-uiautomator" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
