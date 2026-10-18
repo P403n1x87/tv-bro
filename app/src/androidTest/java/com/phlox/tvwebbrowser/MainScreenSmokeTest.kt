@@ -73,6 +73,13 @@ class MainScreenSmokeTest {
         openUrl("http://example.com")
         device.wait(Until.findObject(By.res(URL_BOX).textContains("example.com")), 60_000)
             ?: error("first url never loaded")
+        // The URL box updates when the load merely *starts*; a loadUrl that supersedes a still
+        // -provisional navigation replaces its history entry instead of stacking one, leaving
+        // canGoBack() false and the back button a silent no-op. Wait for the first page's content
+        // — the same marker viewIntentLoadsPage relies on — so the entry is committed before the
+        // second navigation lands on top of it (a slow emulator widens that gap to seconds).
+        device.wait(Until.findObject(By.textContains(PAGE_MARKER)), 60_000)
+            ?: error("first page content never rendered")
         openUrl("http://example.org", sameTab = true)
         device.wait(Until.findObject(By.res(URL_BOX).textContains("example.org")), 60_000)
             ?: error("second url never loaded in the same tab")
