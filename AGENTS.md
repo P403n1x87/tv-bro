@@ -47,8 +47,10 @@ the model/host seam polish. Work on a feature branch; **open a PR only when aske
 - First architecture margin is closed, and so are its two follow-ups (the `MainActivity.onCreate` body
   now delegates to `SessionObservers`/`SessionStartup`, and the four flagged screen areas — toolbar
   URL box, panel focus, D-pad chain, back handling — have Robolectric screen tests); the next margin
-  is the remaining structural items (`Config` grab-bag, wide `WebEngineCallbackHost`, `:app:common`
-  packaging). The global `TVBro.instance`/`AppContext.get()` coupling is now gone from models,
+  is the remaining structural items (wide `WebEngineCallbackHost`, `:app:common`
+  packaging); `Config`'s cohesive slices already moved to `config/` (`AdblockConfig`, `UpdatesConfig`,
+  `PlaybackConfig`, `EngineTuningConfig` next to `CursorConfig`). The global
+  `TVBro.instance`/`AppContext.get()` coupling is now gone from models,
   engines, adapters, widgets and download tasks; what is left is process-level state (singletons,
   restart flags) plus a few inert mentions in comments. Details/evidence:
   `docs/architecture/ARCHITECTURE-REVIEW.md`.
@@ -68,26 +70,36 @@ the model/host seam polish. Work on a feature branch; **open a PR only when aske
   `ktlint --format <file>` (ktlint 1.8 CLI) writes it anyway; afterwards the reports are stable
   and any hit is a real violation.
 - Tests: `:app:player:testDebugUnitTest` (`:app:testDebugUnitTest`), `:app:testP403n1x87GeckoIncludedDebugUnitTest`
-  (192: model/repository units + the Robolectric screen tests — `ActionBarTest`,
+  (216: model/repository units + the Robolectric screen tests — `ActionBarTest`,
   `PanelControllerTest`, `PanelRowFocusDelegateTest`, `BackNavigationEventsAdapterTest`, over real
   inflated layouts, `sdk = 26`, plain `Application`). Screen-test gotchas: hand
   `binding.flWebViewContainer.config` its `Config` after inflate (as `MainActivity.onCreate` does,
   else `CursorLayout.onSizeChanged` throws); build `KeyEvent`s with real `downTime`/`eventTime`
   (`KeyEvent(action, code)` carries 0, so time-window logic never matches); the URL box enters edit
   mode on key **ACTION_UP**, not down. A full `MainActivity` launch is not possible on the JVM
-  (ad-block native lib, null `ComponentName` from the binding shadow) → that needs `androidTest`.
+  (ad-block native lib, null `ComponentName` from the binding shadow) → that level is covered by
+  the instrumented smoke suite: `:app:connectedP403n1x87GeckoIncludedDebugAndroidTest`
+  (`MainScreenSmokeTest`, UiAutomator, needs a booted device/emulator; ~25s of tests). Its gotchas:
+  the instrumentation runs inside the app process, so a `pm clear` in `@Before` kills the run —
+  write tests state-independent instead; a VIEW intent opens a **new tab** (single-entry history,
+  back is a no-op) unless the intent carries `com.phlox.tvwebbrowser.EXTRA_OPEN_IN_SAME_TAB`; the
+  bookmarks panel's "Add this page" row is hidden on the home page (assert `vBookmarks` instead).
 - Debug APK: `./gradlew :app:assembleP403n1x87GeckoIncludedDebug -PenableAbiSplits`.
 - Launch a URL: `am start -a android.intent.action.VIEW -d "http://example.com" -p <appId>`; click
   `input tap <x> <y>`. `p403n1x87` → `com.phlox.tvwebbrowser.p403n1x87`, else `…webbrowser`.
 
 ## Releasing
 - Version comes from git tags (`vX.Y.Z`), never hardcoded; `./gradlew` derives it.
-- CI `.github/workflows/release.yml`: `tests` (the three unit suites) and `lint` (Android lint on
+- CI `.github/workflows/release.yml`: `tests` (the three unit suites), `lint` (Android lint on
   both app flavors + player + common, zero-baseline; `MissingTranslation` is the one global
-  exemption, disabled in buildSrc) run as separate jobs and `build` depends on both
-  (`needs: [tests, lint]`), so neither an APK build nor a release happens on red tests or a new
-  lint error; runs on every PR that touches code or the build harness; a docs-only PR (`docs/**`,
-  `*.md`, repo metadata) runs no CI at all; publish only from a tag.
+  exemption, disabled in buildSrc) and `instrumented` (the UiAutomator smoke suite on an API 36
+  android-tv emulator — the AOSP `default` phone images ship no WebView provider, so the app's
+  first launch aborts on its WebView-error dialog — with a KVM-enable step and failure
+  logcat/artifact upload) run as separate jobs and `build` depends on all three
+  (`needs: [tests, lint, instrumented]`), so neither an APK build nor a release happens on red
+  tests, a new lint error or a broken device flow; runs on every PR that touches code or the build
+  harness; a docs-only PR (`docs/**`, `*.md`, repo metadata) runs no CI at all; publish only from a
+  tag.
 - `gh release create vX.Y.Z --target <ref>` creates the tag → workflow attaches signed APKs and sets
   the body from `RELEASE_NOTES.md`. Keystore: copy of the debug keystore under `secrets`
   (fallback `signing.keystore`); **never regenerate** (it is what upgrades installs in place).

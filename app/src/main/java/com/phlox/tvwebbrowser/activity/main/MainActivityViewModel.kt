@@ -75,9 +75,9 @@ class MainActivityViewModel(
 
     private suspend fun checkVersionCodeAndRunMigrations() {
         Log.d(TAG, "checkVersionCodeAndRunMigrations")
-        if (config.appVersionCodeMark != BuildConfig.VERSION_CODE) {
-            Log.i(TAG, "App version code changed from ${config.appVersionCodeMark} to ${BuildConfig.VERSION_CODE}")
-            config.appVersionCodeMark = BuildConfig.VERSION_CODE
+        if (config.updatesConfig.appVersionCodeMark != BuildConfig.VERSION_CODE) {
+            Log.i(TAG, "App version code changed from ${config.updatesConfig.appVersionCodeMark} to ${BuildConfig.VERSION_CODE}")
+            config.updatesConfig.appVersionCodeMark = BuildConfig.VERSION_CODE
             withContext(Dispatchers.IO) {
                 UpdateChecker.clearTempFilesIfAny(appContext())
             }

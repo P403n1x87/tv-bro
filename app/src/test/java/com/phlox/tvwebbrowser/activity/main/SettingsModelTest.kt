@@ -88,6 +88,6 @@ class SettingsModelTest {
     fun algorithmicDarkeningRoundTripsThroughConfig() {
         model.algorithmicDarkening = true
 
-        assertTrue(config.webviewUseAlgorithmicDarkeningWithDarkUiMode)
+        assertTrue(config.engineTuningConfig.webviewUseAlgorithmicDarkeningWithDarkUiMode)
     }
 }

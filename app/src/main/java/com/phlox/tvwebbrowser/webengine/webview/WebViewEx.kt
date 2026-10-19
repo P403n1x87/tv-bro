@@ -50,8 +50,8 @@ import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.phlox.tvwebbrowser.Config
-import com.phlox.tvwebbrowser.Config.PlayerKind
 import com.phlox.tvwebbrowser.R
+import com.phlox.tvwebbrowser.config.PlaybackConfig.PlayerKind
 import com.phlox.tvwebbrowser.domain.HomePagePolicy
 import com.phlox.tvwebbrowser.domain.HomePagePolicy.HomeAliasTarget
 import com.phlox.tvwebbrowser.player.HandlerScheduler
@@ -248,18 +248,18 @@ open class WebViewEx(
             domStorageEnabled = true
             allowContentAccess = false
             cacheMode = WebSettings.LOAD_DEFAULT
-            mediaPlaybackRequiresUserGesture = !config.allowAutoplayMedia
+            mediaPlaybackRequiresUserGesture = !config.playbackConfig.allowAutoplayMedia
             setGeolocationEnabled(true)
             javaScriptCanOpenWindowsAutomatically = false
             setSupportMultipleWindows(true)
             setNeedInitialFocus(false)
 
             domStorageEnabled = true
-            if (config.webEngineDebug) {
+            if (config.engineTuningConfig.webEngineDebug) {
                 setWebContentsDebuggingEnabled(true)
             }
 
-            val allowDarkening = config.webviewUseAlgorithmicDarkeningWithDarkUiMode
+            val allowDarkening = config.engineTuningConfig.webviewUseAlgorithmicDarkeningWithDarkUiMode
             val uiNightMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
@@ -1072,7 +1072,7 @@ open class WebViewEx(
         autoReplay.onUserPlaybackStarted()
         playCandidate(
             CastCandidate(url, detectedMedia[url] ?: emptyMap(), inferCastKind(url)),
-            config.playerKind,
+            config.playbackConfig.playerKind,
             0L,
         )
     }

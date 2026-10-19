@@ -161,7 +161,7 @@ class AutoUpdateModelTest {
 
     @Test
     fun theUpdateBadgeFollowsTheCheckResult() {
-        config.autoCheckUpdates = true
+        config.updatesConfig.autoCheckUpdates = true
         assertFalse(model.isUpdateAvailable())
 
         withAnAvailableUpdate()

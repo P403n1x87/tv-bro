@@ -16,11 +16,13 @@ on:
     tags:
       - 'v*'
   #Every PR that can affect the build runs the exact same pipeline (minus signing/publishing) so a
-  #broken build or a bad version can never reach a release tag. Two gate jobs run first — `tests`
-  #(the three unit suites) and `lint` (Android lint on both app flavors plus the player) — and
-  #`build` declares `needs: [tests, lint]`, so a change that breaks a suite, stops the test sources
-  #from compiling, or trips a lint error fails the PR even when the APKs themselves would assemble
-  #fine (which is exactly how a broken master once slipped through). A documentation-only PR has
+  #broken build or a bad version can never reach a release tag. Three gate jobs run first — `tests`
+  #(the three unit suites), `lint` (Android lint on both app flavors plus the player) and
+  #`instrumented` (the UiAutomator smoke suite on an emulator) — and `build` declares
+  #`needs: [tests, lint, instrumented]`, so a change that breaks a suite, stops the test sources
+  #from compiling, trips a lint error, or breaks a real-device flow fails the PR even when the
+  #APKs themselves would assemble fine (which is exactly how a broken master once slipped through).
+  #A documentation-only PR has
   #nothing to build or test and is skipped entirely (it reports no check, which is fine because
   #master is not protected). The list below is deliberately a deny-list rather than an allow-list:
   #anything that is not obviously documentation — sources (main *and* test), resources, assets, the
@@ -100,10 +102,71 @@ jobs:
                     :app:player:lintDebug \
                     :app:common:lintDebug
 
+  #The third gate: the instrumented smoke suite (MainScreenSmokeTest) — the flows a JVM test can
+  #not reach: a full MainActivity launch (the ad-block native library and the download-service
+  #binding's null ComponentName keep that out of Robolectric), a real page load through the
+  #configured engine, history back navigation and the bookmarks panel open/close. It runs on the
+  #android-tv image (1080p), matching the product's real form factor and the local dev AVD — and
+  #deliberately NOT on an AOSP `default` phone image: those ship no Android System WebView
+  #provider, so the app's first launch dies on its "Can not link to WebView component" dialog
+  #and every test fails on missing UI. GitHub's Linux runners have KVM, but the device node is
+  #group-restricted — the udev rule below makes /dev/kvm writable or the emulator never boots.
+  instrumented:
+    runs-on: ubuntu-latest
+    #A wedged emulator or step must never hold the pipeline for hours (the GitHub default is 6).
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      #One invocation, and the connected task itself installs/boots the emulator first. The tests
+      #are written state-independent (no `pm clear`: the instrumentation runs inside the app
+      #process and a wipe would kill the run), so a reused or cold AVD behaves the same. On
+      #failure, capture the artifacts that made the phone-image failure diagnosable — logcat, the
+      #UI tree, the focused window — *inside* this step, while the emulator is still alive: the
+      #action tears it down before any later step, which is what wedged a standalone logcat step
+      #once. The gradle exit code is preserved via the last line.
+      - name: Run instrumented smoke tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: android-tv
+          profile: tv_1080p
+          arch: x86_64
+          disable-animations: true
+          script: |
+            bash -c "set +e; ./gradlew :app:connectedP403n1x87GeckoIncludedDebugAndroidTest; test_ok=\$?; if [ "\$test_ok" -ne 0 ]; then adb logcat -d > instrumented-logcat.txt || true; adb shell uiautomator dump /sdcard/ci-ui.xml > /dev/null 2>&1 || true; adb pull /sdcard/ci-ui.xml instrumented-ui.xml > /dev/null 2>&1 || true; adb shell dumpsys window | grep mCurrentFocus > instrumented-window.txt || true; fi; exit \$test_ok"
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instrumented-diagnostics
+          path: |
+            instrumented-logcat.txt
+            instrumented-ui.xml
+            instrumented-window.txt
+            app/build/outputs/androidTest-results/**
+            app/build/reports/androidTests/**
+          if-no-files-found: ignore
+
   build:
     #No APK — and therefore no release, since the tag path publishes from this job — without
-    #green tests and a clean lint run first.
-    needs: [tests, lint]
+    #green tests, a clean lint run and a green emulator first.
+    needs: [tests, lint, instrumented]
     runs-on: ubuntu-latest
     env:
       #Fork PRs get no secrets, so the signing step below no-ops and the APKs come out unsigned.

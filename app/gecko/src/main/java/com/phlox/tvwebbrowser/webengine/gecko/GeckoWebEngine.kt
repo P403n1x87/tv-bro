@@ -12,6 +12,7 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.annotation.UiThread
 import com.phlox.tvwebbrowser.Config
+import com.phlox.tvwebbrowser.config.PlaybackConfig
 import com.phlox.tvwebbrowser.model.WebTabState
 import com.phlox.tvwebbrowser.player.HandlerScheduler
 import com.phlox.tvwebbrowser.player.MediaAutoReplay
@@ -81,7 +82,7 @@ class GeckoWebEngine(
         ) {
             if (!this::runtime.isInitialized) {
                 val builder = GeckoRuntimeSettings.Builder()
-                if (config.webEngineDebug) {
+                if (config.engineTuningConfig.webEngineDebug) {
                     builder.remoteDebuggingEnabled(true)
                     builder.consoleOutput(true)
                 }
@@ -238,7 +239,7 @@ class GeckoWebEngine(
                     .usePrivateMode(config.incognitoMode)
                     .viewportMode(GeckoSessionSettings.VIEWPORT_MODE_MOBILE)
                     .userAgentMode(GeckoSessionSettings.USER_AGENT_MODE_MOBILE)
-                    .useTrackingProtection(tab.adblock ?: config.adBlockEnabled)
+                    .useTrackingProtection(tab.adblock ?: config.adblockConfig.adBlockEnabled)
                     .build(),
             )
         session.navigationDelegate = navigationDelegate
@@ -425,7 +426,7 @@ class GeckoWebEngine(
     }
 
     override fun reload() {
-        val adblockEnabled = tab.adblock ?: config.adBlockEnabled
+        val adblockEnabled = tab.adblock ?: config.adblockConfig.adBlockEnabled
         if (session.settings.useTrackingProtection != adblockEnabled) {
             session.settings.useTrackingProtection = adblockEnabled
         }
@@ -552,8 +553,8 @@ class GeckoWebEngine(
                 source.headers.entries
                     .firstOrNull { it.key.equals("Cookie", ignoreCase = true) }
                     ?.value
-            when (config.playerKind) {
-                Config.PlayerKind.BUILT_IN -> {
+            when (config.playbackConfig.playerKind) {
+                PlaybackConfig.PlayerKind.BUILT_IN -> {
                     try {
                         NativeVideoActivity.launch(
                             appContext,
@@ -566,11 +567,11 @@ class GeckoWebEngine(
                     }
                 }
 
-                Config.PlayerKind.SYSTEM -> {
+                PlaybackConfig.PlayerKind.SYSTEM -> {
                     PlayerLauncher.openSystem(callback?.getActivity() ?: appContext, source.url, ua, source.page, cookie)
                 }
 
-                Config.PlayerKind.EXTERNAL -> {
+                PlaybackConfig.PlayerKind.EXTERNAL -> {
                     callback?.getActivity()?.let { activity ->
                         PlayerLauncher.openExternal(activity, source.url, ua, source.page, cookie)
                     }

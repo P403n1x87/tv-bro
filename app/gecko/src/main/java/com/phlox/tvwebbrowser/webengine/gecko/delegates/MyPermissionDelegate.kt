@@ -53,7 +53,7 @@ class MyPermissionDelegate(
                 }
 
                 PermissionDelegate.PERMISSION_AUTOPLAY_AUDIBLE, PermissionDelegate.PERMISSION_AUTOPLAY_INAUDIBLE -> {
-                    return if (!webEngine.config.allowAutoplayMedia) {
+                    return if (!webEngine.config.playbackConfig.allowAutoplayMedia) {
                         GeckoResult.fromValue(ContentPermission.VALUE_DENY)
                     } else {
                         GeckoResult.fromValue(ContentPermission.VALUE_ALLOW)
