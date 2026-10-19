@@ -34,45 +34,47 @@ td {
     outline:none;
 }
 
+/* Flat card that reads as a raised banner: no border, only a two layer drop shadow. */
 .sugg {
-    padding: 1vh 1vw;
+    position: relative;
+    padding: 1vh 1vw 1vh 0;
     white-space: nowrap;
     word-wrap: break-word;
     overflow: hidden;
-    transition: .5s;
+    transition: .25s;
     color: #4F4F4F;
     background: #FFFFFF;
-    box-shadow: 0px 1px 12px rgb(134 192 255 / 16%);
-    border: 2px solid #FFFFFF;
-    border-radius: 0.5vw;
+    border: none;
+    border-radius: 1vw;
+    box-shadow: 0 1px 2px rgb(46 74 117 / 12%), 0 6px 16px rgb(46 74 117 / 18%);
 }
 @media (prefers-color-scheme: dark) {
     .sugg {
         color: #f8f9fa;
         background: #1e2122;
-        box-shadow: 0px 1px 12px rgb(0 0 0 / 16%);
-        border: 2px solid #343a3c;
+        box-shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 8px 20px rgb(0 0 0 / 45%);
     }
 }
 .sugg:hover {
-    transition:.5s;
     background: #F3F6FA;
-    border: 2px solid #A5D0FF;
-    border-radius: 12px;
+    box-shadow: 0 2px 4px rgb(46 74 117 / 16%), 0 12px 26px rgb(46 74 117 / 30%);
 }
 @media (prefers-color-scheme: dark) {
     .sugg:hover {
-        background: #343a3c;
-        border: 2px solid #A5D0FF;
-        border-radius: 12px;
+        background: #2b3032;
+        box-shadow: 0 2px 4px rgb(0 0 0 / 45%), 0 14px 30px rgb(0 0 0 / 60%);
     }
 }
 .sugg:hover > div:nth-child(2) {
     color: #6666aa;
 }
 .sugg-ico {
+    position: absolute;
+    left: 0;
+    top: 0;
     width: 4vw;
-    float: left;
+    height: 100%;
+    object-fit: cover;
     color-scheme: only light;
 }
 .sugg-title {
@@ -418,7 +420,8 @@ td {
     outline: none;
     cursor: pointer;
     min-width: 0;
-    overflow: hidden;
+    /* The card's drop shadow lives outside its bounds: clipping the cell would cut it to a sliver. */
+    overflow: visible;
 }
 @media (prefers-color-scheme: dark) {
     .section-title, .show-all {
