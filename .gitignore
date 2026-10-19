@@ -10,3 +10,5 @@
 *.hprof
 /buildSrc/build
 .kotlin
+__pycache__/
+*.pyc

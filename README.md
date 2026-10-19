@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/branding/readme-banner-dark.png">
+    <img src="docs/branding/readme-banner.png" alt="Odysseus" width="760">
+  </picture>
+</p>
+
 # Odysseus
 
 Simple web browser optimized to use with TV remote
