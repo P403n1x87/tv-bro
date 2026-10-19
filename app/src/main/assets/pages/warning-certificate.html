@@ -70,26 +70,26 @@
 
         <div id="certErrorAndCaptivePortalButtonContainer">
             <button id="returnButton" onclick="history.back();"></button>
-            <button id="goForwardButton" onclick="TVBro.reloadWithSslTrust();"></button>
+            <button id="goForwardButton" onclick="Odysseus.reloadWithSslTrust();"></button>
         </div>
     </div>
 </div>
 <script>
 function onLoad() {
     //translate captions first
-    document.getElementById("caption").innerHTML = TVBro.getStringByName('connection_isnt_secure');
-    document.getElementById("hostnameLabel").innerHTML = TVBro.getStringByName('hostname');
-    document.getElementById("errorDeskr").innerHTML = TVBro.getStringByName('err_desk');
-    document.getElementById("details").innerHTML = TVBro.getStringByName('details');
-    document.getElementById("returnButton").innerHTML = TVBro.getStringByName('back_to_safety');
-    document.getElementById("goForwardButton").innerHTML = TVBro.getStringByName('go_im_aware');
+    document.getElementById("caption").innerHTML = Odysseus.getStringByName('connection_isnt_secure');
+    document.getElementById("hostnameLabel").innerHTML = Odysseus.getStringByName('hostname');
+    document.getElementById("errorDeskr").innerHTML = Odysseus.getStringByName('err_desk');
+    document.getElementById("details").innerHTML = Odysseus.getStringByName('details');
+    document.getElementById("returnButton").innerHTML = Odysseus.getStringByName('back_to_safety');
+    document.getElementById("goForwardButton").innerHTML = Odysseus.getStringByName('go_im_aware');
 
     //show error info
-    let url = new URL(TVBro.currentUrl());
+    let url = new URL(Odysseus.currentUrl());
     document.getElementById("hostname").innerHTML = url.hostname;
-    let error = TVBro.lastSSLError(false);
+    let error = Odysseus.lastSSLError(false);
     document.getElementById("error").innerHTML = error;
-    error = TVBro.lastSSLError(true);
+    error = Odysseus.lastSSLError(true);
     document.getElementById("error-details").innerHTML = error;
 }
 </script>

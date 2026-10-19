@@ -1,4 +1,4 @@
-# TV Bro
+# Odysseus
 
 Simple web browser optimized to use with TV remote
 

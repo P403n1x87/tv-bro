@@ -1,4 +1,4 @@
-console.log("TV Bro home content extension loaded");
+console.log("Odysseus home content extension loaded");
 
 const homeExtPort = browser.runtime.connectNative("tvbro");
 function postMessageToHomePagePort(action, data) {
@@ -6,7 +6,7 @@ function postMessageToHomePagePort(action, data) {
     homeExtPort.postMessage({ action: action, data: data });
 }
 
-let TVBro = {
+let Odysseus = {
     startVoiceSearch: function () {
         postMessageToHomePagePort("startVoiceSearch");
     },
@@ -26,10 +26,13 @@ let TVBro = {
         postMessageToHomePagePort("markBookmarkRecommendationAsUseful", bookmarkIndex);
     }
 }
-window.wrappedJSObject.TVBro = cloneInto(
-    TVBro,
+window.wrappedJSObject.Odysseus = cloneInto(
+    Odysseus,
     window,
     { cloneFunctions: true });
+// Legacy alias: when the loopback asset server is down the home page falls back to the
+// upstream-hosted copy, whose markup still looks up the old "TVBro" name.
+window.wrappedJSObject.TVBro = window.wrappedJSObject.Odysseus;
 
 homeExtPort.onMessage.addListener(message => {
     switch (message.action) {

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>TV Bro: Home</title>
+    <title>Odysseus: Home</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
 body {
@@ -488,10 +488,10 @@ function faviconFor(link) {
     if (link.favicon) return link.favicon;
     try {
         var url = new URL(link.url);
-        if (window.hasOwnProperty( "TVBro" )) {
-            if (TVBro.requestFavicon) {
+        if (window.hasOwnProperty( "Odysseus" )) {
+            if (Odysseus.requestFavicon) {
                 //GeckoView
-                TVBro.requestFavicon(link.url);
+                Odysseus.requestFavicon(link.url);
                 return url.origin + "/favicon.ico";
             } else {
                 //WebView
@@ -561,8 +561,8 @@ function renderBookmarks() {
         : bookmarksToDisplay.slice(0, BOOKMARKS_COLLAPSED_COUNT);
     list.forEach(function(link) {
         var onMore = null;
-        if (window.hasOwnProperty( "TVBro" ) && link.order !== undefined && link.order !== null) {
-            onMore = function(l) { TVBro.onEditBookmark(l.favoriteId); };
+        if (window.hasOwnProperty( "Odysseus" ) && link.order !== undefined && link.order !== null) {
+            onMore = function(l) { Odysseus.onEditBookmark(l.favoriteId); };
         }
         container.appendChild(createSuggCell(link, onMore));
     });
@@ -604,7 +604,7 @@ function renderSections(bookmarks, history) {
 }
 
 function renderLinks(mode, linksArray) {
-    //standalone usage (opened outside TVBro): show recommendations in the first section
+    //standalone usage (opened outside Odysseus): show recommendations in the first section
     renderSections(linksArray ? linksArray : loadRecommendations(), []);
 }
 
@@ -620,7 +620,7 @@ function promptCustomSearchEngineUrl() {
     return prompt("Enter search engine URL (with [query] as placeholder)", searchEngineUrl);
 }
 
-function applySearchEngine(engine, searchEngineUrl, notifyTVBro) {
+function applySearchEngine(engine, searchEngineUrl, notifyOdysseus) {
     document.getElementById("search-engines-list").classList.remove("active");
 
     searchEngineUrl = searchEngineUrl ? searchEngineUrl : searchEngineUrlMap[engine];
@@ -637,8 +637,8 @@ function applySearchEngine(engine, searchEngineUrl, notifyTVBro) {
     }
     document.getElementsByClassName("default_option")[0].style.backgroundImage = "url('" + iconUrl + "')";    
 
-    if (window.hasOwnProperty( "TVBro" ) && notifyTVBro) {
-        TVBro.setSearchEngine(engine, searchEngineUrl ? searchEngineUrl : searchEngineUrlMap[engine]);
+    if (window.hasOwnProperty( "Odysseus" ) && notifyOdysseus) {
+        Odysseus.setSearchEngine(engine, searchEngineUrl ? searchEngineUrl : searchEngineUrlMap[engine]);
     }
 }
 
@@ -696,7 +696,7 @@ function onModeToggleClick() {
     if (input) input.focus();
 }
 
-//callback called from TVBro/GeckoView
+//callback called from Odysseus/GeckoView
 function onFaviconLoaded(url, data) {
     let imgElements = document.getElementsByTagName("img");
     for (let i = 0; i < imgElements.length; i++) {
@@ -732,8 +732,8 @@ document.getElementsByClassName("search_action_container")[0].onclick = function
     if (document.getElementsByClassName("mic")[0].style.display == "none") {
         submitHomePageInput();
     } else {
-        if (window.hasOwnProperty( "TVBro" )) {
-            TVBro.startVoiceSearch();
+        if (window.hasOwnProperty( "Odysseus" )) {
+            Odysseus.startVoiceSearch();
         }
     }
 };
@@ -741,13 +741,13 @@ document.getElementsByClassName("search_action_container")[0].onclick = function
 updateSearchInputUi();
 
 //there are three modes this page can run in:
-//1. Running inside ordinary web page - TVBro variable is not installed - no bookmarks, no voice search
-//2. Running inside TVBro WebView - TVBro variable is installed
-//3. Running inside TVBro GeckoView - TVBro variable is installed
+//1. Running inside ordinary web page - Odysseus variable is not installed - no bookmarks, no voice search
+//2. Running inside Odysseus WebView - Odysseus variable is installed
+//3. Running inside Odysseus GeckoView - Odysseus variable is installed
 
-if (window.hasOwnProperty( "TVBro" )) {
-    console.log("Running inside TVBro");
-    TVBro.onHomePageLoaded();
+if (window.hasOwnProperty( "Odysseus" )) {
+    console.log("Running inside Odysseus");
+    Odysseus.onHomePageLoaded();
 } else {
     hideVoiceSearchUI();
     applySearchEngine(searchEngine, searchEngineUrl, false);

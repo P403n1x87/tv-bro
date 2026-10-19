@@ -127,7 +127,7 @@ class AndroidJSInterface(
             url,
             "",
             finalFileName,
-            "TV Bro",
+            "Odysseus",
             mimetype,
             Download.OperationAfterDownload.NOP,
             base64BlobData,

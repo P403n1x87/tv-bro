@@ -12,6 +12,8 @@ class SettingsModel(
 ) : ActiveModel() {
     companion object {
         val TAG = SettingsModel::class.java.simpleName
+
+        // See Config.TV_BRO_UA_PREFIX: detection of legacy stored UA prefs, not emitted anywhere.
         const val TV_BRO_UA_PREFIX = "TV Bro/1.0 "
     }
 

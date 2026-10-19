@@ -36,6 +36,9 @@ class Config(
         const val HOME_PAGE_KEY = "home_page"
         const val USER_AGENT_PREF_KEY = "user_agent"
         const val THEME_KEY = "theme"
+
+        // Legacy marker: old versions stored a UA pref starting with "TV Bro/1.0 ". Nothing
+        // emits it anymore — it only exists to detect and reset those stale prefs.
         const val TV_BRO_UA_PREFIX = "TV Bro/1.0 "
         const val HOME_URL_ALIAS = "about:home"
         const val KEEP_SCREEN_ON_KEY = "keep_screen_on"
