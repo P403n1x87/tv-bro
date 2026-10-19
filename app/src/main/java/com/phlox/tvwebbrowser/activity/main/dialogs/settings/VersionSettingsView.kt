@@ -25,7 +25,6 @@ class VersionSettingsView(
             "https://raw.githubusercontent.com/truefedex/tv-bro/refs/heads/master/LICENSE.md"
         private const val URL_PRIVACY_POLICY =
             "https://raw.githubusercontent.com/truefedex/tv-bro/refs/heads/master/PRIVACY.md"
-        private const val URL_ICON_STORY = "https://tv-bro-3546c.web.app/msg001.html"
     }
 
     private val settingsModel = deps.settings
@@ -132,10 +131,12 @@ class VersionSettingsView(
                 ),
             )
             add(
-                // Original upstream project (this is a fork); keeps the original author credited.
+                // License obligation: the About page must state that the app uses TV Bro's
+                // sources and link to the original repository.
                 SettingsItem.Action(
                     iconRes = R.drawable.ic_settings_code_24dp,
                     titleRes = R.string.settings_upstream_project,
+                    summaryRes = R.string.settings_upstream_project_summary,
                     onClick = { loadUrl(URL_UPSTREAM) },
                 ),
             )
@@ -158,13 +159,6 @@ class VersionSettingsView(
                     iconRes = R.drawable.ic_settings_shield_24dp,
                     titleRes = R.string.settings_privacy,
                     onClick = { loadUrl(URL_PRIVACY_POLICY) },
-                ),
-            )
-            add(
-                SettingsItem.Action(
-                    iconRes = R.drawable.ic_settings_flag_24dp,
-                    titleRes = R.string.settings_icon_story,
-                    onClick = { loadUrl(URL_ICON_STORY) },
                 ),
             )
         }

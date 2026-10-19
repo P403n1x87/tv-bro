@@ -1,6 +1,6 @@
 //download blobs support
-if (!window.tvBroClicksListener) {
-    window.tvBroClicksListener = function(e) {
+if (!window.odysseusClicksListener) {
+    window.odysseusClicksListener = function(e) {
         if (e.target.tagName.toUpperCase() == "A" && e.target.attributes.href.value.toLowerCase().startsWith("blob:")) {
             var fileName = e.target.download;
             var url = e.target.attributes.href.value;
@@ -14,7 +14,7 @@ if (!window.tvBroClicksListener) {
                     reader.readAsDataURL(blob);
                     reader.onloadend = function() {
                         base64data = reader.result;
-                        TVBro.takeBlobDownloadData(base64data, fileName, url, blob.type);
+                        Odysseus.takeBlobDownloadData(base64data, fileName, url, blob.type);
                     }
                 }
             };
@@ -23,7 +23,7 @@ if (!window.tvBroClicksListener) {
             e.preventDefault();
         }
     };
-    document.addEventListener("click", window.tvBroClicksListener);
+    document.addEventListener("click", window.odysseusClicksListener);
 }
 
 // video playback control support
@@ -33,7 +33,7 @@ Object.defineProperty(HTMLMediaElement.prototype, 'playing', {
     }
 })
 
-window.tvBroTogglePlayback = function() {
+window.odysseusTogglePlayback = function() {
   var media = document.querySelector('video') || document.querySelector('audio');
   if (media) {
       if (media.playing) {
@@ -44,7 +44,7 @@ window.tvBroTogglePlayback = function() {
   }
 }
 
-window.tvBroStopPlayback = function() {
+window.odysseusStopPlayback = function() {
   var media = document.querySelector('video') || document.querySelector('audio');
   if (media) {
       media.pause();
@@ -52,14 +52,14 @@ window.tvBroStopPlayback = function() {
   }
 }
 
-window.tvBroRewind = function() {
+window.odysseusRewind = function() {
     var media = document.querySelector('video') || document.querySelector('audio');
     if (media) {
         media.currentTime -= 10;
     }
 }
 
-window.tvBroFastForward = function() {
+window.odysseusFastForward = function() {
     var media = document.querySelector('video') || document.querySelector('audio');
     if (media) {
         media.currentTime += 10;
@@ -68,7 +68,7 @@ window.tvBroFastForward = function() {
 
 // context menu support
 window.addEventListener("touchstart", function(e) {
-    window.TVBRO_activeElement = e.target;
-    window.TVBRO_touchStartX = e.touches[0].clientX;
-    window.TVBRO_touchStartY = e.touches[0].clientY;
+    window.ODYSSEUS_activeElement = e.target;
+    window.ODYSSEUS_touchStartX = e.touches[0].clientX;
+    window.ODYSSEUS_touchStartY = e.touches[0].clientY;
 });

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>TV Bro: Home</title>
+    <title>Odysseus: Home</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
 body {
@@ -34,45 +34,47 @@ td {
     outline:none;
 }
 
+/* Flat card that reads as a raised banner: no border, only a two layer drop shadow. */
 .sugg {
-    padding: 1vh 1vw;
+    position: relative;
+    padding: 1vh 1vw 1vh 0;
     white-space: nowrap;
     word-wrap: break-word;
     overflow: hidden;
-    transition: .5s;
+    transition: .25s;
     color: #4F4F4F;
     background: #FFFFFF;
-    box-shadow: 0px 1px 12px rgb(134 192 255 / 16%);
-    border: 2px solid #FFFFFF;
-    border-radius: 0.5vw;
+    border: none;
+    border-radius: 1vw;
+    box-shadow: 0 1px 2px rgb(46 74 117 / 12%), 0 6px 16px rgb(46 74 117 / 18%);
 }
 @media (prefers-color-scheme: dark) {
     .sugg {
         color: #f8f9fa;
         background: #1e2122;
-        box-shadow: 0px 1px 12px rgb(0 0 0 / 16%);
-        border: 2px solid #343a3c;
+        box-shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 8px 20px rgb(0 0 0 / 45%);
     }
 }
 .sugg:hover {
-    transition:.5s;
     background: #F3F6FA;
-    border: 2px solid #A5D0FF;
-    border-radius: 12px;
+    box-shadow: 0 2px 4px rgb(46 74 117 / 16%), 0 12px 26px rgb(46 74 117 / 30%);
 }
 @media (prefers-color-scheme: dark) {
     .sugg:hover {
-        background: #343a3c;
-        border: 2px solid #A5D0FF;
-        border-radius: 12px;
+        background: #2b3032;
+        box-shadow: 0 2px 4px rgb(0 0 0 / 45%), 0 14px 30px rgb(0 0 0 / 60%);
     }
 }
 .sugg:hover > div:nth-child(2) {
     color: #6666aa;
 }
 .sugg-ico {
+    position: absolute;
+    left: 0;
+    top: 0;
     width: 4vw;
-    float: left;
+    height: 100%;
+    object-fit: cover;
     color-scheme: only light;
 }
 .sugg-title {
@@ -134,15 +136,42 @@ td {
     display: none;
 }
 .logo {
-    width: 10vw;
-    height: 7.5vw;
-    margin-top: 5vh;
-    background-image: url("logo.png");
+    width: 24vw;
+    height: 3.8vw;
+    margin-top: 4.5vh;
+    left: 0;
+    right: 0;
+    margin-left: auto;
+    margin-right: auto;
+    background-image: url("title.png");
     background-repeat: no-repeat;
     background-position: center;
     background-size: contain;
     position: absolute;
     color-scheme: only light;
+}
+.watermark {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-image: url("watermark.png");
+    background-repeat: no-repeat;
+    background-position: center 58%;
+    background-size: 30vw auto;
+    opacity: 0.07;
+    pointer-events: none;
+    color-scheme: only light;
+}
+@media (prefers-color-scheme: dark) {
+    .logo {
+        background-image: url("title-dark.png");
+    }
+    .watermark {
+        background-image: url("watermark-dark.png");
+        opacity: 0.09;
+    }
 }
 
 .wrapper {
@@ -391,7 +420,8 @@ td {
     outline: none;
     cursor: pointer;
     min-width: 0;
-    overflow: hidden;
+    /* The card's drop shadow lives outside its bounds: clipping the cell would cut it to a sliver. */
+    overflow: visible;
 }
 @media (prefers-color-scheme: dark) {
     .section-title, .show-all {
@@ -409,6 +439,7 @@ td {
 </head>
 <body>
 <div style="height: 100%; width: 100%; position: absolute; left: 0; top: 0; overflow-x: hidden;">
+    <div class="watermark"></div>
     <div class="logo"></div>
     <div class="wrapper">
         <div class="search_box">
@@ -488,10 +519,10 @@ function faviconFor(link) {
     if (link.favicon) return link.favicon;
     try {
         var url = new URL(link.url);
-        if (window.hasOwnProperty( "TVBro" )) {
-            if (TVBro.requestFavicon) {
+        if (window.hasOwnProperty( "Odysseus" )) {
+            if (Odysseus.requestFavicon) {
                 //GeckoView
-                TVBro.requestFavicon(link.url);
+                Odysseus.requestFavicon(link.url);
                 return url.origin + "/favicon.ico";
             } else {
                 //WebView
@@ -561,8 +592,8 @@ function renderBookmarks() {
         : bookmarksToDisplay.slice(0, BOOKMARKS_COLLAPSED_COUNT);
     list.forEach(function(link) {
         var onMore = null;
-        if (window.hasOwnProperty( "TVBro" ) && link.order !== undefined && link.order !== null) {
-            onMore = function(l) { TVBro.onEditBookmark(l.favoriteId); };
+        if (window.hasOwnProperty( "Odysseus" ) && link.order !== undefined && link.order !== null) {
+            onMore = function(l) { Odysseus.onEditBookmark(l.favoriteId); };
         }
         container.appendChild(createSuggCell(link, onMore));
     });
@@ -604,7 +635,7 @@ function renderSections(bookmarks, history) {
 }
 
 function renderLinks(mode, linksArray) {
-    //standalone usage (opened outside TVBro): show recommendations in the first section
+    //standalone usage (opened outside Odysseus): show recommendations in the first section
     renderSections(linksArray ? linksArray : loadRecommendations(), []);
 }
 
@@ -620,7 +651,7 @@ function promptCustomSearchEngineUrl() {
     return prompt("Enter search engine URL (with [query] as placeholder)", searchEngineUrl);
 }
 
-function applySearchEngine(engine, searchEngineUrl, notifyTVBro) {
+function applySearchEngine(engine, searchEngineUrl, notifyOdysseus) {
     document.getElementById("search-engines-list").classList.remove("active");
 
     searchEngineUrl = searchEngineUrl ? searchEngineUrl : searchEngineUrlMap[engine];
@@ -637,8 +668,8 @@ function applySearchEngine(engine, searchEngineUrl, notifyTVBro) {
     }
     document.getElementsByClassName("default_option")[0].style.backgroundImage = "url('" + iconUrl + "')";    
 
-    if (window.hasOwnProperty( "TVBro" ) && notifyTVBro) {
-        TVBro.setSearchEngine(engine, searchEngineUrl ? searchEngineUrl : searchEngineUrlMap[engine]);
+    if (window.hasOwnProperty( "Odysseus" ) && notifyOdysseus) {
+        Odysseus.setSearchEngine(engine, searchEngineUrl ? searchEngineUrl : searchEngineUrlMap[engine]);
     }
 }
 
@@ -696,7 +727,7 @@ function onModeToggleClick() {
     if (input) input.focus();
 }
 
-//callback called from TVBro/GeckoView
+//callback called from Odysseus/GeckoView
 function onFaviconLoaded(url, data) {
     let imgElements = document.getElementsByTagName("img");
     for (let i = 0; i < imgElements.length; i++) {
@@ -732,8 +763,8 @@ document.getElementsByClassName("search_action_container")[0].onclick = function
     if (document.getElementsByClassName("mic")[0].style.display == "none") {
         submitHomePageInput();
     } else {
-        if (window.hasOwnProperty( "TVBro" )) {
-            TVBro.startVoiceSearch();
+        if (window.hasOwnProperty( "Odysseus" )) {
+            Odysseus.startVoiceSearch();
         }
     }
 };
@@ -741,13 +772,13 @@ document.getElementsByClassName("search_action_container")[0].onclick = function
 updateSearchInputUi();
 
 //there are three modes this page can run in:
-//1. Running inside ordinary web page - TVBro variable is not installed - no bookmarks, no voice search
-//2. Running inside TVBro WebView - TVBro variable is installed
-//3. Running inside TVBro GeckoView - TVBro variable is installed
+//1. Running inside ordinary web page - Odysseus variable is not installed - no bookmarks, no voice search
+//2. Running inside Odysseus WebView - Odysseus variable is installed
+//3. Running inside Odysseus GeckoView - Odysseus variable is installed
 
-if (window.hasOwnProperty( "TVBro" )) {
-    console.log("Running inside TVBro");
-    TVBro.onHomePageLoaded();
+if (window.hasOwnProperty( "Odysseus" )) {
+    console.log("Running inside Odysseus");
+    Odysseus.onHomePageLoaded();
 } else {
     hideVoiceSearchUI();
     applySearchEngine(searchEngine, searchEngineUrl, false);

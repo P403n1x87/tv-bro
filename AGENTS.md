@@ -1,4 +1,4 @@
-# tv-bro — agent notes
+# Odysseus — agent notes
 
 Android TV browser. `master` already carries the MVVM refactor, the `MainActivity` decomposition and
 the model/host seam polish. Work on a feature branch; **open a PR only when asked**.
@@ -58,7 +58,7 @@ the model/host seam polish. Work on a feature branch; **open a PR only when aske
 ## Build / test
 - Linux: JDK 21 exported, plus JDK 17 at `/usr/lib/jvm/java-17-openjdk-amd64` (`buildSrc` pins
   `jvmToolchain(17)` → both required). macOS: `JAVA_HOME="$HOME/java/jdk-21.0.12.1+1/Contents/Home"`.
-  Android SDK at `$HOME/.android/sdk`; AVD `tvbro_tv_api36`.
+  Android SDK at `$HOME/.android/sdk`; AVD `odysseus_tv_api36`.
 - Run Gradle tasks **serially** (concurrent builds corrupt the Kotlin incremental state).
 - Formatting: Spotless + ktlint (`ktlint_official` style; config in root `build.gradle.kts`, rules in
   `.editorconfig`). `./gradlew spotlessApply` fixes; `spotlessCheck` gates CI's lint job and the

@@ -2,7 +2,7 @@
 
 **Last updated:** March 28, 2026
 
-This policy describes how **TV Bro** (“the application”) handles information. The application is open-source software. The primary author is **Fedir Tsapana**. Development may also involve a **changing set of voluntary contributors**; you can see the current list on the [GitHub contributors page](https://github.com/truefedex/tv-bro/graphs/contributors).
+This policy describes how **Odysseus** (“the application”) handles information. The application is open-source software. The primary author is **Fedir Tsapana**. Development may also involve a **changing set of voluntary contributors**; you can see the current list on the [GitHub contributors page](https://github.com/truefedex/tv-bro/graphs/contributors).
 
 ---
 
@@ -16,7 +16,7 @@ The current version of the application **does not collect personal data** and **
 
 #### Websites you visit ####
 
-TV Bro is a **web browser**. When you browse the internet:
+Odysseus is a **web browser**. When you browse the internet:
 
 - **Websites, networks, and services you use** may collect, store, and process data according to **their own** privacy policies and practices.
 - **Your device, ISP, DNS provider, and other intermediaries** may see network activity when you load pages or use online services.

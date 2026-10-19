@@ -174,19 +174,19 @@ class WebViewWebEngine(
     }
 
     override fun togglePlayback() {
-        webView?.evaluateJavascript("tvBroTogglePlayback()", null)
+        webView?.evaluateJavascript("odysseusTogglePlayback()", null)
     }
 
     override fun stopPlayback() {
-        webView?.evaluateJavascript("tvBroStopPlayback()", null)
+        webView?.evaluateJavascript("odysseusStopPlayback()", null)
     }
 
     override fun rewind() {
-        webView?.evaluateJavascript("tvBroRewind()", null)
+        webView?.evaluateJavascript("odysseusRewind()", null)
     }
 
     override fun fastForward() {
-        webView?.evaluateJavascript("tvBroFastForward()", null)
+        webView?.evaluateJavascript("odysseusFastForward()", null)
     }
 
     override fun mediaCandidates(): List<MediaCandidate> = webView?.mediaCandidates() ?: emptyList()

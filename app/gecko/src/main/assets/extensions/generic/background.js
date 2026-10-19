@@ -1,4 +1,4 @@
-console.log("TV Bro background extension loaded");
+console.log("Odysseus background extension loaded");
 
 let requests = new Map();
 let tvBroPort = browser.runtime.connectNative("tvbro_bg");

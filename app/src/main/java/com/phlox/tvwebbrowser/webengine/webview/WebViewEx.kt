@@ -82,7 +82,7 @@ open class WebViewEx(
 ) : WebView(context) {
     companion object {
         val TAG = WebViewEx::class.java.simpleName
-        const val WEB_VIEW_TAG = "TV Bro WebView"
+        const val WEB_VIEW_TAG = "Odysseus WebView"
         const val INTERNAL_SCHEME = "internal://"
         const val INTERNAL_SCHEME_WARNING_DOMAIN = "warning"
         const val INTERNAL_SCHEME_WARNING_DOMAIN_TYPE_CERT = "certificate"
@@ -738,7 +738,7 @@ open class WebViewEx(
             }
         }
 
-        addJavascriptInterface(jsInterface, "TVBro")
+        addJavascriptInterface(jsInterface, "Odysseus")
     }
 
     override fun restoreState(inState: Bundle): WebBackForwardList? {
@@ -1100,10 +1100,10 @@ open class WebViewEx(
         }
     }
 
-    /** Opens the stream in TV Bro's built-in (ExoPlayer) player. */
+    /** Opens the stream in Odysseus's built-in (ExoPlayer) player. */
     fun playInInternalPlayer(candidate: CastCandidate) = playInInternalPlayer(candidate, 0L)
 
-    /** Opens the stream in TV Bro's built-in (ExoPlayer) player, resuming at [startMs]. */
+    /** Opens the stream in Odysseus's built-in (ExoPlayer) player, resuming at [startMs]. */
     fun playInInternalPlayer(
         candidate: CastCandidate,
         startMs: Long,
