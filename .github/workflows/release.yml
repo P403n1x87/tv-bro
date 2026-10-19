@@ -151,7 +151,6 @@ jobs:
             set +e
             ./gradlew :app:connectedP403n1x87GeckoIncludedDebugAndroidTest
             test_ok=$?
-            set -e
             if [ "$test_ok" -ne 0 ]; then
               adb logcat -d > instrumented-logcat.txt || true
               adb shell uiautomator dump /sdcard/ci-ui.xml > /dev/null 2>&1 || true
