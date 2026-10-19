@@ -12,3 +12,6 @@
 .kotlin
 __pycache__/
 *.pyc
+
+# artwork workspace is local-only (rebuild with artwork/build.py)
+/artwork/
