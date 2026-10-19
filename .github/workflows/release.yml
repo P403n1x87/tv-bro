@@ -148,16 +148,7 @@ jobs:
           arch: x86_64
           disable-animations: true
           script: |
-            set +e
-            ./gradlew :app:connectedP403n1x87GeckoIncludedDebugAndroidTest
-            test_ok=$?
-            if [ "$test_ok" -ne 0 ]; then
-              adb logcat -d > instrumented-logcat.txt || true
-              adb shell uiautomator dump /sdcard/ci-ui.xml > /dev/null 2>&1 || true
-              adb pull /sdcard/ci-ui.xml instrumented-ui.xml > /dev/null 2>&1 || true
-              adb shell dumpsys window | grep mCurrentFocus > instrumented-window.txt || true
-            fi
-            exit $test_ok
+            bash -c "set +e; ./gradlew :app:connectedP403n1x87GeckoIncludedDebugAndroidTest; test_ok=\$?; if [ "\$test_ok" -ne 0 ]; then adb logcat -d > instrumented-logcat.txt || true; adb shell uiautomator dump /sdcard/ci-ui.xml > /dev/null 2>&1 || true; adb pull /sdcard/ci-ui.xml instrumented-ui.xml > /dev/null 2>&1 || true; adb shell dumpsys window | grep mCurrentFocus > instrumented-window.txt || true; fi; exit \$test_ok"
 
       - name: Upload failure diagnostics
         if: failure()
