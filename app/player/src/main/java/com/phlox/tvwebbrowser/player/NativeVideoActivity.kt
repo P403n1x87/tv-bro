@@ -351,16 +351,25 @@ class NativeVideoActivity : Activity() {
                     .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
                     .build()
             }
-        val mimeType = current.source.kind.mime ?: run {
-            val u = current.source.url.substringBefore('?').lowercase()
-            when {
-                u.endsWith(".mkv") -> null // let ExoPlayer sniff
-                u.endsWith(".webm") -> "video/webm"
-                u.endsWith(".mp4") || u.endsWith(".m4v") -> "video/mp4"
-                u.endsWith(".mov") -> "video/quicktime"
-                else -> null
+        val mimeType =
+            current.source.kind.mime ?: run {
+                val u =
+                    current.source.url
+                        .substringBefore('?')
+                        .lowercase()
+                when {
+                    u.endsWith(".mkv") -> null
+
+                    // let ExoPlayer sniff
+                    u.endsWith(".webm") -> "video/webm"
+
+                    u.endsWith(".mp4") || u.endsWith(".m4v") -> "video/mp4"
+
+                    u.endsWith(".mov") -> "video/quicktime"
+
+                    else -> null
+                }
             }
-        }
         p.setMediaItem(
             MediaItem
                 .Builder()
