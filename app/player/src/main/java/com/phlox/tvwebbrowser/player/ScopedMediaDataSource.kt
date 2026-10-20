@@ -44,9 +44,25 @@ class ScopedMediaDataSource(
     override fun open(dataSpec: DataSpec): Long {
         if (dataSpec.httpMethod != DataSpec.HTTP_METHOD_GET) throw IOException("Only GET media requests are supported")
         var url = dataSpec.uri.toString()
+        android.util.Log.d("ScopedMediaDataSource", "open url=$url headers=${dataSpec.httpRequestHeaders}")
         for (redirect in 0..10) {
             if (!MediaRequestCatalog.isHttp(url)) throw IOException("Unsupported media URI scheme")
-            val source = OkHttpDataSource.Factory(client).setDefaultRequestProperties(context.headersFor(url)).createDataSource()
+            val scopedHeaders = context.headersFor(url)
+            val mergedHeaders = linkedMapOf<String, String>()
+            // Add scoped headers first (case-insensitive)
+            scopedHeaders.forEach { (key, value) ->
+                // Remove existing case-insensitive match
+                val toRemove = mergedHeaders.keys.firstOrNull { it.equals(key, true) }
+                if (toRemove != null) mergedHeaders.remove(toRemove)
+                mergedHeaders[key] = value
+            }
+            // Let DataSpec headers override (e.g., Range for seeking in progressive streams)
+            dataSpec.httpRequestHeaders.forEach { (key, value) ->
+                val toRemove = mergedHeaders.keys.firstOrNull { it.equals(key, true) }
+                if (toRemove != null) mergedHeaders.remove(toRemove)
+                mergedHeaders[key] = value
+            }
+            val source = OkHttpDataSource.Factory(client).setDefaultRequestProperties(mergedHeaders).createDataSource()
             listeners.forEach(source::addTransferListener)
             delegate = source
             val request =
