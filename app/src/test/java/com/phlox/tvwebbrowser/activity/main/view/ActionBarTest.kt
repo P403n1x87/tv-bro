@@ -194,6 +194,14 @@ class ActionBarTest {
     }
 
     @Test
+    fun theTabsAndStreamsButtonsStartHidden() {
+        assertFalse("no tabs yet, the tabs button must not be shown", button(R.id.flTabsButton).isShown)
+        assertFalse("a hidden view must also be unfocusable, or the D-pad chain can land on it", button(R.id.ibTabs).isFocusable)
+        assertFalse("no streams yet, the streams button must not be shown", button(R.id.flMediaButton).isShown)
+        assertFalse("a hidden view must also be unfocusable, or the D-pad chain can land on it", button(R.id.ibMedia).isFocusable)
+    }
+
+    @Test
     fun theTabsButtonIsUnfocusableWithASingleTab() {
         actionBar.setTabsCounter(1)
 

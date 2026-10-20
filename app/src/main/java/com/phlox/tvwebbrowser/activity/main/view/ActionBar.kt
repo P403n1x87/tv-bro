@@ -134,6 +134,12 @@ class ActionBar
 
             if (isInEditMode) return
 
+            // The Tabs and Streams buttons only mean something when there is more than one tab or a
+            // detected stream, so start from the hidden state the counter setters define instead of
+            // flashing them until the first tabs/media update lands.
+            setTabsCounter(0)
+            setMediaCounter(0)
+
             vb.ibTabs.setOnClickListener { callback?.onToggleTabPanel() }
             vb.ibBack.setOnClickListener { callback?.onNavigateBack() }
             vb.ibForward.setOnClickListener { callback?.onNavigateForward() }
