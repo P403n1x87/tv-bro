@@ -149,4 +149,24 @@ class TabsModelTest {
     fun noTabIsSelectedWhileNothingIsLoaded() {
         assertNull(model.currentTab.value)
     }
+
+    // -- onCloseAllTabs ---------------------------------------------------------------------
+
+    @Test
+    fun closingAllTabsDoesNotEatAFreshTabOpenedRightAfter() {
+        model.onOpenTab(WebTabState(url = "https://first.example/"), 0)
+        model.onOpenTab(WebTabState(url = "https://second.example/"), 1)
+        var lastObservedCount = -1
+        model.tabsStates.subscribe({ lastObservedCount = it.size }, false)
+
+        // The tab panel's "Close all" asks for the clear and then, without joining the returned job,
+        // requests a fresh tab (TabsView.showTabOptions). The clear has to apply before that request
+        // runs, or its snapshot includes (and drops) the tab opened after it.
+        model.onCloseAllTabs()
+        model.onOpenTab(WebTabState(url = "https://fresh.example/"), 0)
+        advance(1)
+
+        assertEquals(listOf("https://fresh.example/"), model.tabsStates.map { it.url })
+        assertEquals("the tabs button badge follows the same list, so it must see 1 too", 1, lastObservedCount)
+    }
 }

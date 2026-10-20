@@ -182,9 +182,14 @@ class TabsModel(
      * Drops every tab of the current browsing mode: the list is cleared (and the selection with
      * it — nothing is selected when no tab exists), the rows are deleted from the repository and
      * the tab files go away in the background.
+     *
+     * Dispatched on [Dispatchers.Main.immediate]: the tab panel's "Close all" asks for a fresh tab
+     * right after this call without joining the returned job, so the clear has to be applied before
+     * that request runs — a plain [Dispatchers.Main] launch would execute afterwards and drop the
+     * new tab as well. The durable work (repository, files) stays in the returned job.
      */
     fun onCloseAllTabs() =
-        modelScope.launch(Dispatchers.Main) {
+        modelScope.launch(Dispatchers.Main.immediate) {
             val tabsClone = ArrayList(tabsStates)
             tabsStates.clear()
             currentTab.value = null

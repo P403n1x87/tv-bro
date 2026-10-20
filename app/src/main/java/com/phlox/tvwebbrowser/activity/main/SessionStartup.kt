@@ -65,10 +65,6 @@ class SessionStartup(
 
             vb.progressBarGeneric.visibility = View.GONE
 
-            // `tabsStates` is retained across activity re-creation (theme toggle), in which case the
-            // observer does not fire again, so the counter is set here too.
-            vb.vActionBar.setTabsCounter(tabsModel.tabsStates.size)
-
             if (intent.data == null) {
                 restoreSavedTabOrOpenHome()
             } else {

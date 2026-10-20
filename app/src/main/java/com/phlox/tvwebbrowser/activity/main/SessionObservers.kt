@@ -17,9 +17,10 @@ import com.phlox.tvwebbrowser.webengine.WebEngineFactory
  * Renders model changes into the main screen: every `subscribe()` the composition root used to make
  * in `onCreate` lives here, so [MainActivity] only wires and never observes.
  *
- * The subscriptions keep the notification flags they had in `onCreate` (`false` for the ones whose
- * initial state the composition root sets by hand) and their relative order, because that order is
- * what the user sees at startup.
+ * The subscriptions keep their relative order, because that order is what the user sees at
+ * startup, and their notification flags: `false` for the ones whose initial state the composition
+ * root sets by hand, `true` for the tabs counter, which replays the retained tab count on
+ * (re)subscribe and so never goes stale across recreation or a stopped-state mutation.
  *
  * The activity is the host for the three side effects the observers have to trigger: recreating
  * itself on a night-mode change, toasting an ad-blocker failure, and refreshing the page-level
@@ -110,7 +111,11 @@ class SessionObservers(
             it?.let(onCurrentTabChanged)
         }
 
-        tabsModel.tabsStates.subscribe(activity.lifecycle, false) {
+        // Notify on subscribe: the model survives activity re-creation (theme toggle) and this
+        // observer only lives while the activity is RESUMED, so a mutation made in between would
+        // otherwise leave the tabs button/badge stale until the next change. The replayed size is
+        // also the correct value at startup, which makes this the only writer of the counter.
+        tabsModel.tabsStates.subscribe(activity.lifecycle, true) {
             vb.vActionBar.setTabsCounter(it.size)
             if (it.isEmpty()) {
                 if (!WebEnginePolicy.isGecko(config.webEngine)) {
