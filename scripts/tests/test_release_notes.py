@@ -94,11 +94,11 @@ class FragmentOrderTest(unittest.TestCase):
     def test_the_fragments_are_published_in_the_order_they_landed(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = make_repo(Path(directory))
-            write_fragment(repo, "second.md", "### Second")
+            write_fragment(repo, "second.md", "* The second feature")
             commit(repo, "the second feature", date="2026-01-02T00:00:00")
-            write_fragment(repo, "first.md", "### First")
+            write_fragment(repo, "first.md", "* The first feature")
             commit(repo, "the first feature", date="2026-01-01T00:00:00")
-            write_fragment(repo, "third.md", "### Third")
+            write_fragment(repo, "third.md", "* The third feature")
             commit(repo, "the third feature", date="2026-01-03T00:00:00")
 
             fragments = release_notes.fragment_order(repo, release_notes.fragment_paths(repo))
@@ -110,9 +110,9 @@ class FragmentOrderTest(unittest.TestCase):
     def test_a_fragment_that_is_not_committed_yet_comes_last(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = make_repo(Path(directory))
-            write_fragment(repo, "committed.md", "### Committed")
+            write_fragment(repo, "committed.md", "* The committed feature")
             commit(repo, "the committed feature", date="2026-01-01T00:00:00")
-            write_fragment(repo, "fresh.md", "### Fresh")
+            write_fragment(repo, "fresh.md", "* The fresh feature")
 
             fragments = release_notes.fragment_order(repo, release_notes.fragment_paths(repo))
             self.assertEqual([path.name for path in fragments], ["committed.md", "fresh.md"])
@@ -120,8 +120,8 @@ class FragmentOrderTest(unittest.TestCase):
     def test_fragments_landed_together_are_ordered_by_name(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = make_repo(Path(directory))
-            write_fragment(repo, "beta.md", "### Beta")
-            write_fragment(repo, "alpha.md", "### Alpha")
+            write_fragment(repo, "beta.md", "* The beta feature")
+            write_fragment(repo, "alpha.md", "* The alpha feature")
             commit(repo, "both features", date="2026-01-01T00:00:00")
 
             fragments = release_notes.fragment_order(repo, release_notes.fragment_paths(repo))
@@ -130,7 +130,7 @@ class FragmentOrderTest(unittest.TestCase):
     def test_the_readme_of_the_folder_is_not_a_fragment(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)
-            write_fragment(repo, "a-feature.md", "### A feature")
+            write_fragment(repo, "a-feature.md", "* A feature")
             write_fragment(repo, "README.md", "How the notes work.")
             fragments = release_notes.fragment_paths(repo)
             self.assertEqual([path.name for path in fragments], ["a-feature.md"])
@@ -141,21 +141,32 @@ class BuildTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             repo = make_repo(Path(directory))
             commit(repo, "the work")
-            write_fragment(repo, "a-feature.md", "### A feature\n\n* Something.")
+            write_fragment(repo, "a-feature.md", "* A feature")
             body = release_notes.build_body(repo, "v3.1.0")
-            self.assertTrue(body.startswith("### A feature"))
+            self.assertTrue(body.startswith("* A feature"))
             self.assertIn("## Changes", body)
 
     def test_the_body_follows_the_order_the_fragments_landed_in(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = make_repo(Path(directory))
-            write_fragment(repo, "second.md", "### Second")
+            write_fragment(repo, "second.md", "* The second feature")
             commit(repo, "the second feature", date="2026-01-02T00:00:00")
-            write_fragment(repo, "first.md", "### First")
+            write_fragment(repo, "first.md", "* The first feature")
             commit(repo, "the first feature", date="2026-01-01T00:00:00")
 
             body = release_notes.build_body(repo, "v3.1.0")
-            self.assertLess(body.index("### First"), body.index("### Second"))
+            self.assertLess(body.index("* The first feature"), body.index("* The second feature"))
+
+    def test_the_fragments_are_published_as_one_list(self):
+        # The fragments are the items of a single list: no blank line between them, or
+        # the body would render as a list of loose, airy paragraphs.
+        with tempfile.TemporaryDirectory() as directory:
+            repo = make_repo(Path(directory))
+            write_fragment(repo, "a-feature.md", "* A feature")
+            write_fragment(repo, "another-feature.md", "* Another feature")
+
+            body = release_notes.build_body(repo, "v3.1.0")
+            self.assertIn("* A feature\n* Another feature", body)
 
     def test_build_fails_without_fragments(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -257,7 +268,7 @@ class ChangelogTest(unittest.TestCase):
             commit(repo, "the work")
             run("git", "tag", "v3.0.0", cwd=repo)
             commit(repo, "feat: the new work")
-            write_fragment(repo, "a-feature.md", "### A feature")
+            write_fragment(repo, "a-feature.md", "* A feature")
             run("git", "add", "-A", cwd=repo)
             run("git", "commit", "-q", "-m", "chore: clear the notes of the previous release", cwd=repo)
             run("git", "tag", "v3.1.0", cwd=repo)
@@ -285,7 +296,7 @@ class ChangelogTest(unittest.TestCase):
             repo = make_repo(Path(directory))
             commit(repo, "the work")
             run("git", "tag", "v3.0.0", cwd=repo)
-            write_fragment(repo, "a-feature.md", "### A feature")
+            write_fragment(repo, "a-feature.md", "* A feature")
             run("git", "add", "-A", cwd=repo)
             run("git", "commit", "-q", "-m", "the notes", cwd=repo)
             run("git", "tag", "v3.1.0", cwd=repo)
@@ -303,7 +314,7 @@ class ChangelogTest(unittest.TestCase):
             run("git", "tag", "v3.0.0", cwd=repo)
             commit(repo, "feat: the new work")
             run("git", "tag", "v3.1.0", cwd=repo)
-            write_fragment(repo, "a-feature.md", "### A feature")
+            write_fragment(repo, "a-feature.md", "* A feature")
 
             with_notes = release_notes.changelog_section(repo, "v3.1.0")
             without_notes = release_notes.changelog_section(repo, "v3.1.0")
@@ -379,7 +390,31 @@ class CheckTest(unittest.TestCase):
     def test_a_written_release_passes(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)
-            write_fragment(repo, "a-feature.md", "### A feature")
+            write_fragment(repo, "a-feature.md", "* A feature")
+            self.assertEqual(release_notes.command_check(repo, "v3.1.0"), 0)
+
+    def test_a_fragment_that_is_not_a_bullet_is_only_a_warning(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            write_fragment(repo, "a-feature.md", "A feature, in a paragraph.")
+            self.assertEqual(release_notes.command_check(repo, "v3.1.0"), 0)
+
+    def test_a_fragment_with_a_title_is_only_a_warning(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            write_fragment(repo, "a-feature.md", "### A feature\n\n* A feature")
+            self.assertEqual(release_notes.command_check(repo, "v3.1.0"), 0)
+
+    def test_a_fragment_with_two_bullets_is_only_a_warning(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            write_fragment(repo, "a-feature.md", "* A feature\n* Another feature")
+            self.assertEqual(release_notes.command_check(repo, "v3.1.0"), 0)
+
+    def test_a_wrapped_bullet_is_one_bullet(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            write_fragment(repo, "a-feature.md", "* A feature that is\n  described over two lines")
             self.assertEqual(release_notes.command_check(repo, "v3.1.0"), 0)
 
     def test_an_empty_fragment_is_only_a_warning(self):
@@ -392,7 +427,7 @@ class CheckTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             repo = make_repo(Path(directory))
             commit(repo, "the work")
-            write_fragment(repo, "a-feature.md", "### A feature")
+            write_fragment(repo, "a-feature.md", "* A feature")
             ship(repo, "v3.0.0")
             # The fragment is byte for byte the one the previous release shipped: it is a
             # leftover, but it does not block the release.
@@ -407,7 +442,7 @@ class NewTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             repo = make_repo(Path(directory))
             commit(repo, "the work")
-            write_fragment(repo, "shipped.md", "### The shipped feature")
+            write_fragment(repo, "shipped.md", "* The shipped feature")
             ship(repo, "v3.0.0")
 
             self.assertEqual(release_notes.command_new(repo, "v3.1.0", False), 0)
@@ -417,9 +452,9 @@ class NewTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             repo = make_repo(Path(directory))
             commit(repo, "the work")
-            write_fragment(repo, "shipped.md", "### The shipped feature")
+            write_fragment(repo, "shipped.md", "* The shipped feature")
             ship(repo, "v3.0.0")
-            write_fragment(repo, "fresh.md", "### The feature in progress")
+            write_fragment(repo, "fresh.md", "* The feature in progress")
 
             self.assertEqual(release_notes.command_new(repo, "v3.1.0", False), 0)
             directory = repo / release_notes.NOTES_DIR_NAME
@@ -430,9 +465,9 @@ class NewTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             repo = make_repo(Path(directory))
             commit(repo, "the work")
-            write_fragment(repo, "shipped.md", "### The shipped feature")
+            write_fragment(repo, "shipped.md", "* The shipped feature")
             ship(repo, "v3.0.0")
-            write_fragment(repo, "shipped.md", "### The shipped feature, edited")
+            write_fragment(repo, "shipped.md", "* The shipped feature, edited")
 
             self.assertEqual(release_notes.command_new(repo, "v3.1.0", False), 1)
             # The edit is still there: the command refuses before touching anything.
@@ -444,7 +479,7 @@ class NewTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             repo = make_repo(Path(directory))
             commit(repo, "the work")
-            write_fragment(repo, "a-feature.md", "### A feature")
+            write_fragment(repo, "a-feature.md", "* A feature")
 
             self.assertEqual(release_notes.command_new(repo, "v3.1.0", False), 0)
             self.assertTrue((repo / release_notes.NOTES_DIR_NAME / "a-feature.md").exists())

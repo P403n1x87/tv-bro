@@ -516,19 +516,21 @@ def changelog_section(repo_root: Path, version: str | None) -> str:
 
 
 def build_body(repo_root: Path, version: str | None) -> str:
-    """The release body: the fragments of the notes, then the generated section."""
+    """The release body: the fragments of the notes, then the generated section.
+
+    The fragments are joined without a blank line between them: they are the items of one
+    list, and the body reads as one. The generated section is a section of its own, so it
+    is separated from the list by a blank line.
+    """
     fragments = fragment_order(repo_root, fragment_paths(repo_root))
     if not fragments:
         raise NotesError(f"no fragment in {notes_dir(repo_root)}")
-    parts = []
-    for fragment in fragments:
-        text = read_fragment(fragment)
-        if text:
-            parts.append(text)
+    texts = [text for text in (read_fragment(fragment) for fragment in fragments) if text]
+    body = "\n".join(texts)
     changelog = changelog_section(repo_root, version)
     if changelog:
-        parts.append(changelog)
-    return "\n\n".join(parts).rstrip() + "\n"
+        body = f"{body}\n\n{changelog}" if body else changelog
+    return body.rstrip() + "\n"
 
 
 def command_new(repo_root: Path, version: str | None, force: bool) -> int:
@@ -607,6 +609,25 @@ def command_changelog(repo_root: Path, version: str | None) -> int:
     return 0
 
 
+def fragment_problems(text: str) -> list[str]:
+    """What is wrong with the way a fragment is written.
+
+    A fragment is one bullet: a brief description of what the user notices. A title would
+    make it a section of its own, and a second bullet a second feature — both break the
+    list the release body is made of.
+    """
+    problems: list[str] = []
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if any(line.startswith("#") for line in lines):
+        problems.append("it holds a title: a fragment describes the feature, it is not a section")
+    bullets = [line for line in lines if line.startswith("* ")]
+    if not bullets:
+        problems.append("it is not a bullet: a fragment describes one feature in one bullet")
+    elif len(bullets) > 1:
+        problems.append(f"it holds {len(bullets)} bullets: a fragment describes one feature")
+    return problems
+
+
 def command_check(repo_root: Path, version: str | None) -> int:
     """Validates the notes: the errors block the release, the warnings do not."""
     directory = notes_dir(repo_root)
@@ -620,8 +641,12 @@ def command_check(repo_root: Path, version: str | None) -> int:
         errors.append(f"{directory} holds no fragment: a release needs at least one feature fragment")
 
     for fragment in fragments:
-        if not read_fragment(fragment):
+        text = read_fragment(fragment)
+        if not text:
             warnings.append(f"{fragment.name} is empty")
+            continue
+        for problem in fragment_problems(text):
+            warnings.append(f"{fragment.name}: {problem}")
 
     # A fragment that is byte for byte the one the previous release shipped is a leftover:
     # the feature was already announced, and the fragment must not be published again.

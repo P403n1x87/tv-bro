@@ -106,18 +106,19 @@ the model/host seam polish. Work on a feature branch; **open a PR only when aske
   (fallback `signing.keystore`); **never regenerate** (it is what upgrades installs in place).
 - Release notes are **fragments**, one file per *feature*, in the flat `release-notes/` folder
   (see `docs/release-notes.md`). One file per pull request: two pull requests never touch the
-  same file, so the notes never collide. Every past release keeps its own copy in the git
-  history, at its tag. Before tagging: `python3 scripts/release_notes.py new vX.Y.Z` (removes
-  the fragments the previous release shipped — the next release starts empty), then
-  `python3 scripts/release_notes.py check vX.Y.Z` (errors block the release, warnings do not).
-  `build` concatenates the fragments — in the order they landed in the repository — and appends
-  a generated `## Changes since <previous tag>` section reconstructed from the git history
-  alone (grouped by conventional-commit type, merge commits skipped, pull requests linked).
-  The first release of the fork is compared against the `fork-point` tag (the commit where
-  this repo left `truefedex/tv-bro`) instead of a previous release: the upstream releases are
-  not ours to describe. The tag is deliberately not `v*`, so pushing it cannot cut a release.
-  The tool's own tests: `python3 -m unittest discover -s scripts/tests -t scripts` (the `tests`
-  CI job runs them).
+  same file, so the notes never collide. A fragment is a single bullet — no title, brief, and
+  about what the user notices, not about the implementation. Every past release keeps its own
+  copy in the git history, at its tag. Before tagging: `python3 scripts/release_notes.py new
+  vX.Y.Z` (removes the fragments the previous release shipped — the next release starts empty),
+  then `python3 scripts/release_notes.py check vX.Y.Z` (errors block the release, warnings do
+  not). `build` concatenates the fragments — in the order they landed in the repository — and
+  appends a generated `## Changes since <previous tag>` section reconstructed from the git
+  history alone (grouped by conventional-commit type, merge commits skipped, pull requests
+  linked). The first release of the fork is compared against the `fork-point` tag (the commit
+  where this repo left `truefedex/tv-bro`) instead of a previous release: the upstream
+  releases are not ours to describe. The tag is deliberately not `v*`, so pushing it cannot cut
+  a release. The tool's own tests: `python3 -m unittest discover -s scripts/tests -t scripts`
+  (the `tests` CI job runs them).
 
 ## Known issues / gotchas
 - History is keyed by URL (`HistoryDao.deleteByUrl` before insert → visits collapse to one row,

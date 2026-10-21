@@ -1,8 +1,8 @@
 # Release notes
 
 The notes of a release are a set of **fragments**, one per **feature**, in the
-`release-notes/` folder. Each fragment is a self-contained markdown file: it carries its
-own heading and describes a single feature.
+`release-notes/` folder. Each fragment is a single bullet: a brief description of what the
+user notices.
 
 **One file per feature, one file per pull request.** A pull request that adds a feature
 adds its own fragment, so two pull requests never touch the same file: the notes never
@@ -10,31 +10,37 @@ collide, and nobody has to rebase a shared file to land a feature.
 
 | File | What it holds |
 |---|---|
-| `history-screen.md` | One feature: a `###` heading and what the user notices. The file name is kebab-case and describes the feature. |
+| `history-screen.md` | One feature: one bullet saying what the user notices. The file name is kebab-case and describes the feature. |
 
 The folder holds the notes of the release being prepared, and nothing else. Every past
 release keeps its own copy in the git history, at its tag:
 `git show v3.1.0:release-notes/history-screen.md` is the note that release shipped with.
 There is nothing to archive by hand.
 
-The release body published on GitHub is the concatenation of the fragments — **in the
-order they landed in the repository**, which is the order of the work — plus an
-automatically generated section that lists everything the commit history holds since the
-previous release. The hand-written fragments tell the story; the generated section makes
-sure nothing is missed.
+The release body published on GitHub is the list of those fragments — **in the order they
+landed in the repository**, which is the order of the work — plus an automatically
+generated section that lists everything the commit history holds since the previous
+release. The hand-written fragments tell the story; the generated section makes sure
+nothing is missed.
 
 ## Adding a note to a pull request
 
 Drop a file in `release-notes/`, named after the feature:
 
 ```markdown
-### My feature
-
-What the user notices, in a sentence or two.
+* The browsing history has a screen of its own, where every entry can be deleted on
+  its own or all at once.
 ```
 
-That is the whole convention: one file, one heading, one feature. The file name is
-kebab-case (`live-stream-recovery.md`), the heading is the title of the feature.
+That is the whole convention: one file, one bullet, one feature.
+
+- **No title.** The fragment is an item of a list, not a section of its own: a `###`
+  heading would break the list the release body is made of.
+- **Brief.** One sentence, or two: what the user notices.
+- **User-visible.** The result, not the implementation. No class names, no policies, no
+  internal names — "the history screen has a title bar and a delete button", not "the
+  focus routing lives in a `HistoryFocusPolicy`".
+- **One feature.** A fragment that needs two bullets is two features: two files.
 
 ## Cutting a release
 
@@ -58,8 +64,9 @@ progress for the next release. It refuses to run when a shipped fragment was edi
 after the release, unless `--force` is passed: the edit would be lost.
 
 `check` fails when the release has no fragment at all, and warns about a fragment that is
-empty or that is byte for byte the one the previous release shipped — a leftover: the
-feature was already announced, so the fragment must not be published again.
+empty, that is not a single bullet, or that is byte for byte the one the previous release
+shipped — a leftover: the feature was already announced, so the fragment must not be
+published again.
 
 ## The generated section
 
@@ -105,7 +112,7 @@ workflow triggers on, so pushing it cannot cut a release.
 | `new [version]` | Removes the fragments the previous release shipped, so the next release starts empty. `--force` removes them even when they were edited after the release. |
 | `build [version]` | Assembles the release body (fragments + generated section) and writes it to stdout, or to `--output <file>`. |
 | `changelog [version]` | Prints only the generated section. |
-| `check [version]` | Validates the notes: a missing folder or a release without any fragment is an error; an empty or already shipped fragment is a warning. |
+| `check [version]` | Validates the notes: a missing folder or a release without any fragment is an error; an empty, malformed or already shipped fragment is a warning. |
 
 The version is optional: it defaults to the tag at HEAD, and only drives the generated
 section (which release the diff is computed against).
