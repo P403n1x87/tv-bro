@@ -79,7 +79,7 @@ jobs:
       #The release body is assembled out of the note fragments (`release-notes/`) and gets
       #the changes since the previous release appended, so the page never misses a commit
       #the hand-written notes forgot. The fragments are checked here, in the first gate: a
-      #release without a headline must fail in minutes, not after the emulator suite and
+      #release without a fragment must fail in minutes, not after the emulator suite and
       #the APKs are done.
       - name: Validate release notes
         if: startsWith(github.ref, 'refs/tags/')
