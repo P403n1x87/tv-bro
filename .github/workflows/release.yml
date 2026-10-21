@@ -71,6 +71,20 @@ jobs:
                     :app:testGenericGeckoExcludedDebugUnitTest \
                     :app:player:testDebugUnitTest
 
+      #The release-notes assembler is part of the release path, so its tests run with the
+      #rest: a broken assembler would otherwise only show up while a release is being cut.
+      - name: Run release notes tests
+        run: python3 -m unittest discover --start-directory scripts/tests --top-level-directory scripts
+
+      #The release body is assembled out of the note fragments of the tagged version
+      #(`release-notes/<tag>/`) and gets the changes since the previous release appended, so
+      #the page never misses a commit the hand-written notes forgot. The fragments are
+      #checked here, in the first gate: a release without a headline must fail in minutes,
+      #not after the emulator suite and the APKs are done.
+      - name: Validate release notes
+        if: startsWith(github.ref, 'refs/tags/')
+        run: python3 scripts/release_notes.py check "${{ github.ref_name }}"
+
   #The second gate: Android lint, errors failing the build (AGP's abortOnError default) with no
   #baseline — the tree is kept lint-clean, so a red run means a new, real finding. The only
   #project-wide exemption is MissingTranslation (disabled in buildSrc: partial locales are the
@@ -285,19 +299,27 @@ jobs:
           path: app/build/outputs/apk/**/release/*.apk
           if-no-files-found: error
 
+      #The release body is assembled out of the note fragments of the tagged version
+      #(`release-notes/<tag>/`) and gets the changes since the previous release appended, so
+      #the page never misses a commit the hand-written notes forgot. The fragments were
+      #checked in the `tests` gate; this writes the body the release is published with.
+      - name: Assemble release notes
+        if: startsWith(github.ref, 'refs/tags/')
+        run: python3 scripts/release_notes.py build "${{ github.ref_name }}" --output build/release-notes.md
+
       #The tag already exists (pushed by `gh release create` or by hand), so this looks the release up
       #by tag — drafts included, which the getReleaseByTag API does not return, hence the listing
-      #fallback in the action — replaces its body with RELEASE_NOTES.md and attaches the APKs,
-      #replacing same-named assets. A release created published (`gh release create vX.Y.Z --target
-      #master`) is complete once this step ends; one created as a draft (`--draft`) is published here
-      #because `draft` is not passed.
+      #fallback in the action — replaces its body with the assembled release notes and attaches the
+      #APKs, replacing same-named assets. A release created published (`gh release create vX.Y.Z
+      #--target master`) is complete once this step ends; one created as a draft (`--draft`) is
+      #published here because `draft` is not passed.
       - name: Create release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
-          body_path: RELEASE_NOTES.md
+          body_path: build/release-notes.md
           prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
           #A glob that matches nothing would otherwise publish an empty release and still go green.
           fail_on_unmatched_files: true

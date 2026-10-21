@@ -100,9 +100,18 @@ the model/host seam polish. Work on a feature branch; **open a PR only when aske
   tests, a new lint error or a broken device flow; runs on every PR that touches code or the build
   harness; a docs-only PR (`docs/**`, `*.md`, repo metadata) runs no CI at all; publish only from a
   tag.
-- `gh release create vX.Y.Z --target <ref>` creates the tag → workflow attaches signed APKs and sets
-  the body from `RELEASE_NOTES.md`. Keystore: copy of the debug keystore under `secrets`
+- `gh release create vX.Y.Z --target <ref>` creates the tag → workflow attaches signed APKs and
+  publishes the release body assembled by `scripts/release_notes.py` (fragments + the changes
+  since the previous tag). Keystore: copy of the debug keystore under `secrets`
   (fallback `signing.keystore`); **never regenerate** (it is what upgrades installs in place).
+- Release notes are **fragments**, one file per topic, under `release-notes/<tag>/` (see
+  `release-notes/README.md`); `00-summary.md` is the headline and is mandatory. Before tagging:
+  `python3 scripts/release_notes.py new vX.Y.Z`, write the fragments, then
+  `python3 scripts/release_notes.py check vX.Y.Z` (errors block the release, warnings do not).
+  `build` concatenates the fragments and appends a generated `## Changes since <previous tag>`
+  section built from the commit history (grouped by conventional-commit type, merge commits
+  skipped, pull requests linked). The tool's own tests:
+  `python3 -m unittest discover -s scripts/tests -t scripts` (the `tests` CI job runs them).
 
 ## Known issues / gotchas
 - History is keyed by URL (`HistoryDao.deleteByUrl` before insert → visits collapse to one row,
