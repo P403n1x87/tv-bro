@@ -14,6 +14,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.databinding.ActivityHistoryBinding
+import com.phlox.tvwebbrowser.domain.HistoryFocusPolicy
 import com.phlox.tvwebbrowser.model.HistoryItem
 import com.phlox.tvwebbrowser.utils.Utils
 import com.phlox.tvwebbrowser.utils.VoiceSearchHelper
@@ -125,10 +126,12 @@ class HistoryActivity :
     }
 
     /**
-     * The first fully-visible history row, used as the RIGHT-key target when the list reports no
-     * selected view (AbsListView exposes no reliable "focused row" position without selection).
+     * The row the RIGHT key should step onto, preferring the list's selected view and falling back
+     * to the first visible row. `AbsListView` exposes no reliable "focused row" position without
+     * selection, so the selected view is the best signal when present.
      */
-    private fun firstVisibleHistoryRow(): HistoryItemView? {
+    private fun focusedHistoryRow(): HistoryItemView? {
+        (vb.listView.selectedView as? HistoryItemView)?.let { return it }
         for (i in 0 until vb.listView.childCount) {
             val child = vb.listView.getChildAt(i)
             if (child is HistoryItemView && child.historyItem?.isDateHeader == false) {
@@ -219,26 +222,33 @@ class HistoryActivity :
 
             // The list is a single D-pad focus target, so the per-row delete icon can't be reached
             // by ordinary navigation. RIGHT steps off the focused row onto its trash; once the
-            // trash holds focus, LEFT/UP/DOWN hand focus back to the list.
-            KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                if (event.action == KeyEvent.ACTION_DOWN && vb.listView.isFocused) {
-                    if (vb.listView.selectedView is HistoryItemView) {
-                        val row = vb.listView.selectedView as HistoryItemView
-                        if (row.requestDeleteFocus()) return true
-                    }
-                    // No selected view: fall back to the row the adapter last saw focused.
-                    val row = firstVisibleHistoryRow()
-                    if (row?.requestDeleteFocus() == true) return true
-                }
-            }
-
-            KeyEvent.KEYCODE_DPAD_LEFT,
-            KeyEvent.KEYCODE_DPAD_UP,
-            KeyEvent.KEYCODE_DPAD_DOWN,
+            // trash holds focus, LEFT/UP/DOWN hand focus back to the list. The routing itself is
+            // pure logic, tested in HistoryFocusPolicyTest.
+            KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_LEFT,
+            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
             -> {
-                if (event.action == KeyEvent.ACTION_DOWN && currentFocus?.id == R.id.ibDelete) {
-                    vb.listView.requestFocus()
-                    return true
+                val row = focusedHistoryRow()
+                when (
+                    HistoryFocusPolicy.route(
+                        keyCode = event.keyCode,
+                        listFocusable = event.action == KeyEvent.ACTION_DOWN && vb.listView.isFocused,
+                        rowDeleteFocusable = row?.canFocusDelete() == true,
+                        deleteIconFocused = currentFocus?.id == R.id.ibDelete,
+                    )
+                ) {
+                    HistoryFocusPolicy.Action.FOCUS_ROW_DELETE -> {
+                        row?.requestDeleteFocus()
+                        return true
+                    }
+
+                    HistoryFocusPolicy.Action.FOCUS_LIST -> {
+                        vb.listView.requestFocus()
+                        return true
+                    }
+
+                    HistoryFocusPolicy.Action.PASS_THROUGH -> {
+                        Unit
+                    }
                 }
             }
         }

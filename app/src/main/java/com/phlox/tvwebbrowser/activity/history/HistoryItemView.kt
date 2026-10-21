@@ -87,13 +87,22 @@ class HistoryItemView(
     }
 
     /**
+     * Whether this row currently offers a focusable delete icon — false for date headers and for
+     * any row whose icon is hidden (multi-select). Callers use it to decide if RIGHT should step
+     * onto the icon or let the list keep the key.
+     */
+    fun canFocusDelete(): Boolean {
+        if (viewType != HistoryAdapter.VIEW_TYPE_HISTORY_ITEM) return false
+        val icon = ibDelete ?: return false
+        return icon.visibility == VISIBLE
+    }
+
+    /**
      * Moves D-pad focus onto this row's delete icon, so a single visit can be removed without
      * leaving the list. No-op on date headers. Returns whether focus moved.
      */
     fun requestDeleteFocus(): Boolean {
-        if (viewType != HistoryAdapter.VIEW_TYPE_HISTORY_ITEM) return false
-        val icon = ibDelete ?: return false
-        if (icon.visibility != VISIBLE) return false
-        return icon.requestFocus()
+        if (!canFocusDelete()) return false
+        return ibDelete!!.requestFocus()
     }
 }
