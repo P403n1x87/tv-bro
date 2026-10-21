@@ -14,7 +14,7 @@ collide, and nobody has to rebase a shared file to land a feature.
 
 The folder holds the notes of the release being prepared, and nothing else. Every past
 release keeps its own copy in the git history, at its tag:
-`git show v3.1.0:release-notes/history-screen.md` is the note that release shipped with.
+`git show v1.0.0:release-notes/history-screen.md` is the note that release shipped with.
 There is nothing to archive by hand.
 
 The release body published on GitHub is the list of those fragments — **in the order they
@@ -46,16 +46,16 @@ That is the whole convention: one file, one bullet, one feature.
 
 ```sh
 # 1. Remove the fragments the previous release shipped: the next release starts empty.
-python3 scripts/release_notes.py new v3.1.0
+python3 scripts/release_notes.py new v1.0.0
 
 # 2. Check the notes. Errors block the release, warnings do not.
-python3 scripts/release_notes.py check v3.1.0
+python3 scripts/release_notes.py check v1.0.0
 
 # 3. Preview the release body.
-python3 scripts/release_notes.py build v3.1.0
+python3 scripts/release_notes.py build v1.0.0
 
 # 4. Cut the release: the tag triggers the workflow, which publishes the assembled body.
-gh release create v3.1.0 --target master
+gh release create v1.0.0 --target master
 ```
 
 `new` removes the fragments the previous release shipped — their copy lives in the git
@@ -104,6 +104,18 @@ the baseline of that first release:
 
 The tag is named `fork-point` on purpose: it does not match the `v*` pattern the release
 workflow triggers on, so pushing it cannot cut a release.
+
+### The version numbering
+
+The fork counts its own releases, and it starts at `v1.0.0`: the upstream project is on
+its 2.x line, and the fork's own `v3.0.0` was withdrawn (it shipped the upstream's
+branding, which the upstream license forbids for a modified redistribution). The
+withdrawn tag is gone, so the fork's first release has no predecessor either — it is
+the one compared against the fork point.
+
+The numbering matters beyond bookkeeping: the in-app updater compares version *names*
+to decide whether a release is newer (`"1.0.1"` is newer than `"1.0.0"`), so the fork's
+versions must keep growing from `1.0.0` onwards.
 
 ## Commands
 

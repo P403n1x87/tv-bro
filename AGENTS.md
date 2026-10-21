@@ -89,7 +89,15 @@ the model/host seam polish. Work on a feature branch; **open a PR only when aske
   `input tap <x> <y>`. `p403n1x87` → `com.phlox.tvwebbrowser.p403n1x87`, else `…webbrowser`.
 
 ## Releasing
-- Version comes from git tags (`vX.Y.Z`), never hardcoded; `./gradlew` derives it.
+- Version comes from git tags (`vX.Y.Z`), never hardcoded; `./gradlew` derives it. The fork counts
+  its own releases and starts at `v1.0.0` (upstream is on 2.x; the fork's own `v3.0.0` was
+  withdrawn — it shipped the upstream branding, which `LICENSE.md` forbids for a modified
+  redistribution — and its tag is gone, so `v1.0.0` is the fork's first release, compared against
+  the `fork-point` tag).
+- The version name is what the in-app updater compares (`UpdateChecker.compareVersions`), so the
+  fork's versions must keep growing from `1.0.0`; the versionCode is derived from it
+  (`1.0.0` → 10000) and the package manager refuses to install an APK with a lower code than the
+  installed one.
 - CI `.github/workflows/release.yml`: `tests` (the three unit suites), `lint` (Android lint on
   both app flavors + player + common, zero-baseline; `MissingTranslation` is the one global
   exemption, disabled in buildSrc) and `instrumented` (the UiAutomator smoke suite on an API 36
