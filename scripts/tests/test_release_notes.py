@@ -280,6 +280,20 @@ class ChangelogTest(unittest.TestCase):
             section = release_notes.changelog_section(repo, "v3.1.0")
             self.assertIn("1 file changed, 1 insertion(+)", section)
 
+    def test_a_release_without_a_product_change_says_so(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = make_repo(Path(directory))
+            commit(repo, "the work")
+            run("git", "tag", "v3.0.0", cwd=repo)
+            write_fragment(repo, "a-feature.md", "### A feature")
+            run("git", "add", "-A", cwd=repo)
+            run("git", "commit", "-q", "-m", "the notes", cwd=repo)
+            run("git", "tag", "v3.1.0", cwd=repo)
+
+            section = release_notes.changelog_section(repo, "v3.1.0")
+            self.assertIn("## Changes since v3.0.0", section)
+            self.assertIn("No change of the product", section)
+
     def test_the_section_is_reconstructed_from_the_history_alone(self):
         # The notes folder holds no versioned copy of the diff: the section is what the
         # git history says, and nothing else.

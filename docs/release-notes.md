@@ -73,7 +73,8 @@ the notes folder:
 - merge commits are skipped — they only repeat the title of the branch they brought in;
 - the commits that only touched the notes are skipped as well — the one that clears the
   fragments the previous release shipped is the bookkeeping of a release, not a change of
-  the product, and the diffstat leaves the notes out for the same reason;
+  the product, and the diffstat leaves the notes out for the same reason (a release that
+  changed nothing but the notes says so, instead of listing an empty diff);
 - a subject that references a pull request (`… (#42)`) links to it;
 - the section ends with a link to the compare view of the two versions.
 

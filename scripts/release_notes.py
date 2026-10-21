@@ -474,10 +474,15 @@ def changelog_section(repo_root: Path, version: str | None) -> str:
     if reference:
         lines.append(f"## Changes since {baseline_label(reference, is_fork_point)}")
         stats = diff_shortstat(repo_root, reference, commit)
-        summary = f"_{len(subjects)} commit{'s' if len(subjects) != 1 else ''}"
-        if stats:
-            summary += f", {stats}"
-        lines.append(summary + "._")
+        if not subjects:
+            # Everything that happened since the previous release was the bookkeeping of
+            # the notes: there is no change of the product to describe.
+            lines.append("_No change of the product since the previous release._")
+        else:
+            summary = f"_{len(subjects)} commit{'s' if len(subjects) != 1 else ''}"
+            if stats:
+                summary += f", {stats}"
+            lines.append(summary + "._")
     else:
         # Without a predecessor there is no diff to show: the whole history is not a
         # comparison, and listing it would bury the notes of the release.
