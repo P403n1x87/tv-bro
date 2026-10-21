@@ -223,25 +223,69 @@ def baseline_label(ref: str, is_fork_point: bool) -> str:
     return "the fork point" if is_fork_point else ref
 
 
+def commit_paths(repo_root: Path, commit: str) -> list[str]:
+    """The files a commit touched."""
+    try:
+        listed = git(repo_root, "show", "--name-only", "--format=", commit)
+    except GitError:
+        return []
+    return [line.strip() for line in listed.splitlines() if line.strip()]
+
+
+def touches_only_the_notes(repo_root: Path, commit: str) -> bool:
+    """Whether a commit only touched the notes.
+
+    The notes are the bookkeeping of a release — the commit that clears the fragments the
+    previous release shipped, for instance. It is not a change of the product, so it does
+    not belong in the changelog of the next one.
+    """
+    paths = commit_paths(repo_root, commit)
+    if not paths:
+        return False
+    return all(path.startswith(f"{NOTES_DIR_NAME}/") for path in paths)
+
+
 def commit_subjects(repo_root: Path, previous: str | None, commit: str) -> list[str]:
     """The subjects of the commits between the previous release and this one.
 
     Merge commits are skipped: they only repeat the title of the branch they brought in,
-    and the commits they carry are listed on their own.
+    and the commits they carry are listed on their own. The commits that only touched the
+    notes are skipped as well: they are the bookkeeping of a release.
     """
     if not commit:
         return []
     revision = f"{previous}..{commit}" if previous else commit
-    listed = git(repo_root, "log", "--no-merges", "--pretty=format:%s", revision)
-    return [line.strip() for line in listed.splitlines() if line.strip()]
+    listed = git(repo_root, "log", "--no-merges", "--pretty=format:%H%x09%s", revision)
+    subjects = []
+    for line in listed.splitlines():
+        if not line.strip():
+            continue
+        sha, _, subject = line.partition("\t")
+        if touches_only_the_notes(repo_root, sha.strip()):
+            continue
+        subjects.append(subject.strip())
+    return subjects
 
 
 def diff_shortstat(repo_root: Path, previous: str | None, commit: str) -> str:
-    """The one-line summary of the diff against the previous release."""
+    """The one-line summary of the diff against the previous release.
+
+    The notes are left out: the line describes the change of the product, not the
+    bookkeeping of the release.
+    """
     if not commit:
         return ""
     revision = f"{previous}..{commit}" if previous else f"{EMPTY_TREE}..{commit}"
-    return git(repo_root, "diff", "--shortstat", revision).strip()
+    listed = git(
+        repo_root,
+        "diff",
+        "--shortstat",
+        revision,
+        "--",
+        ".",
+        f":(exclude){NOTES_DIR_NAME}",
+    )
+    return listed.strip()
 
 
 def github_repo_url(repo_root: Path) -> str | None:

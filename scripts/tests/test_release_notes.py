@@ -249,6 +249,37 @@ class ChangelogTest(unittest.TestCase):
             # notes of the release.
             self.assertNotIn("The old work", section)
 
+    def test_a_commit_that_only_touches_the_notes_is_not_listed(self):
+        # The commit that clears the fragments the previous release shipped is the
+        # bookkeeping of a release, not a change of the product.
+        with tempfile.TemporaryDirectory() as directory:
+            repo = make_repo(Path(directory))
+            commit(repo, "the work")
+            run("git", "tag", "v3.0.0", cwd=repo)
+            commit(repo, "feat: the new work")
+            write_fragment(repo, "a-feature.md", "### A feature")
+            run("git", "add", "-A", cwd=repo)
+            run("git", "commit", "-q", "-m", "chore: clear the notes of the previous release", cwd=repo)
+            run("git", "tag", "v3.1.0", cwd=repo)
+
+            section = release_notes.changelog_section(repo, "v3.1.0")
+            self.assertNotIn("clear the notes", section)
+            self.assertIn("The new work", section)
+
+    def test_the_diffstat_leaves_the_notes_out(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = make_repo(Path(directory))
+            commit(repo, "the work")
+            run("git", "tag", "v3.0.0", cwd=repo)
+            commit(repo, "feat: the new work")
+            write_fragment(repo, "a-feature.md", "\n".join(f"line {index}" for index in range(100)))
+            run("git", "add", "-A", cwd=repo)
+            run("git", "commit", "-q", "-m", "the notes", cwd=repo)
+            run("git", "tag", "v3.1.0", cwd=repo)
+
+            section = release_notes.changelog_section(repo, "v3.1.0")
+            self.assertIn("1 file changed, 1 insertion(+)", section)
+
     def test_the_section_is_reconstructed_from_the_history_alone(self):
         # The notes folder holds no versioned copy of the diff: the section is what the
         # git history says, and nothing else.
