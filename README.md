@@ -60,8 +60,8 @@ adb shell am start -a android.intent.action.VIEW -d "http://example.com" -p com.
 Every pull request is built with the same pipeline as a release, so a broken build or a bad version
 cannot reach a tag. Releases are cut by pushing a `vX.Y.Z` tag — the tag becomes the app version and
 drives the GitHub release, whose body is assembled from the note fragments in
-[`release-notes/`](release-notes/README.md) plus the changes since the previous release, read from
-the git history.
+[`release-notes/`](release-notes/) plus the changes since the previous release, read from
+the git history (see [docs/release-notes.md](docs/release-notes.md)).
 
 See [AGENTS.md](AGENTS.md) for the full build, test and debug instructions, and
 [docs/architecture/ARCHITECTURE-REVIEW.md](docs/architecture/ARCHITECTURE-REVIEW.md) for how the

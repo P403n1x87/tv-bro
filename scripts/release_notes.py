@@ -10,7 +10,11 @@ always recoverable — there is nothing to archive by hand.
 This tool concatenates the fragments and appends an automatically generated section that
 lists everything the commit history holds since the previous release.  That section is
 reconstructed from the git history alone — the previous tag, the commits in between, the
-diffstat — so it never depends on anything stored in the working tree.
+diffstat — so it never depends on anything stored in the working tree.  The first release
+of the fork is compared against the fork point (the `fork-point` tag), because the
+releases before it belong to the upstream project.
+
+The documentation of the notes lives in `docs/release-notes.md`.
 
 Commands:
   new [version]        prepare the notes of the next release: restore the fragments of
@@ -33,8 +37,14 @@ from pathlib import Path
 
 # The flat folder holding the fragments of the release being prepared.
 NOTES_DIR_NAME = "release-notes"
-# The file of the folder that is documentation, not a fragment.
+# The file of the folder that is documentation, not a fragment.  The documentation of
+# the notes lives in `docs/release-notes.md`; this only guards against a stray readme
+# being published as a fragment.
 NOTES_README = "README.md"
+# The tag marking the commit where this repository left the upstream one.  It is the
+# baseline of the first release of the fork: the releases before it belong to the
+# upstream project and are not ours to describe.
+FORK_POINT_TAG = "fork-point"
 # The fragment holding the headline of a release.  It is the only mandatory one: it is
 # what the release page shows first, and what the in-app update dialog shows as the
 # summary of the new version.
@@ -184,6 +194,38 @@ def previous_tag(repo_root: Path, tag: str | None, commit: str) -> str | None:
     if not candidates:
         return None
     return max(candidates, key=version_key)
+
+
+def fork_point(repo_root: Path, commit: str) -> str | None:
+    """The fork point, when it is an ancestor of the commit: the baseline of the first release."""
+    if not commit:
+        return None
+    try:
+        listed = git(repo_root, "tag", "--list", FORK_POINT_TAG, "--merged", commit)
+    except GitError:
+        return None
+    return FORK_POINT_TAG if listed.strip() else None
+
+
+def baseline(repo_root: Path, tag: str | None, commit: str) -> tuple[str | None, bool]:
+    """The reference a release is compared against, and whether it is the fork point.
+
+    A release is compared against the previous release tag. The first release of the fork
+    has none, so it is compared against the fork point instead: the commits before it are
+    the upstream project's, and the releases they shipped do not belong to this fork.
+    """
+    previous = previous_tag(repo_root, tag, commit)
+    if previous:
+        return previous, False
+    point = fork_point(repo_root, commit)
+    if point:
+        return point, True
+    return None, False
+
+
+def baseline_label(ref: str, is_fork_point: bool) -> str:
+    """How the baseline is named in the generated section."""
+    return "the fork point" if is_fork_point else ref
 
 
 def commit_subjects(repo_root: Path, previous: str | None, commit: str) -> list[str]:
@@ -356,14 +398,14 @@ def changelog_section(repo_root: Path, version: str | None) -> str:
     commit = resolve_commit(repo_root, tag)
     if not commit:
         return ""
-    previous = previous_tag(repo_root, tag, commit)
-    subjects = commit_subjects(repo_root, previous, commit)
+    reference, is_fork_point = baseline(repo_root, tag, commit)
+    subjects = commit_subjects(repo_root, reference, commit)
     repo_url = github_repo_url(repo_root)
 
     lines: list[str] = []
-    if previous:
-        lines.append(f"## Changes since {previous}")
-        stats = diff_shortstat(repo_root, previous, commit)
+    if reference:
+        lines.append(f"## Changes since {baseline_label(reference, is_fork_point)}")
+        stats = diff_shortstat(repo_root, reference, commit)
         summary = f"_{len(subjects)} commit{'s' if len(subjects) != 1 else ''}"
         if stats:
             summary += f", {stats}"
@@ -372,7 +414,7 @@ def changelog_section(repo_root: Path, version: str | None) -> str:
         # Without a predecessor there is no diff to show: the whole history is not a
         # comparison, and listing it would bury the notes of the release.
         lines.append("## Changes")
-        lines.append(f"_{len(subjects)} commits — the first release of this repository._")
+        lines.append(f"_{len(subjects)} commits — the whole history of the repository._")
         return "\n".join(lines)
 
     grouped: dict[str, list[str]] = {}
@@ -390,7 +432,7 @@ def changelog_section(repo_root: Path, version: str | None) -> str:
 
     if tag and repo_url:
         lines.append("")
-        lines.append(f"[Compare {previous}...{tag}]({repo_url}/compare/{previous}...{tag})")
+        lines.append(f"[Compare {reference}...{tag}]({repo_url}/compare/{reference}...{tag})")
 
     return "\n".join(lines)
 
@@ -425,18 +467,20 @@ def command_new(repo_root: Path, version: str | None, force: bool) -> int:
     """
     tag = current_release(repo_root, version)
     commit = resolve_commit(repo_root, tag)
-    previous = previous_tag(repo_root, tag, commit)
+    reference, is_fork_point = baseline(repo_root, tag, commit)
     directory = notes_dir(repo_root)
     directory.mkdir(parents=True, exist_ok=True)
 
-    if not previous:
+    if not reference or is_fork_point:
+        # The fork point is not a release of this fork: there are no notes to restore
+        # from it, the fragments of the working tree are the ones to write.
         print("No previous release to restore the notes from.")
     else:
-        names = fragments_at(repo_root, previous)
+        names = fragments_at(repo_root, reference)
         if not force:
             edited = []
             for name in names:
-                published = git_show(repo_root, previous, f"{NOTES_DIR_NAME}/{name}")
+                published = git_show(repo_root, reference, f"{NOTES_DIR_NAME}/{name}")
                 local = directory / name
                 if published is None:
                     continue
@@ -444,24 +488,24 @@ def command_new(repo_root: Path, version: str | None, force: bool) -> int:
                     edited.append(name)
             if edited:
                 print(
-                    f"error: the notes hold changes that are not in {previous} "
+                    f"error: the notes hold changes that are not in {reference} "
                     f"({', '.join(edited)}); commit them or pass --force",
                     file=sys.stderr,
                 )
                 return 1
         for name in names:
-            published = git_show(repo_root, previous, f"{NOTES_DIR_NAME}/{name}")
+            published = git_show(repo_root, reference, f"{NOTES_DIR_NAME}/{name}")
             if published is None:
                 continue
             (directory / name).write_text(published, encoding="utf-8")
-        print(f"Restored {len(names)} fragments from {previous}")
+        print(f"Restored {len(names)} fragments from {reference}")
 
     # The headline is release-specific, so it is replaced by a placeholder: `check` refuses
     # to publish a release whose headline is still the placeholder.
     (directory / SUMMARY_FRAGMENT).write_text(
         f"{SUMMARY_PLACEHOLDER}\n"
-        f"Changes since {previous or 'the previous release'}: what this release is about, "
-        f"in one or two sentences.\n",
+        f"Changes since {baseline_label(reference, is_fork_point) if reference else 'the previous release'}: "
+        f"what this release is about, in one or two sentences.\n",
         encoding="utf-8",
     )
     print(f"Wrote the headline placeholder {directory / SUMMARY_FRAGMENT}")
@@ -517,12 +561,12 @@ def command_check(repo_root: Path, version: str | None) -> int:
     # leftover: the section describes something that did not change. The comparison is
     # made against the copy the previous release kept in the git history.
     tag = current_release(repo_root, version)
-    previous = previous_tag(repo_root, tag, resolve_commit(repo_root, tag))
-    if previous:
+    reference, _ = baseline(repo_root, tag, resolve_commit(repo_root, tag))
+    if reference:
         for fragment in fragments:
-            published = git_show(repo_root, previous, f"{NOTES_DIR_NAME}/{fragment.name}")
+            published = git_show(repo_root, reference, f"{NOTES_DIR_NAME}/{fragment.name}")
             if published is not None and published.strip() == read_fragment(fragment):
-                warnings.append(f"{fragment.name} is unchanged since {previous}")
+                warnings.append(f"{fragment.name} is unchanged since {reference}")
 
     for warning in warnings:
         print(f"warning: {warning}")

@@ -195,7 +195,7 @@ class ChangelogTest(unittest.TestCase):
 
             section = release_notes.changelog_section(repo, "v3.1.0")
             self.assertIn("## Changes", section)
-            self.assertIn("the first release of this repository", section)
+            self.assertIn("the whole history of the repository", section)
             # The whole history is not a diff against a previous version: it would bury the
             # notes of the release.
             self.assertNotIn("The old work", section)
@@ -215,6 +215,59 @@ class ChangelogTest(unittest.TestCase):
             without_notes = release_notes.changelog_section(repo, "v3.1.0")
             self.assertEqual(with_notes, without_notes)
             self.assertIn("The new work", with_notes)
+
+
+class ForkPointTest(unittest.TestCase):
+    """The first release of the fork is compared against the fork point.
+
+    The commits before it belong to the upstream project: their releases are not ours to
+    describe, so they must not show up in the diff.
+    """
+
+    def test_the_first_release_is_compared_against_the_fork_point(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = make_repo(Path(directory))
+            commit(repo, "the upstream work")
+            run("git", "tag", "-a", release_notes.FORK_POINT_TAG, "-m", "the fork point", cwd=repo)
+            commit(repo, "feat: the work of the fork (#7)")
+            run("git", "tag", "v3.0.0", cwd=repo)
+
+            section = release_notes.changelog_section(repo, "v3.0.0")
+            self.assertIn("## Changes since the fork point", section)
+            self.assertIn("* The work of the fork", section)
+            # The upstream commits are before the fork point: they are not part of the diff.
+            self.assertNotIn("The upstream work", section)
+            self.assertIn(
+                "[Compare fork-point...v3.0.0](https://github.com/owner/repo/compare/fork-point...v3.0.0)",
+                section,
+            )
+
+    def test_a_previous_release_wins_over_the_fork_point(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = make_repo(Path(directory))
+            commit(repo, "the upstream work")
+            run("git", "tag", "-a", release_notes.FORK_POINT_TAG, "-m", "the fork point", cwd=repo)
+            commit(repo, "feat: the work of the fork")
+            run("git", "tag", "v3.0.0", cwd=repo)
+            commit(repo, "fix: the next one")
+            run("git", "tag", "v3.1.0", cwd=repo)
+
+            section = release_notes.changelog_section(repo, "v3.1.0")
+            self.assertIn("## Changes since v3.0.0", section)
+            self.assertNotIn("the fork point", section)
+            self.assertNotIn("The work of the fork", section)
+
+    def test_without_a_fork_point_the_history_is_not_compared(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = make_repo(Path(directory))
+            commit(repo, "the upstream work")
+            commit(repo, "feat: the work of the fork")
+            run("git", "tag", "v3.0.0", cwd=repo)
+
+            section = release_notes.changelog_section(repo, "v3.0.0")
+            self.assertIn("## Changes", section)
+            self.assertNotIn("## Changes since", section)
+            self.assertNotIn("The upstream work", section)
 
 
 class CheckTest(unittest.TestCase):

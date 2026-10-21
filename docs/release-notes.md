@@ -1,19 +1,20 @@
 # Release notes
 
-The notes of a release are not one file but a set of **fragments**, one per topic, in this
-folder. Each fragment is a self-contained markdown file: it carries its own heading, and
-the file name only decides the order it is published in (the numeric prefix). Splitting the
-notes keeps unrelated topics in unrelated files, so a reworded section never collides with
-the rest of the notes.
+The notes of a release are not one file but a set of **fragments**, one per topic, in the
+`release-notes/` folder. Each fragment is a self-contained markdown file: it carries its
+own heading, and the file name only decides the order it is published in (the numeric
+prefix). Splitting the notes keeps unrelated topics in unrelated files, so a reworded
+section never collides with the rest of the notes.
 
 | File | What it holds |
 |---|---|
 | `00-summary.md` | The headline of the release: one or two sentences on what a user would notice. Mandatory — it is what the release page shows first, and what the in-app update dialog shows as the summary of the new version. |
 | `10-….md`, `20-…` | One file per topic (`### Video playback`, `### Settings`, …). Delete the ones that do not apply to the release instead of leaving them empty. |
 
-The folder is flat and holds the notes of the release being prepared. Every past release
-keeps its own copy in the git history, at its tag: `git show v3.1.0:release-notes/00-summary.md`
-is the headline that release shipped with. There is nothing to archive by hand.
+The folder holds the notes of the release being prepared, and nothing else. Every past
+release keeps its own copy in the git history, at its tag:
+`git show v3.1.0:release-notes/00-summary.md` is the headline that release shipped with.
+There is nothing to archive by hand.
 
 The release body published on GitHub is the concatenation of the fragments, **plus** an
 automatically generated section that lists everything the commit history holds since the
@@ -53,7 +54,7 @@ usually describes something that did not change.
 `build` appends a `## Changes since <previous tag>` section built from the commit history
 between the previous release tag and this one. It is reconstructed from the git history
 alone — the previous tag, the commits in between, the diffstat — and reads nothing from
-this folder:
+the notes folder:
 
 - the commits are grouped by their conventional-commit type (`feat`, `fix`, `refactor`,
   `ci`, …); anything else lands in "Other changes";
@@ -66,6 +67,20 @@ unrelated branch never becomes the baseline of the diff.
 
 The section is generated, not written by hand: it is regenerated on every release and
 never edited. The fragments above it are the curated part.
+
+### The fork point
+
+The first release of this fork has no previous release tag, and the releases before it
+belong to the upstream project (`truefedex/tv-bro`) — they are not ours to describe. The
+`fork-point` tag marks the commit where this repository left the upstream one, and it is
+the baseline of that first release:
+
+```
+## Changes since the fork point
+```
+
+The tag is named `fork-point` on purpose: it does not match the `v*` pattern the release
+workflow triggers on, so pushing it cannot cut a release.
 
 ## Commands
 
