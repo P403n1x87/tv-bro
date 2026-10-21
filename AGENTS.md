@@ -100,6 +100,11 @@ the model/host seam polish. Work on a feature branch; **open a PR only when aske
   tests, a new lint error or a broken device flow; runs on every PR that touches code or the build
   harness; a docs-only PR (`docs/**`, `*.md`, repo metadata) runs no CI at all; publish only from a
   tag.
+- The release-notes assembler is Python, outside the Gradle build: `scripts/**` is in the CI
+  workflow's `paths-ignore`, so a change to the tool never drags the Android suites, the lint and
+  the emulator along. Its own workflow (`.github/workflows/release-notes.yml`) runs the tool's tests
+  in seconds on a bare runner; the same tests also run in the CI `tests` job, so a release stays
+  gated on them.
 - `gh release create vX.Y.Z --target <ref>` creates the tag → workflow attaches signed APKs and
   publishes the release body assembled by `scripts/release_notes.py` (fragments + the changes
   since the previous tag). Keystore: copy of the debug keystore under `secrets`

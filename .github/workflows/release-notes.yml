@@ -1,0 +1,23 @@
+name: Release notes
+
+on:
+  #The release-notes assembler is Python, outside the Gradle build: a change to it cannot break the
+  #Android sources, so it must not drag the unit suites, the lint and the emulator suite along. The
+  #main CI workflow ignores `scripts/**` for the same reason, and this workflow runs the tool's own
+  #tests instead — in seconds, on a bare runner, with no JDK and no emulator.
+  #
+  #A pull request that only adds a release-note fragment changes no Python either: the fragments are
+  #markdown, and the main workflow ignores those too. The shape of a fragment is checked when the
+  #release is cut (`python3 scripts/release_notes.py check`), in the fast gate of the main workflow.
+  pull_request:
+    paths:
+      - 'scripts/**'
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run the release-notes tests
+        run: python3 -m unittest discover --start-directory scripts/tests --top-level-directory scripts

@@ -35,6 +35,11 @@ on:
       - '.gitignore'
       - '.github/FUNDING.yml'
       - '.github/ISSUE_TEMPLATE/**'
+      #The release-notes assembler is Python, outside the Gradle build: a change to it cannot break
+      #the Android sources, so it must not drag the unit suites, the lint and the emulator suite
+      #along. Its own workflow (`.github/workflows/release-notes.yml`) runs the tool's tests
+      #instead, in seconds, on a bare runner.
+      - 'scripts/**'
   #Plain "just build it" runs (never publishes). Dispatching from master also refreshes the cache.
   workflow_dispatch:
 
@@ -73,6 +78,9 @@ jobs:
 
       #The release-notes assembler is part of the release path, so its tests run with the
       #rest: a broken assembler would otherwise only show up while a release is being cut.
+      #They also run on their own (`.github/workflows/release-notes.yml`), where they are the
+      #whole check — a pull request that only touches the assembler does not need the
+      #Android pipeline, so it does not get it.
       - name: Run release notes tests
         run: python3 -m unittest discover --start-directory scripts/tests --top-level-directory scripts
 
