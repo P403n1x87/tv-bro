@@ -100,9 +100,30 @@ the model/host seam polish. Work on a feature branch; **open a PR only when aske
   tests, a new lint error or a broken device flow; runs on every PR that touches code or the build
   harness; a docs-only PR (`docs/**`, `*.md`, repo metadata) runs no CI at all; publish only from a
   tag.
-- `gh release create vX.Y.Z --target <ref>` creates the tag → workflow attaches signed APKs and sets
-  the body from `RELEASE_NOTES.md`. Keystore: copy of the debug keystore under `secrets`
+- The release-notes assembler is Python, outside the Gradle build: `scripts/**` is in the CI
+  workflow's `paths-ignore`, so a change to the tool never drags the Android suites, the lint and
+  the emulator along. Its own workflow (`.github/workflows/release-notes.yml`) runs the tool's tests
+  in seconds on a bare runner; the same tests also run in the CI `tests` job, so a release stays
+  gated on them.
+- `gh release create vX.Y.Z --target <ref>` creates the tag → workflow attaches signed APKs and
+  publishes the release body assembled by `scripts/release_notes.py` (fragments + the changes
+  since the previous tag). Keystore: copy of the debug keystore under `secrets`
   (fallback `signing.keystore`); **never regenerate** (it is what upgrades installs in place).
+- Release notes are **fragments**, one file per *feature*, in the flat `release-notes/` folder
+  (see `docs/release-notes.md`). One file per pull request: two pull requests never touch the
+  same file, so the notes never collide. A fragment is a single bullet — no title, brief, and
+  about what the user notices, not about the implementation. Every past release keeps its own
+  copy in the git history, at its tag. Before tagging: `python3 scripts/release_notes.py new
+  vX.Y.Z` (removes the fragments the previous release shipped — the next release starts empty),
+  then `python3 scripts/release_notes.py check vX.Y.Z` (errors block the release, warnings do
+  not). `build` concatenates the fragments — in the order they landed in the repository — and
+  appends a generated `## Changes since <previous tag>` section reconstructed from the git
+  history alone (grouped by conventional-commit type, merge commits skipped, pull requests
+  linked). The first release of the fork is compared against the `fork-point` tag (the commit
+  where this repo left `truefedex/tv-bro`) instead of a previous release: the upstream
+  releases are not ours to describe. The tag is deliberately not `v*`, so pushing it cannot cut
+  a release. The tool's own tests: `python3 -m unittest discover -s scripts/tests -t scripts`
+  (the `tests` CI job runs them).
 
 ## Known issues / gotchas
 - History is keyed by URL (`HistoryDao.deleteByUrl` before insert → visits collapse to one row,
