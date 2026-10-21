@@ -498,7 +498,10 @@ def command_new(repo_root: Path, version: str | None, force: bool) -> int:
             if published is None:
                 continue
             (directory / name).write_text(published, encoding="utf-8")
-        print(f"Restored {len(names)} fragments from {reference}")
+        if names:
+            print(f"Restored {len(names)} fragments from {reference}")
+        else:
+            print(f"{reference} holds no notes to restore.")
 
     # The headline is release-specific, so it is replaced by a placeholder: `check` refuses
     # to publish a release whose headline is still the placeholder.
