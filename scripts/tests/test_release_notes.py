@@ -1,11 +1,13 @@
 """Tests of the release-notes assembler.
 
 They run with `python3 -m unittest discover -s scripts/tests -t scripts` (the CI runs
-exactly that) and cover the parts that are easy to break silently: the ordering of the
-fragments, the grouping of the generated changelog — which is reconstructed from the git
-history alone — and the checks that guard a release.
+exactly that) and cover the parts that are easy to break silently: the publication order
+of the fragments — the order they landed in the repository — the grouping of the
+generated changelog, which is reconstructed from the git history alone, and the checks
+that guard a release.
 """
 
+import os
 import subprocess
 import sys
 import tempfile
@@ -17,8 +19,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import release_notes  # noqa: E402  (the path is set up right above)
 
 
-def run(*args: str, cwd: Path) -> None:
-    subprocess.run(args, cwd=str(cwd), check=True, capture_output=True, text=True)
+def run(*args: str, cwd: Path, env: dict | None = None) -> None:
+    subprocess.run(args, cwd=str(cwd), check=True, capture_output=True, text=True, env=env)
 
 
 def make_repo(root: Path) -> Path:
@@ -36,10 +38,22 @@ def make_repo(root: Path) -> Path:
     return repo
 
 
-def commit(repo: Path, message: str) -> None:
+def commit(repo: Path, message: str, date: str | None = None) -> None:
+    """Commits everything in the working tree, at a given date when one is given."""
     (repo / "file.txt").write_text(message, encoding="utf-8")
     run("git", "add", "-A", cwd=repo)
-    run("git", "commit", "-q", "-m", message, cwd=repo)
+    env = os.environ.copy()
+    if date:
+        env["GIT_AUTHOR_DATE"] = date
+        env["GIT_COMMITTER_DATE"] = date
+    subprocess.run(
+        ["git", "commit", "-q", "-m", message],
+        cwd=str(repo),
+        check=True,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
 
 
 def write_fragment(repo: Path, name: str, text: str) -> Path:
@@ -48,6 +62,13 @@ def write_fragment(repo: Path, name: str, text: str) -> Path:
     path = directory / name
     path.write_text(text, encoding="utf-8")
     return path
+
+
+def ship(repo: Path, version: str) -> None:
+    """Commits the notes and tags them as a release."""
+    run("git", "add", "-A", cwd=repo)
+    run("git", "commit", "-q", "-m", "the notes", cwd=repo)
+    run("git", "tag", version, cwd=repo)
 
 
 class VersionTest(unittest.TestCase):
@@ -70,31 +91,49 @@ class VersionTest(unittest.TestCase):
 
 
 class FragmentOrderTest(unittest.TestCase):
-    def test_fragments_are_ordered_by_file_name(self):
+    def test_the_fragments_are_published_in_the_order_they_landed(self):
         with tempfile.TemporaryDirectory() as directory:
-            repo = Path(directory)
-            write_fragment(repo, "10-second.md", "second")
-            write_fragment(repo, "00-summary.md", "summary")
-            write_fragment(repo, "20-third.md", "third")
-            fragments = release_notes.fragment_paths(repo)
-            self.assertEqual([path.name for path in fragments], ["00-summary.md", "10-second.md", "20-third.md"])
+            repo = make_repo(Path(directory))
+            write_fragment(repo, "second.md", "### Second")
+            commit(repo, "the second feature", date="2026-01-02T00:00:00")
+            write_fragment(repo, "first.md", "### First")
+            commit(repo, "the first feature", date="2026-01-01T00:00:00")
+            write_fragment(repo, "third.md", "### Third")
+            commit(repo, "the third feature", date="2026-01-03T00:00:00")
 
-    def test_ten_sorts_before_nine(self):
-        # The names are prefixed by hand, so the order must not depend on the digits.
+            fragments = release_notes.fragment_order(repo, release_notes.fragment_paths(repo))
+            self.assertEqual(
+                [path.name for path in fragments],
+                ["first.md", "second.md", "third.md"],
+            )
+
+    def test_a_fragment_that_is_not_committed_yet_comes_last(self):
         with tempfile.TemporaryDirectory() as directory:
-            repo = Path(directory)
-            write_fragment(repo, "9-nine.md", "nine")
-            write_fragment(repo, "10-ten.md", "ten")
-            fragments = release_notes.fragment_paths(repo)
-            self.assertEqual([path.name for path in fragments], ["9-nine.md", "10-ten.md"])
+            repo = make_repo(Path(directory))
+            write_fragment(repo, "committed.md", "### Committed")
+            commit(repo, "the committed feature", date="2026-01-01T00:00:00")
+            write_fragment(repo, "fresh.md", "### Fresh")
+
+            fragments = release_notes.fragment_order(repo, release_notes.fragment_paths(repo))
+            self.assertEqual([path.name for path in fragments], ["committed.md", "fresh.md"])
+
+    def test_fragments_landed_together_are_ordered_by_name(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = make_repo(Path(directory))
+            write_fragment(repo, "beta.md", "### Beta")
+            write_fragment(repo, "alpha.md", "### Alpha")
+            commit(repo, "both features", date="2026-01-01T00:00:00")
+
+            fragments = release_notes.fragment_order(repo, release_notes.fragment_paths(repo))
+            self.assertEqual([path.name for path in fragments], ["alpha.md", "beta.md"])
 
     def test_the_readme_of_the_folder_is_not_a_fragment(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)
-            write_fragment(repo, "00-summary.md", "summary")
+            write_fragment(repo, "a-feature.md", "### A feature")
             write_fragment(repo, "README.md", "How the notes work.")
             fragments = release_notes.fragment_paths(repo)
-            self.assertEqual([path.name for path in fragments], ["00-summary.md"])
+            self.assertEqual([path.name for path in fragments], ["a-feature.md"])
 
 
 class BuildTest(unittest.TestCase):
@@ -102,11 +141,21 @@ class BuildTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             repo = make_repo(Path(directory))
             commit(repo, "the work")
-            write_fragment(repo, "00-summary.md", "The headline.")
-            write_fragment(repo, "10-feature.md", "### A feature\n\n* Something.")
+            write_fragment(repo, "a-feature.md", "### A feature\n\n* Something.")
             body = release_notes.build_body(repo, "v3.1.0")
-            self.assertTrue(body.startswith("The headline.\n\n### A feature"))
+            self.assertTrue(body.startswith("### A feature"))
             self.assertIn("## Changes", body)
+
+    def test_the_body_follows_the_order_the_fragments_landed_in(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = make_repo(Path(directory))
+            write_fragment(repo, "second.md", "### Second")
+            commit(repo, "the second feature", date="2026-01-02T00:00:00")
+            write_fragment(repo, "first.md", "### First")
+            commit(repo, "the first feature", date="2026-01-01T00:00:00")
+
+            body = release_notes.build_body(repo, "v3.1.0")
+            self.assertLess(body.index("### First"), body.index("### Second"))
 
     def test_build_fails_without_fragments(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -209,7 +258,7 @@ class ChangelogTest(unittest.TestCase):
             run("git", "tag", "v3.0.0", cwd=repo)
             commit(repo, "feat: the new work")
             run("git", "tag", "v3.1.0", cwd=repo)
-            write_fragment(repo, "00-summary.md", "The headline.")
+            write_fragment(repo, "a-feature.md", "### A feature")
 
             with_notes = release_notes.changelog_section(repo, "v3.1.0")
             without_notes = release_notes.changelog_section(repo, "v3.1.0")
@@ -271,78 +320,89 @@ class ForkPointTest(unittest.TestCase):
 
 
 class CheckTest(unittest.TestCase):
-    def test_notes_without_a_headline_are_an_error(self):
+    def test_notes_without_a_fragment_are_an_error(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)
-            write_fragment(repo, "10-feature.md", "### A feature")
             self.assertEqual(release_notes.command_check(repo, "v3.1.0"), 1)
 
-    def test_the_placeholder_headline_is_an_error(self):
+    def test_an_empty_folder_is_an_error(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)
-            write_fragment(repo, "00-summary.md", f"{release_notes.SUMMARY_PLACEHOLDER}\n")
-            self.assertEqual(release_notes.command_check(repo, "v3.1.0"), 1)
-
-    def test_an_empty_headline_is_an_error(self):
-        with tempfile.TemporaryDirectory() as directory:
-            repo = Path(directory)
-            write_fragment(repo, "00-summary.md", "   \n")
+            (repo / release_notes.NOTES_DIR_NAME).mkdir()
             self.assertEqual(release_notes.command_check(repo, "v3.1.0"), 1)
 
     def test_a_written_release_passes(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)
-            write_fragment(repo, "00-summary.md", "The headline.")
-            write_fragment(repo, "10-feature.md", "### A feature")
+            write_fragment(repo, "a-feature.md", "### A feature")
             self.assertEqual(release_notes.command_check(repo, "v3.1.0"), 0)
 
-    def test_an_untouched_fragment_is_only_a_warning(self):
+    def test_an_empty_fragment_is_only_a_warning(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            write_fragment(repo, "a-feature.md", "   \n")
+            self.assertEqual(release_notes.command_check(repo, "v3.1.0"), 0)
+
+    def test_a_fragment_that_already_shipped_is_only_a_warning(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = make_repo(Path(directory))
             commit(repo, "the work")
-            run("git", "tag", "v3.0.0", cwd=repo)
-            write_fragment(repo, "00-summary.md", "The headline.")
-            write_fragment(repo, "10-feature.md", "### A feature")
-            run("git", "add", "-A", cwd=repo)
-            run("git", "commit", "-q", "-m", "the notes", cwd=repo)
-            run("git", "tag", "v3.0.1", cwd=repo)
-            write_fragment(repo, "00-summary.md", "The new headline.")
-            # The fragment is byte for byte the one the previous release kept in the history.
+            write_fragment(repo, "a-feature.md", "### A feature")
+            ship(repo, "v3.0.0")
+            # The fragment is byte for byte the one the previous release shipped: it is a
+            # leftover, but it does not block the release.
             self.assertEqual(release_notes.command_check(repo, "v3.1.0"), 0)
 
 
 class NewTest(unittest.TestCase):
-    def test_restores_the_fragments_of_the_previous_release(self):
+    """`new` starts the notes of the next release: the fragments the previous release
+    shipped are removed, the ones that were not are kept."""
+
+    def test_removes_the_fragments_the_previous_release_shipped(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = make_repo(Path(directory))
             commit(repo, "the work")
-            write_fragment(repo, "00-summary.md", "The published headline.")
-            write_fragment(repo, "10-feature.md", "### The published feature")
-            run("git", "add", "-A", cwd=repo)
-            run("git", "commit", "-q", "-m", "the notes", cwd=repo)
-            run("git", "tag", "v3.0.0", cwd=repo)
+            write_fragment(repo, "shipped.md", "### The shipped feature")
+            ship(repo, "v3.0.0")
+
+            self.assertEqual(release_notes.command_new(repo, "v3.1.0", False), 0)
+            self.assertFalse((repo / release_notes.NOTES_DIR_NAME / "shipped.md").exists())
+
+    def test_keeps_the_fragments_that_were_not_shipped(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = make_repo(Path(directory))
+            commit(repo, "the work")
+            write_fragment(repo, "shipped.md", "### The shipped feature")
+            ship(repo, "v3.0.0")
+            write_fragment(repo, "fresh.md", "### The feature in progress")
 
             self.assertEqual(release_notes.command_new(repo, "v3.1.0", False), 0)
             directory = repo / release_notes.NOTES_DIR_NAME
-            # The headline is release specific: it is replaced by a placeholder the check refuses.
-            self.assertIn(release_notes.SUMMARY_PLACEHOLDER, (directory / "00-summary.md").read_text(encoding="utf-8"))
-            self.assertEqual(
-                (directory / "10-feature.md").read_text(encoding="utf-8"),
-                "### The published feature",
-            )
+            self.assertFalse((directory / "shipped.md").exists())
+            self.assertTrue((directory / "fresh.md").exists())
 
-    def test_refuses_to_drop_local_changes(self):
+    def test_refuses_to_drop_a_fragment_edited_after_the_release(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = make_repo(Path(directory))
             commit(repo, "the work")
-            write_fragment(repo, "00-summary.md", "The published headline.")
-            run("git", "add", "-A", cwd=repo)
-            run("git", "commit", "-q", "-m", "the notes", cwd=repo)
-            run("git", "tag", "v3.0.0", cwd=repo)
-            write_fragment(repo, "00-summary.md", "Something else entirely.")
+            write_fragment(repo, "shipped.md", "### The shipped feature")
+            ship(repo, "v3.0.0")
+            write_fragment(repo, "shipped.md", "### The shipped feature, edited")
 
             self.assertEqual(release_notes.command_new(repo, "v3.1.0", False), 1)
+            # The edit is still there: the command refuses before touching anything.
+            self.assertTrue((repo / release_notes.NOTES_DIR_NAME / "shipped.md").exists())
             self.assertEqual(release_notes.command_new(repo, "v3.1.0", True), 0)
+            self.assertFalse((repo / release_notes.NOTES_DIR_NAME / "shipped.md").exists())
+
+    def test_nothing_to_clear_without_a_previous_release(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = make_repo(Path(directory))
+            commit(repo, "the work")
+            write_fragment(repo, "a-feature.md", "### A feature")
+
+            self.assertEqual(release_notes.command_new(repo, "v3.1.0", False), 0)
+            self.assertTrue((repo / release_notes.NOTES_DIR_NAME / "a-feature.md").exists())
 
 
 class RemoteUrlTest(unittest.TestCase):

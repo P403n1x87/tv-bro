@@ -1,53 +1,65 @@
 # Release notes
 
-The notes of a release are not one file but a set of **fragments**, one per topic, in the
+The notes of a release are a set of **fragments**, one per **feature**, in the
 `release-notes/` folder. Each fragment is a self-contained markdown file: it carries its
-own heading, and the file name only decides the order it is published in (the numeric
-prefix). Splitting the notes keeps unrelated topics in unrelated files, so a reworded
-section never collides with the rest of the notes.
+own heading and describes a single feature.
+
+**One file per feature, one file per pull request.** A pull request that adds a feature
+adds its own fragment, so two pull requests never touch the same file: the notes never
+collide, and nobody has to rebase a shared file to land a feature.
 
 | File | What it holds |
 |---|---|
-| `00-summary.md` | The headline of the release: one or two sentences on what a user would notice. Mandatory — it is what the release page shows first, and what the in-app update dialog shows as the summary of the new version. |
-| `10-….md`, `20-…` | One file per topic (`### Video playback`, `### Settings`, …). Delete the ones that do not apply to the release instead of leaving them empty. |
+| `history-screen.md` | One feature: a `###` heading and what the user notices. The file name is kebab-case and describes the feature. |
 
 The folder holds the notes of the release being prepared, and nothing else. Every past
 release keeps its own copy in the git history, at its tag:
-`git show v3.1.0:release-notes/00-summary.md` is the headline that release shipped with.
+`git show v3.1.0:release-notes/history-screen.md` is the note that release shipped with.
 There is nothing to archive by hand.
 
-The release body published on GitHub is the concatenation of the fragments, **plus** an
+The release body published on GitHub is the concatenation of the fragments — **in the
+order they landed in the repository**, which is the order of the work — plus an
 automatically generated section that lists everything the commit history holds since the
 previous release. The hand-written fragments tell the story; the generated section makes
 sure nothing is missed.
 
+## Adding a note to a pull request
+
+Drop a file in `release-notes/`, named after the feature:
+
+```markdown
+### My feature
+
+What the user notices, in a sentence or two.
+```
+
+That is the whole convention: one file, one heading, one feature. The file name is
+kebab-case (`live-stream-recovery.md`), the heading is the title of the feature.
+
 ## Cutting a release
 
 ```sh
-# 1. Restore the notes of the release that was published last and reset the headline.
+# 1. Remove the fragments the previous release shipped: the next release starts empty.
 python3 scripts/release_notes.py new v3.1.0
 
-# 2. Write the notes: the headline in 00-summary.md, then one fragment per topic.
-#    The restored fragments are a starting point — delete the ones that do not apply.
-
-# 3. Check them. Errors block the release, warnings do not.
+# 2. Check the notes. Errors block the release, warnings do not.
 python3 scripts/release_notes.py check v3.1.0
 
-# 4. Preview the release body.
+# 3. Preview the release body.
 python3 scripts/release_notes.py build v3.1.0
 
-# 5. Cut the release: the tag triggers the workflow, which publishes the assembled body.
+# 4. Cut the release: the tag triggers the workflow, which publishes the assembled body.
 gh release create v3.1.0 --target master
 ```
 
-`new` refuses to run when the notes hold changes that are not in the previous release
-(commit them first, or pass `--force`): the notes of a release live in the git history, so
-the published copy is never the only one.
+`new` removes the fragments the previous release shipped — their copy lives in the git
+history, at the tag — and keeps the ones that were not shipped, which are the work in
+progress for the next release. It refuses to run when a shipped fragment was edited
+after the release, unless `--force` is passed: the edit would be lost.
 
-`new` writes a placeholder headline, and `check` refuses a release whose headline is still
-the placeholder — a release never goes out with an empty summary. `check` also warns about
-a fragment that is byte for byte the one the previous release kept in the history: it
-usually describes something that did not change.
+`check` fails when the release has no fragment at all, and warns about a fragment that is
+empty or that is byte for byte the one the previous release shipped — a leftover: the
+feature was already announced, so the fragment must not be published again.
 
 ## The generated section
 
@@ -86,10 +98,10 @@ workflow triggers on, so pushing it cannot cut a release.
 
 | Command | What it does |
 |---|---|
-| `new [version]` | Restores the fragments of the previous release from its tag and writes the placeholder headline. `--force` restores them even when the notes hold changes. |
+| `new [version]` | Removes the fragments the previous release shipped, so the next release starts empty. `--force` removes them even when they were edited after the release. |
 | `build [version]` | Assembles the release body (fragments + generated section) and writes it to stdout, or to `--output <file>`. |
 | `changelog [version]` | Prints only the generated section. |
-| `check [version]` | Validates the notes: a missing folder, a missing headline or a placeholder headline is an error; an empty or untouched fragment is a warning. |
+| `check [version]` | Validates the notes: a missing folder or a release without any fragment is an error; an empty or already shipped fragment is a warning. |
 
 The version is optional: it defaults to the tag at HEAD, and only drives the generated
 section (which release the diff is computed against).

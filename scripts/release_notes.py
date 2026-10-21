@@ -2,13 +2,15 @@
 """Assembles the GitHub release body out of the release-note fragments.
 
 The notes of a release live in a flat ``release-notes/`` folder: one markdown file per
-topic, each self-contained (it carries its own heading) and ordered by the numeric prefix
-of its file name.  The folder holds the notes of the release being prepared; every past
-release keeps its own copy in the git history, at its tag, so the notes of a release are
-always recoverable — there is nothing to archive by hand.
+**feature**, each self-contained (it carries its own heading).  Every pull request that
+adds a feature adds its own file, so two pull requests never touch the same one and the
+notes never collide.  The folder holds the notes of the release being prepared; every
+past release keeps its own copy in the git history, at its tag, so the notes of a release
+are always recoverable — there is nothing to archive by hand.
 
-This tool concatenates the fragments and appends an automatically generated section that
-lists everything the commit history holds since the previous release.  That section is
+This tool concatenates the fragments — in the order they landed in the repository, which
+is the order of the work — and appends an automatically generated section that lists
+everything the commit history holds since the previous release.  That section is
 reconstructed from the git history alone — the previous tag, the commits in between, the
 diffstat — so it never depends on anything stored in the working tree.  The first release
 of the fork is compared against the fork point (the `fork-point` tag), because the
@@ -17,8 +19,8 @@ releases before it belong to the upstream project.
 The documentation of the notes lives in `docs/release-notes.md`.
 
 Commands:
-  new [version]        prepare the notes of the next release: restore the fragments of
-                        the previous release from its tag and reset the headline
+  new [version]        start the notes of the next release: remove the fragments the
+                        previous release shipped
   build [version]      write the release body (fragments + generated changelog)
   changelog [version]  write only the generated changelog section
   check [version]      validate the fragments
@@ -45,13 +47,6 @@ NOTES_README = "README.md"
 # baseline of the first release of the fork: the releases before it belong to the
 # upstream project and are not ours to describe.
 FORK_POINT_TAG = "fork-point"
-# The fragment holding the headline of a release.  It is the only mandatory one: it is
-# what the release page shows first, and what the in-app update dialog shows as the
-# summary of the new version.
-SUMMARY_FRAGMENT = "00-summary.md"
-# Marker left in a freshly seeded headline, so `check` can tell an unwritten headline
-# from a written one.
-SUMMARY_PLACEHOLDER = "<!-- release-notes: summary placeholder -->"
 # The hash of the empty tree, used to diff against when a release has no predecessor.
 EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
@@ -321,6 +316,35 @@ def read_fragment(path: Path) -> str:
     return path.read_text(encoding="utf-8").strip()
 
 
+def added_at(repo_root: Path, path: Path) -> int | None:
+    """The timestamp of the commit that added a file, or None when it is not in the history.
+
+    The date is the one of the author of the commit, not the one of the commit itself: it
+    does not change when the commit is rebased or cherry-picked.
+    """
+    try:
+        relative = path.relative_to(repo_root).as_posix()
+    except ValueError:
+        return None
+    try:
+        listed = git(repo_root, "log", "--diff-filter=A", "--reverse", "--format=%at", "--", relative)
+    except GitError:
+        return None
+    stamps = [int(line.strip()) for line in listed.splitlines() if line.strip().isdigit()]
+    return stamps[0] if stamps else None
+
+
+def fragment_order(repo_root: Path, fragments: list[Path]) -> list[Path]:
+    """The fragments in publication order: the order they landed in the repository.
+
+    Every pull request adds its own fragment, so the order of the files is the order of
+    the work. A fragment that is not committed yet comes last: it is the newest one.
+    """
+    dated = [(added_at(repo_root, path), path.name, path) for path in fragments]
+    dated.sort(key=lambda item: (item[0] is None, item[0] or 0, item[1]))
+    return [item[2] for item in dated]
+
+
 def fragments_at(repo_root: Path, ref: str) -> list[str]:
     """The names of the fragments a revision held, in publication order.
 
@@ -444,7 +468,7 @@ def changelog_section(repo_root: Path, version: str | None) -> str:
 
 def build_body(repo_root: Path, version: str | None) -> str:
     """The release body: the fragments of the notes, then the generated section."""
-    fragments = fragment_paths(repo_root)
+    fragments = fragment_order(repo_root, fragment_paths(repo_root))
     if not fragments:
         raise NotesError(f"no fragment in {notes_dir(repo_root)}")
     parts = []
@@ -459,60 +483,57 @@ def build_body(repo_root: Path, version: str | None) -> str:
 
 
 def command_new(repo_root: Path, version: str | None, force: bool) -> int:
-    """Prepares the notes of the next release.
+    """Starts the notes of the next release.
 
-    The fragments of the previous release are restored from its tag — the notes of a
-    release live in the git history, so the working tree is never the only copy — and the
-    headline is reset to a placeholder the check refuses to publish.
+    The fragments the previous release shipped are removed from the working tree: their
+    copy lives in the git history, at the tag of that release, and the next release starts
+    from an empty folder. Every pull request adds its own fragment, so two pull requests
+    never touch the same file.
+
+    A fragment that was edited after the release is not removed — the edit would be lost.
+    The command refuses to run in that case, unless it is forced.
     """
     tag = current_release(repo_root, version)
     commit = resolve_commit(repo_root, tag)
     reference, is_fork_point = baseline(repo_root, tag, commit)
     directory = notes_dir(repo_root)
-    directory.mkdir(parents=True, exist_ok=True)
+    if not directory.is_dir():
+        print(f"Nothing to clear: {directory} does not exist.")
+        return 0
 
-    if not reference or is_fork_point:
-        # The fork point is not a release of this fork: there are no notes to restore
-        # from it, the fragments of the working tree are the ones to write.
-        print("No previous release to restore the notes from.")
-    else:
-        names = fragments_at(repo_root, reference)
-        if not force:
-            edited = []
-            for name in names:
-                published = git_show(repo_root, reference, f"{NOTES_DIR_NAME}/{name}")
-                local = directory / name
-                if published is None:
-                    continue
-                if not local.exists() or local.read_text(encoding="utf-8").strip() != published.strip():
-                    edited.append(name)
-            if edited:
-                print(
-                    f"error: the notes hold changes that are not in {reference} "
-                    f"({', '.join(edited)}); commit them or pass --force",
-                    file=sys.stderr,
-                )
-                return 1
-        for name in names:
-            published = git_show(repo_root, reference, f"{NOTES_DIR_NAME}/{name}")
-            if published is None:
+    shipped = fragments_at(repo_root, reference) if reference and not is_fork_point else []
+    if not shipped:
+        print("No previous release to clear the notes of.")
+        return 0
+
+    removable: list[Path] = []
+    edited: list[str] = []
+    for name in shipped:
+        published = git_show(repo_root, reference, f"{NOTES_DIR_NAME}/{name}")
+        local = directory / name
+        if not local.exists():
+            continue
+        if published is not None and local.read_text(encoding="utf-8").strip() != published.strip():
+            edited.append(name)
+            if not force:
                 continue
-            (directory / name).write_text(published, encoding="utf-8")
-        if names:
-            print(f"Restored {len(names)} fragments from {reference}")
-        else:
-            print(f"{reference} holds no notes to restore.")
+        removable.append(local)
 
-    # The headline is release-specific, so it is replaced by a placeholder: `check` refuses
-    # to publish a release whose headline is still the placeholder.
-    (directory / SUMMARY_FRAGMENT).write_text(
-        f"{SUMMARY_PLACEHOLDER}\n"
-        f"Changes since {baseline_label(reference, is_fork_point) if reference else 'the previous release'}: "
-        f"what this release is about, in one or two sentences.\n",
-        encoding="utf-8",
-    )
-    print(f"Wrote the headline placeholder {directory / SUMMARY_FRAGMENT}")
-    print("Edit the fragments, then cut the release with `gh release create`.")
+    if edited and not force:
+        print(
+            f"error: these fragments were edited after {reference} ({', '.join(edited)}); "
+            f"commit them or pass --force to drop them",
+            file=sys.stderr,
+        )
+        return 1
+
+    for path in removable:
+        path.unlink()
+    if removable:
+        print(f"Removed {len(removable)} fragments shipped by {reference}: {', '.join(path.name for path in removable)}")
+    else:
+        print(f"Nothing to remove: {reference} shipped no fragment.")
+    print("The next release starts empty: every pull request adds its own fragment.")
     return 0
 
 
@@ -547,29 +568,21 @@ def command_check(repo_root: Path, version: str | None) -> int:
     if not directory.is_dir():
         errors.append(f"no notes: {directory} does not exist")
     elif not fragments:
-        errors.append(f"{directory} holds no fragment")
+        errors.append(f"{directory} holds no fragment: a release needs at least one feature fragment")
 
-    summary = directory / SUMMARY_FRAGMENT
-    if not summary.exists():
-        errors.append(f"{directory} has no {SUMMARY_FRAGMENT}: a release needs a headline")
-    elif not read_fragment(summary):
-        errors.append(f"{summary} is empty: a release needs a headline")
-    elif SUMMARY_PLACEHOLDER in summary.read_text(encoding="utf-8"):
-        errors.append(f"{summary} still holds the placeholder headline")
     for fragment in fragments:
         if not read_fragment(fragment):
             warnings.append(f"{fragment.name} is empty")
 
-    # A fragment that is byte for byte the one of the previous release is very likely a
-    # leftover: the section describes something that did not change. The comparison is
-    # made against the copy the previous release kept in the git history.
+    # A fragment that is byte for byte the one the previous release shipped is a leftover:
+    # the feature was already announced, and the fragment must not be published again.
     tag = current_release(repo_root, version)
     reference, _ = baseline(repo_root, tag, resolve_commit(repo_root, tag))
     if reference:
         for fragment in fragments:
             published = git_show(repo_root, reference, f"{NOTES_DIR_NAME}/{fragment.name}")
             if published is not None and published.strip() == read_fragment(fragment):
-                warnings.append(f"{fragment.name} is unchanged since {reference}")
+                warnings.append(f"{fragment.name} already shipped in {reference}: remove it")
 
     for warning in warnings:
         print(f"warning: {warning}")
