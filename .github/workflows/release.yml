@@ -269,11 +269,23 @@ jobs:
             echo "::error::aapt not found under '$sdk' — cannot verify the APK version"
             exit 1
           fi
+          #The versionCode is derived from the version name ("1.0.0" -> 10000, see
+          #versionCodeFromName in app/build.gradle.kts). The package manager refuses to install an
+          #APK whose code is lower than the installed one, so a published APK that does not carry
+          #the code its version implies is a release that cannot upgrade anybody: fail here.
+          version="${{ steps.version.outputs.version }}"
+          base="${version%%-*}"
+          IFS='.' read -r major minor patch <<< "$base"
+          expected_code=$(( 10#${major:-0} * 10000 + 10#${minor:-0} * 100 + 10#${patch:-0} ))
           for apk in app/build/outputs/apk/p403n1x87*/release/*.apk; do
             badging=$("$aapt" dump badging "$apk" | head -1)
             echo "$apk -> $badging"
-            if ! grep -qF "versionName='${{ steps.version.outputs.version }}'" <<< "$badging"; then
-              echo "::error::$apk does not carry versionName ${{ steps.version.outputs.version }}"
+            if ! grep -qF "versionName='$version'" <<< "$badging"; then
+              echo "::error::$apk does not carry versionName $version"
+              exit 1
+            fi
+            if ! grep -qF "versionCode='$expected_code'" <<< "$badging"; then
+              echo "::error::$apk does not carry versionCode $expected_code (derived from $version)"
               exit 1
             fi
             #AGP names a release APK built without a signing config "*-unsigned.apk": the in-app
@@ -290,7 +302,7 @@ jobs:
         run: |
           for dir in p403n1x87GeckoIncluded p403n1x87GeckoExcluded; do
             for f in app/build/outputs/apk/${dir}/release/app-*.apk; do
-              new="${f/app-/tvbro-${{ steps.version.outputs.version }}-}"
+              new="${f/app-/odysseus-${{ steps.version.outputs.version }}-}"
               new="${new/-release-unsigned.apk/.apk}"
               new="${new/-release.apk/.apk}"
               mv "$f" "$new"
@@ -303,7 +315,7 @@ jobs:
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         uses: actions/upload-artifact@v4
         with:
-          name: tvbro-${{ steps.version.outputs.version || github.run_number }}
+          name: odysseus-${{ steps.version.outputs.version || github.run_number }}
           path: app/build/outputs/apk/**/release/*.apk
           if-no-files-found: error
 
@@ -327,7 +339,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
+          name: Odysseus ${{ steps.version.outputs.version }}
           body_path: build/release-notes.md
           prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
           #A glob that matches nothing would otherwise publish an empty release and still go green.
