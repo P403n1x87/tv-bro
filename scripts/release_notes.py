@@ -2,11 +2,12 @@
 """Assembles the GitHub release body out of the release-note fragments.
 
 The notes of a release live in a flat ``release-notes/`` folder: one markdown file per
-**feature**, each self-contained (it carries its own heading).  Every pull request that
-adds a feature adds its own file, so two pull requests never touch the same one and the
-notes never collide.  The folder holds the notes of the release being prepared; every
-past release keeps its own copy in the git history, at its tag, so the notes of a release
-are always recoverable — there is nothing to archive by hand.
+**feature**, each holding a single bullet — a brief description of what the user notices.
+Every pull request that adds a feature adds its own file, so two pull requests never
+touch the same one and the notes never collide.  The folder holds the notes of the
+release being prepared; every past release keeps its own copy in the git history, at its
+tag, so the notes of a release are always recoverable — there is nothing to archive by
+hand.
 
 This tool concatenates the fragments — in the order they landed in the repository, which
 is the order of the work — and appends an automatically generated section that lists
