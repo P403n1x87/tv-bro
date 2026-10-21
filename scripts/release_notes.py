@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
 """Assembles the GitHub release body out of the release-note fragments.
 
-The notes of a release are not one file but a set of markdown *fragments* under
-``release-notes/<tag>/``: one file per topic, each self-contained (it carries its own
-heading) and ordered by the numeric prefix of its file name.  Splitting them keeps
-unrelated topics in unrelated files, so a reworded section never conflicts with the
-rest of the notes.
+The notes of a release live in a flat ``release-notes/`` folder: one markdown file per
+topic, each self-contained (it carries its own heading) and ordered by the numeric prefix
+of its file name.  The folder holds the notes of the release being prepared; every past
+release keeps its own copy in the git history, at its tag, so the notes of a release are
+always recoverable — there is nothing to archive by hand.
 
-This tool concatenates those fragments and appends an automatically generated section
-that lists everything the commit history holds since the previous release, so the
-release page never misses a change the hand-written notes forgot.
+This tool concatenates the fragments and appends an automatically generated section that
+lists everything the commit history holds since the previous release.  That section is
+reconstructed from the git history alone — the previous tag, the commits in between, the
+diffstat — so it never depends on anything stored in the working tree.
 
 Commands:
-  new <version>        create the fragment folder of a new release, seeded with the
-                        fragments of the previous one
-  build <version>      write the release body (fragments + generated changelog)
-  changelog <version>  write only the generated changelog section
-  check <version>      validate the fragments of a release
-  list                 list the releases that have fragments
+  new [version]        prepare the notes of the next release: restore the fragments of
+                        the previous release from its tag and reset the headline
+  build [version]      write the release body (fragments + generated changelog)
+  changelog [version]  write only the generated changelog section
+  check [version]      validate the fragments
 
 Only the standard library is used, so the tool runs on a bare CI runner and on any
 developer machine with Python 3.8+.
@@ -27,18 +27,19 @@ from __future__ import annotations
 
 import argparse
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
-# The folder holding the fragments of every release, one sub-folder per tag.
+# The flat folder holding the fragments of the release being prepared.
 NOTES_DIR_NAME = "release-notes"
+# The file of the folder that is documentation, not a fragment.
+NOTES_README = "README.md"
 # The fragment holding the headline of a release.  It is the only mandatory one: it is
 # what the release page shows first, and what the in-app update dialog shows as the
 # summary of the new version.
 SUMMARY_FRAGMENT = "00-summary.md"
-# Marker left in a freshly seeded summary, so `check` can tell an unwritten headline
+# Marker left in a freshly seeded headline, so `check` can tell an unwritten headline
 # from a written one.
 SUMMARY_PLACEHOLDER = "<!-- release-notes: summary placeholder -->"
 # The hash of the empty tree, used to diff against when a release has no predecessor.
@@ -130,23 +131,43 @@ def git(repo_root: Path, *args: str) -> str:
     return result.stdout
 
 
-def resolve_commit(repo_root: Path, tag: str) -> str:
-    """The commit a tag points at, or HEAD when the tag does not exist yet (a local dry run).
+def git_show(repo_root: Path, ref: str, path: str) -> str | None:
+    """The content of a file at a revision, or None when it does not exist there."""
+    try:
+        return git(repo_root, "show", f"{ref}:{path}")
+    except GitError:
+        return None
+
+
+def current_release(repo_root: Path, version: str | None) -> str | None:
+    """The release a command works on: the given version, or the tag at HEAD."""
+    if version:
+        return normalize_version(version)
+    try:
+        described = git(repo_root, "describe", "--tags", "--exact-match", "HEAD").strip()
+    except GitError:
+        return None
+    return described if VERSION_RE.match(described) else None
+
+
+def resolve_commit(repo_root: Path, tag: str | None) -> str:
+    """The commit of a release, or HEAD when the tag does not exist yet (a local dry run).
 
     An empty string means the repository has no commit yet, which the callers treat as
     "there is nothing to compare".
     """
-    try:
-        return git(repo_root, "rev-list", "-n", "1", tag).strip()
-    except GitError:
-        pass
+    if tag:
+        try:
+            return git(repo_root, "rev-list", "-n", "1", tag).strip()
+        except GitError:
+            pass
     try:
         return git(repo_root, "rev-parse", "HEAD").strip()
     except GitError:
         return ""
 
 
-def previous_tag(repo_root: Path, tag: str, commit: str) -> str | None:
+def previous_tag(repo_root: Path, tag: str | None, commit: str) -> str | None:
     """The newest release tag that is an ancestor of `commit`, i.e. the version this one succeeds.
 
     Only ancestors count: a tag cut from an unrelated branch is not a predecessor of this
@@ -230,9 +251,9 @@ def github_repo_url(repo_root: Path) -> str | None:
 # --------------------------------------------------------------------------------------
 
 
-def notes_dir(repo_root: Path, version: str) -> Path:
-    """The folder holding the fragments of a release."""
-    return repo_root / NOTES_DIR_NAME / normalize_version(version)
+def notes_dir(repo_root: Path) -> Path:
+    """The flat folder holding the fragments."""
+    return repo_root / NOTES_DIR_NAME
 
 
 def natural_key(name: str) -> list[tuple[int, object]]:
@@ -240,11 +261,16 @@ def natural_key(name: str) -> list[tuple[int, object]]:
     return [(0, int(part)) if part.isdigit() else (1, part.lower()) for part in re.split(r"(\d+)", name)]
 
 
-def fragment_paths(directory: Path) -> list[Path]:
-    """The fragments of a release, in the order they are published in."""
+def fragment_paths(repo_root: Path) -> list[Path]:
+    """The fragments of the notes, in the order they are published in."""
+    directory = notes_dir(repo_root)
     if not directory.is_dir():
         return []
-    fragments = [path for path in directory.iterdir() if path.is_file() and path.suffix == ".md"]
+    fragments = [
+        path
+        for path in directory.iterdir()
+        if path.is_file() and path.suffix == ".md" and path.name != NOTES_README
+    ]
     return sorted(fragments, key=lambda path: natural_key(path.name))
 
 
@@ -253,19 +279,26 @@ def read_fragment(path: Path) -> str:
     return path.read_text(encoding="utf-8").strip()
 
 
-def release_folders(repo_root: Path) -> list[Path]:
-    """The fragment folders of every release that has one, oldest first."""
-    base = repo_root / NOTES_DIR_NAME
-    if not base.is_dir():
+def fragments_at(repo_root: Path, ref: str) -> list[str]:
+    """The names of the fragments a revision held, in publication order.
+
+    The names are relative to the notes folder, like the ones of the working tree.
+    """
+    try:
+        listed = git(repo_root, "ls-tree", "--name-only", ref, f"{NOTES_DIR_NAME}/")
+    except GitError:
         return []
-    folders = [path for path in base.iterdir() if path.is_dir() and VERSION_RE.match(path.name)]
-    return sorted(folders, key=lambda path: version_key(path.name))
-
-
-def latest_release_folder(repo_root: Path, exclude: str | None = None) -> Path | None:
-    """The fragment folder of the newest release, optionally skipping one version."""
-    folders = [folder for folder in release_folders(repo_root) if folder.name != exclude]
-    return folders[-1] if folders else None
+    prefix = f"{NOTES_DIR_NAME}/"
+    names = []
+    for line in listed.splitlines():
+        name = line.strip()
+        if not name.startswith(prefix):
+            continue
+        name = name[len(prefix) :]
+        if not name.endswith(".md") or name == NOTES_README:
+            continue
+        names.append(name)
+    return sorted(names, key=natural_key)
 
 
 # --------------------------------------------------------------------------------------
@@ -313,9 +346,13 @@ def format_entry(subject: str, repo_url: str | None) -> str:
     return entry
 
 
-def changelog_section(repo_root: Path, version: str) -> str:
-    """The generated section: everything the commit history holds since the previous release."""
-    tag = normalize_version(version)
+def changelog_section(repo_root: Path, version: str | None) -> str:
+    """The generated section: everything the commit history holds since the previous release.
+
+    Everything it shows comes from the git history: the previous tag, the commits in
+    between and the diffstat. Nothing is read from the notes folder.
+    """
+    tag = current_release(repo_root, version)
     commit = resolve_commit(repo_root, tag)
     if not commit:
         return ""
@@ -351,7 +388,7 @@ def changelog_section(repo_root: Path, version: str) -> str:
         lines.append(f"### {category}")
         lines.extend(f"* {entry}" for entry in entries)
 
-    if previous and repo_url:
+    if tag and repo_url:
         lines.append("")
         lines.append(f"[Compare {previous}...{tag}]({repo_url}/compare/{previous}...{tag})")
 
@@ -363,50 +400,68 @@ def changelog_section(repo_root: Path, version: str) -> str:
 # --------------------------------------------------------------------------------------
 
 
-def build_body(repo_root: Path, version: str) -> str:
-    """The release body: the fragments of the release, then the generated section."""
-    directory = notes_dir(repo_root, version)
-    if not directory.is_dir():
-        raise NotesError(
-            f"no fragments for {normalize_version(version)}: {directory} does not exist "
-            f"(create it with `release_notes.py new {normalize_version(version)}`)"
-        )
+def build_body(repo_root: Path, version: str | None) -> str:
+    """The release body: the fragments of the notes, then the generated section."""
+    fragments = fragment_paths(repo_root)
+    if not fragments:
+        raise NotesError(f"no fragment in {notes_dir(repo_root)}")
     parts = []
-    for fragment in fragment_paths(directory):
+    for fragment in fragments:
         text = read_fragment(fragment)
         if text:
             parts.append(text)
-    if not parts:
-        raise NotesError(f"{directory} holds no fragment with any content")
     changelog = changelog_section(repo_root, version)
     if changelog:
         parts.append(changelog)
     return "\n\n".join(parts).rstrip() + "\n"
 
 
-def command_new(repo_root: Path, version: str) -> int:
-    """Creates the fragment folder of a release, seeded with the fragments of the previous one."""
-    tag = normalize_version(version)
-    directory = notes_dir(repo_root, tag)
-    if directory.exists():
-        print(f"error: {directory} already exists", file=sys.stderr)
-        return 1
-    directory.mkdir(parents=True)
+def command_new(repo_root: Path, version: str | None, force: bool) -> int:
+    """Prepares the notes of the next release.
 
-    previous_folder = latest_release_folder(repo_root, exclude=tag)
-    if previous_folder:
-        for fragment in fragment_paths(previous_folder):
-            shutil.copy2(fragment, directory / fragment.name)
-        print(f"Seeded {directory} from {previous_folder.name} ({len(fragment_paths(directory))} fragments)")
+    The fragments of the previous release are restored from its tag — the notes of a
+    release live in the git history, so the working tree is never the only copy — and the
+    headline is reset to a placeholder the check refuses to publish.
+    """
+    tag = current_release(repo_root, version)
+    commit = resolve_commit(repo_root, tag)
+    previous = previous_tag(repo_root, tag, commit)
+    directory = notes_dir(repo_root)
+    directory.mkdir(parents=True, exist_ok=True)
+
+    if not previous:
+        print("No previous release to restore the notes from.")
     else:
-        print(f"Created {directory}")
+        names = fragments_at(repo_root, previous)
+        if not force:
+            edited = []
+            for name in names:
+                published = git_show(repo_root, previous, f"{NOTES_DIR_NAME}/{name}")
+                local = directory / name
+                if published is None:
+                    continue
+                if not local.exists() or local.read_text(encoding="utf-8").strip() != published.strip():
+                    edited.append(name)
+            if edited:
+                print(
+                    f"error: the notes hold changes that are not in {previous} "
+                    f"({', '.join(edited)}); commit them or pass --force",
+                    file=sys.stderr,
+                )
+                return 1
+        for name in names:
+            published = git_show(repo_root, previous, f"{NOTES_DIR_NAME}/{name}")
+            if published is None:
+                continue
+            (directory / name).write_text(published, encoding="utf-8")
+        print(f"Restored {len(names)} fragments from {previous}")
 
-    # The headline is release-specific, so the copied one is replaced by a placeholder:
-    # `check` refuses to publish a release whose headline is still the placeholder.
-    previous = previous_tag(repo_root, tag, resolve_commit(repo_root, tag)) or "the previous release"
+    # The headline is release-specific, so it is replaced by a placeholder: `check` refuses
+    # to publish a release whose headline is still the placeholder.
     (directory / SUMMARY_FRAGMENT).write_text(
         f"{SUMMARY_PLACEHOLDER}\n"
-        f"Changes since {previous}: what this release is about, in one or two sentences.\n",
+        f"Changes since {previous or 'the previous release'}: what this release is about, "
+        f"in one or two sentences.\n",
         encoding="utf-8",
     )
     print(f"Wrote the headline placeholder {directory / SUMMARY_FRAGMENT}")
@@ -414,7 +469,7 @@ def command_new(repo_root: Path, version: str) -> int:
     return 0
 
 
-def command_build(repo_root: Path, version: str, output: str | None) -> int:
+def command_build(repo_root: Path, version: str | None, output: str | None) -> int:
     """Assembles the release body and writes it to a file (or to stdout)."""
     body = build_body(repo_root, version)
     if output:
@@ -427,42 +482,47 @@ def command_build(repo_root: Path, version: str, output: str | None) -> int:
     return 0
 
 
-def command_changelog(repo_root: Path, version: str) -> int:
+def command_changelog(repo_root: Path, version: str | None) -> int:
     """Prints only the generated section of the release body."""
-    sys.stdout.write(changelog_section(repo_root, version) + "\n")
+    section = changelog_section(repo_root, version)
+    if section:
+        sys.stdout.write(section + "\n")
     return 0
 
 
-def command_check(repo_root: Path, version: str) -> int:
-    """Validates the fragments of a release: the errors block the release, the warnings do not."""
-    tag = normalize_version(version)
-    directory = notes_dir(repo_root, tag)
+def command_check(repo_root: Path, version: str | None) -> int:
+    """Validates the notes: the errors block the release, the warnings do not."""
+    directory = notes_dir(repo_root)
     errors: list[str] = []
     warnings: list[str] = []
 
+    fragments = fragment_paths(repo_root)
     if not directory.is_dir():
-        errors.append(f"no fragments for {tag}: {directory} does not exist (run `release_notes.py new {tag}`)")
-    else:
-        fragments = fragment_paths(directory)
-        if not fragments:
-            errors.append(f"{directory} holds no fragment")
-        summary = directory / SUMMARY_FRAGMENT
-        if not summary.exists():
-            errors.append(f"{directory} has no {SUMMARY_FRAGMENT}: a release needs a headline")
-        elif SUMMARY_PLACEHOLDER in summary.read_text(encoding="utf-8"):
-            errors.append(f"{summary} still holds the placeholder headline")
-        for fragment in fragments:
-            if not read_fragment(fragment):
-                warnings.append(f"{fragment.name} is empty")
+        errors.append(f"no notes: {directory} does not exist")
+    elif not fragments:
+        errors.append(f"{directory} holds no fragment")
 
-        # A fragment that is byte for byte the one of the previous release is very likely
-        # a leftover: the section describes something that did not change.
-        previous_folder = latest_release_folder(repo_root, exclude=tag)
-        if previous_folder:
-            for fragment in fragments:
-                previous_fragment = previous_folder / fragment.name
-                if previous_fragment.exists() and previous_fragment.read_bytes() == fragment.read_bytes():
-                    warnings.append(f"{fragment.name} is unchanged since {previous_folder.name}")
+    summary = directory / SUMMARY_FRAGMENT
+    if not summary.exists():
+        errors.append(f"{directory} has no {SUMMARY_FRAGMENT}: a release needs a headline")
+    elif not read_fragment(summary):
+        errors.append(f"{summary} is empty: a release needs a headline")
+    elif SUMMARY_PLACEHOLDER in summary.read_text(encoding="utf-8"):
+        errors.append(f"{summary} still holds the placeholder headline")
+    for fragment in fragments:
+        if not read_fragment(fragment):
+            warnings.append(f"{fragment.name} is empty")
+
+    # A fragment that is byte for byte the one of the previous release is very likely a
+    # leftover: the section describes something that did not change. The comparison is
+    # made against the copy the previous release kept in the git history.
+    tag = current_release(repo_root, version)
+    previous = previous_tag(repo_root, tag, resolve_commit(repo_root, tag))
+    if previous:
+        for fragment in fragments:
+            published = git_show(repo_root, previous, f"{NOTES_DIR_NAME}/{fragment.name}")
+            if published is not None and published.strip() == read_fragment(fragment):
+                warnings.append(f"{fragment.name} is unchanged since {previous}")
 
     for warning in warnings:
         print(f"warning: {warning}")
@@ -470,18 +530,7 @@ def command_check(repo_root: Path, version: str) -> int:
         print(f"error: {error}", file=sys.stderr)
     if errors:
         return 1
-    print(f"{tag}: the fragments are ready")
-    return 0
-
-
-def command_list(repo_root: Path) -> int:
-    """Lists the releases that have fragments."""
-    folders = release_folders(repo_root)
-    if not folders:
-        print("No release has fragments yet.")
-        return 0
-    for folder in folders:
-        print(f"{folder.name}: {len(fragment_paths(folder))} fragments")
+    print(f"The notes are ready: {len(fragments)} fragments")
     return 0
 
 
@@ -504,34 +553,31 @@ def main(argv: list[str] | None = None) -> int:
     )
     commands = parser.add_subparsers(dest="command", required=True)
 
-    new_command = commands.add_parser("new", help="create the fragments of a new release")
-    new_command.add_argument("version", help="the version of the release, e.g. v3.1.0")
+    new_command = commands.add_parser("new", help="prepare the notes of the next release")
+    new_command.add_argument("version", nargs="?", help="the release being prepared (defaults to the tag at HEAD)")
+    new_command.add_argument("--force", action="store_true", help="restore the notes even when they hold changes")
 
     build_command = commands.add_parser("build", help="assemble the release body")
-    build_command.add_argument("version", help="the version of the release, e.g. v3.1.0")
+    build_command.add_argument("version", nargs="?", help="the release being built (defaults to the tag at HEAD)")
     build_command.add_argument("-o", "--output", help="the file to write (defaults to stdout)")
 
     changelog_command = commands.add_parser("changelog", help="print the generated changelog section")
-    changelog_command.add_argument("version", help="the version of the release, e.g. v3.1.0")
+    changelog_command.add_argument("version", nargs="?", help="the release (defaults to the tag at HEAD)")
 
-    check_command = commands.add_parser("check", help="validate the fragments of a release")
-    check_command.add_argument("version", help="the version of the release, e.g. v3.1.0")
-
-    commands.add_parser("list", help="list the releases that have fragments")
+    check_command = commands.add_parser("check", help="validate the notes")
+    check_command.add_argument("version", nargs="?", help="the release being checked (defaults to the tag at HEAD)")
 
     args = parser.parse_args(argv)
     repo_root = Path(args.repo_root).resolve()
 
     try:
         if args.command == "new":
-            return command_new(repo_root, args.version)
+            return command_new(repo_root, args.version, args.force)
         if args.command == "build":
             return command_build(repo_root, args.version, args.output)
         if args.command == "changelog":
             return command_changelog(repo_root, args.version)
-        if args.command == "check":
-            return command_check(repo_root, args.version)
-        return command_list(repo_root)
+        return command_check(repo_root, args.version)
     except (NotesError, GitError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1

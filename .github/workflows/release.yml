@@ -76,11 +76,11 @@ jobs:
       - name: Run release notes tests
         run: python3 -m unittest discover --start-directory scripts/tests --top-level-directory scripts
 
-      #The release body is assembled out of the note fragments of the tagged version
-      #(`release-notes/<tag>/`) and gets the changes since the previous release appended, so
-      #the page never misses a commit the hand-written notes forgot. The fragments are
-      #checked here, in the first gate: a release without a headline must fail in minutes,
-      #not after the emulator suite and the APKs are done.
+      #The release body is assembled out of the note fragments (`release-notes/`) and gets
+      #the changes since the previous release appended, so the page never misses a commit
+      #the hand-written notes forgot. The fragments are checked here, in the first gate: a
+      #release without a headline must fail in minutes, not after the emulator suite and
+      #the APKs are done.
       - name: Validate release notes
         if: startsWith(github.ref, 'refs/tags/')
         run: python3 scripts/release_notes.py check "${{ github.ref_name }}"
@@ -299,9 +299,10 @@ jobs:
           path: app/build/outputs/apk/**/release/*.apk
           if-no-files-found: error
 
-      #The release body is assembled out of the note fragments of the tagged version
-      #(`release-notes/<tag>/`) and gets the changes since the previous release appended, so
-      #the page never misses a commit the hand-written notes forgot. The fragments were
+      #The release body is assembled out of the note fragments (`release-notes/`) and gets
+      #the changes since the previous release appended, so the page never misses a commit
+      #the hand-written notes forgot. That section is reconstructed from the git history
+      #alone — the previous tag, the commits in between, the diffstat. The fragments were
       #checked in the `tests` gate; this writes the body the release is published with.
       - name: Assemble release notes
         if: startsWith(github.ref, 'refs/tags/')
