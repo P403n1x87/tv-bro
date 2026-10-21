@@ -3,26 +3,26 @@ package com.phlox.tvwebbrowser.activity.history
 import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
-import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
-import android.view.animation.Animation
-import android.view.animation.AnimationUtils
+import android.webkit.CookieManager
+import android.webkit.WebStorage
 import android.widget.AbsListView
 import android.widget.AdapterView
-import android.widget.ImageButton
-import android.widget.PopupMenu
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.databinding.ActivityHistoryBinding
-import com.phlox.tvwebbrowser.utils.BaseAnimationListener
+import com.phlox.tvwebbrowser.domain.HistoryFocusPolicy
+import com.phlox.tvwebbrowser.model.HistoryItem
 import com.phlox.tvwebbrowser.utils.Utils
 import com.phlox.tvwebbrowser.utils.VoiceSearchHelper
 import com.phlox.tvwebbrowser.utils.activemodel.ActiveModelsRepository
+import com.phlox.tvwebbrowser.webengine.WebEngineFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Created by fedex on 29.12.16.
@@ -33,9 +33,9 @@ class HistoryActivity :
     AdapterView.OnItemClickListener,
     AdapterView.OnItemLongClickListener {
     private lateinit var vb: ActivityHistoryBinding
-    private var ibDelete: ImageButton? = null
     private var adapter: HistoryAdapter? = null
     private lateinit var historyModel: HistoryModel
+    private var focusedRow: HistoryItem? = null
     private val voiceSearchHelper =
         VoiceSearchHelper(
             this,
@@ -70,14 +70,24 @@ class HistoryActivity :
 
         historyModel = ActiveModelsRepository.get(HistoryModel::class, this)
 
-        ibDelete = findViewById(R.id.ibDelete)
-
         adapter = HistoryAdapter()
+        adapter!!.onDeleteRequest = { item -> confirmDeleteItem(item) }
+        adapter!!.onDeleteFocus = { item -> focusedRow = item }
         vb.listView.adapter = adapter
 
         vb.listView.setOnScrollListener(onListScrollListener)
         vb.listView.onItemClickListener = this
         vb.listView.onItemLongClickListener = this
+
+        vb.btnClose.setOnClickListener { finish() }
+        vb.btnDelete.setOnClickListener {
+            if (adapter!!.isMultiselectMode && adapter!!.selectedItems.isNotEmpty()) {
+                showDeleteDialog(false)
+            } else {
+                showDeleteDialog(true)
+            }
+        }
+        vb.btnClearBrowsingData.setOnClickListener { showClearBrowsingDataDialog() }
 
         // Back first exits multi-select; otherwise the dispatcher falls through to the default
         // behavior. Predictive-back gestures never reach an onBackPressed() override, so this
@@ -88,7 +98,7 @@ class HistoryActivity :
                 override fun handleOnBackPressed() {
                     if (adapter!!.isMultiselectMode) {
                         adapter!!.isMultiselectMode = false
-                        updateMenu()
+                        updatePlaceholder()
                     } else {
                         isEnabled = false
                         onBackPressedDispatcher.onBackPressed()
@@ -98,12 +108,37 @@ class HistoryActivity :
         )
 
         historyModel.lastLoadedItems.subscribe(this, false) {
-            if (it.isEmpty()) return@subscribe
+            if (it.isEmpty()) {
+                updatePlaceholder()
+                return@subscribe
+            }
             adapter!!.addItems(it)
+            updatePlaceholder()
             vb.listView.requestFocus()
         }
 
         historyModel.loadItems()
+        updatePlaceholder()
+    }
+
+    private fun updatePlaceholder() {
+        vb.tvPlaceholder.visibility = if (adapter!!.items.isEmpty()) View.VISIBLE else View.GONE
+    }
+
+    /**
+     * The row the RIGHT key should step onto, preferring the list's selected view and falling back
+     * to the first visible row. `AbsListView` exposes no reliable "focused row" position without
+     * selection, so the selected view is the best signal when present.
+     */
+    private fun focusedHistoryRow(): HistoryItemView? {
+        (vb.listView.selectedView as? HistoryItemView)?.let { return it }
+        for (i in 0 until vb.listView.childCount) {
+            val child = vb.listView.getChildAt(i)
+            if (child is HistoryItemView && child.historyItem?.isDateHeader == false) {
+                return child
+            }
+        }
+        return null
     }
 
     private fun showDeleteDialog(deleteAll: Boolean) {
@@ -121,6 +156,41 @@ class HistoryActivity :
                         historyModel.delete(adapter!!.selectedItems)
                         adapter!!.remove(adapter!!.selectedItems)
                     }
+                    updatePlaceholder()
+                }
+            }.setNeutralButton(android.R.string.cancel) { dialogInterface, i -> }
+            .show()
+    }
+
+    private fun confirmDeleteItem(item: HistoryItem) {
+        AlertDialog
+            .Builder(this)
+            .setTitle(R.string.delete)
+            .setMessage(R.string.msg_delete_history_item)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                lifecycleScope.launch(Dispatchers.Main) {
+                    historyModel.delete(item)
+                    adapter!!.remove(item)
+                    updatePlaceholder()
+                }
+            }.setNeutralButton(android.R.string.cancel) { dialogInterface, i -> }
+            .show()
+    }
+
+    private fun showClearBrowsingDataDialog() {
+        AlertDialog
+            .Builder(this)
+            .setTitle(R.string.clear_browsing_data)
+            .setMessage(R.string.msg_clear_browsing_data)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                lifecycleScope.launch(Dispatchers.Main) {
+                    withContext(Dispatchers.IO) {
+                        WebStorage.getInstance().deleteAllData()
+                        CookieManager.getInstance().removeAllCookies(null)
+                        CookieManager.getInstance().flush()
+                    }
+                    WebEngineFactory.clearCache(this@HistoryActivity)
+                    Utils.showToast(this@HistoryActivity, getString(android.R.string.ok))
                 }
             }.setNeutralButton(android.R.string.cancel) { dialogInterface, i -> }
             .show()
@@ -140,6 +210,7 @@ class HistoryActivity :
                                     return
                                 }
                                 adapter!!.erase()
+                                updatePlaceholder()
                                 historyModel.searchQuery = text
                                 historyModel.loadItems()
                             }
@@ -147,6 +218,38 @@ class HistoryActivity :
                     )
                 }
                 return true
+            }
+
+            // The list is a single D-pad focus target, so the per-row delete icon can't be reached
+            // by ordinary navigation. RIGHT steps off the focused row onto its trash; once the
+            // trash holds focus, LEFT/UP/DOWN hand focus back to the list. The routing itself is
+            // pure logic, tested in HistoryFocusPolicyTest.
+            KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_LEFT,
+            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
+            -> {
+                val row = focusedHistoryRow()
+                when (
+                    HistoryFocusPolicy.route(
+                        keyCode = event.keyCode,
+                        listFocusable = event.action == KeyEvent.ACTION_DOWN && vb.listView.isFocused,
+                        rowDeleteFocusable = row?.canFocusDelete() == true,
+                        deleteIconFocused = currentFocus?.id == R.id.ibDelete,
+                    )
+                ) {
+                    HistoryFocusPolicy.Action.FOCUS_ROW_DELETE -> {
+                        row?.requestDeleteFocus()
+                        return true
+                    }
+
+                    HistoryFocusPolicy.Action.FOCUS_LIST -> {
+                        vb.listView.requestFocus()
+                        return true
+                    }
+
+                    HistoryFocusPolicy.Action.PASS_THROUGH -> {
+                        Unit
+                    }
+                }
             }
         }
         return super.dispatchKeyEvent(event)
@@ -183,7 +286,6 @@ class HistoryActivity :
         if (hi!!.isDateHeader) return
         if (adapter!!.isMultiselectMode) {
             view.setSelection(!hi.selected)
-            updateMenu()
         } else {
             val resultIntent = Intent()
             resultIntent.putExtra(KEY_URL, hi.url)
@@ -202,49 +304,7 @@ class HistoryActivity :
         adapter!!.isMultiselectMode = true
         val v = view as HistoryItemView
         v.setSelection(true)
-        updateMenu()
         return true
-    }
-
-    private fun updateMenu() {
-        val selection = adapter!!.selectedItems
-        if (selection.isEmpty()) {
-            if (ibDelete!!.visibility == View.GONE) return
-            val anim = AnimationUtils.loadAnimation(this, R.anim.right_menu_out_anim)
-            anim.setAnimationListener(
-                object : BaseAnimationListener() {
-                    override fun onAnimationEnd(animation: Animation) {
-                        ibDelete!!.visibility = View.GONE
-                    }
-                },
-            )
-            ibDelete!!.startAnimation(anim)
-        } else {
-            if (ibDelete!!.visibility == View.VISIBLE) return
-            ibDelete!!.visibility = View.VISIBLE
-            ibDelete!!.startAnimation(AnimationUtils.loadAnimation(this, R.anim.right_menu_in_anim))
-        }
-    }
-
-    private fun showItemOptionsPopup(v: HistoryItemView) {
-        val pm = PopupMenu(this, v, Gravity.BOTTOM)
-        pm.menu.add(R.string.delete)
-        pm.setOnMenuItemClickListener {
-            lifecycleScope.launch(Dispatchers.Main) {
-                historyModel.delete(v.historyItem!!)
-                adapter!!.remove(v.historyItem!!)
-            }
-            true
-        }
-        pm.show()
-    }
-
-    fun onClearHistoryClick(view: View) {
-        showDeleteDialog(true)
-    }
-
-    fun onClearHistoryItemsClick(view: View) {
-        showDeleteDialog(false)
     }
 
     companion object {

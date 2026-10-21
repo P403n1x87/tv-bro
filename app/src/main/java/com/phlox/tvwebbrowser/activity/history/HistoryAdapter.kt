@@ -31,6 +31,11 @@ class HistoryAdapter :
         }
     private val tmpSelected = ArrayList<HistoryItem>()
 
+    var onDeleteRequest: ((HistoryItem) -> Unit)? = null
+
+    /** Reports which row's delete icon currently holds focus, so the host can track it. */
+    var onDeleteFocus: ((HistoryItem) -> Unit)? = null
+
     val selectedItems: List<HistoryItem>
         get() {
             tmpSelected.clear()
@@ -74,6 +79,8 @@ class HistoryAdapter :
         } else {
             hiv = HistoryItemView(parent.context, getItemViewType(position))
         }
+        hiv.onDeleteClick = onDeleteRequest
+        hiv.onDeleteFocus = onDeleteFocus
         hiv.setHistoryItem(items[position], isMultiselectMode)
         return hiv
     }
@@ -86,17 +93,37 @@ class HistoryAdapter :
 
     fun erase() {
         items.clear()
+        lastHeaderDate = -1
         notifyDataSetChanged()
     }
 
     fun remove(historyItem: HistoryItem) {
         items.remove(historyItem)
+        pruneOrphanHeaders()
         notifyDataSetChanged()
     }
 
     fun remove(selectedItems: List<HistoryItem>) {
         items.removeAll(selectedItems)
+        pruneOrphanHeaders()
         notifyDataSetChanged()
+    }
+
+    /** Drops date headers that no longer have any visit under them. */
+    private fun pruneOrphanHeaders() {
+        var i = 0
+        while (i < items.size) {
+            if (items[i].isDateHeader &&
+                (i + 1 >= items.size || items[i + 1].isDateHeader)
+            ) {
+                items.removeAt(i)
+                continue
+            }
+            i++
+        }
+        if (items.isEmpty()) {
+            lastHeaderDate = -1
+        }
     }
 
     companion object {
