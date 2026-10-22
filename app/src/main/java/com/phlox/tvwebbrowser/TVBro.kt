@@ -54,7 +54,9 @@ class TVBro :
 
         instance = this
 
-        AppContext.init(this, Config(getSharedPreferences(MAIN_PREFS_NAME, MODE_MULTI_PROCESS)))
+        // MODE_PRIVATE: the preferences belong to this app alone. MODE_MULTI_PROCESS (deprecated in
+        // API 23) does not work reliably and the app keeps its state in one process.
+        AppContext.init(this, Config(getSharedPreferences(MAIN_PREFS_NAME, MODE_PRIVATE)))
 
         LocalAssetServer.start(this)
 

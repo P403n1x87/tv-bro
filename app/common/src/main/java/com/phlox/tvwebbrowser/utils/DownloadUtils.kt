@@ -149,7 +149,9 @@ object DownloadUtils {
                 val encoding = m.group(3)
 
                 if (encodedFileName != null) {
-                    return decodeHeaderField(encodedFileName, encoding)
+                    // RFC 5987 makes the charset mandatory; a missing one is malformed, so fall
+                    // back to UTF-8 rather than the NPE decodeHeaderField would throw.
+                    return decodeHeaderField(encodedFileName, encoding ?: Charsets.UTF_8.name())
                 }
 
                 // Return quoted string if available and replace escaped characters.
@@ -181,7 +183,7 @@ object DownloadUtils {
             if (symbol.startsWith("%")) {
                 stream.write(Integer.parseInt(symbol.substring(1), 16))
             } else {
-                stream.write(symbol[0].toInt())
+                stream.write(symbol[0].code)
             }
         }
 

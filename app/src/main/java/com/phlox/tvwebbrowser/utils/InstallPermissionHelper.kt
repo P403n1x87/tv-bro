@@ -23,9 +23,6 @@ import java.io.File
  * update, the downloads screen opens the installer.
  */
 object InstallPermissionHelper {
-    /** Request code for [openUnknownSourcesSettings]; callers that care handle the result. */
-    const val REQUEST_CODE_UNKNOWN_APP_SOURCES = 10007
-
     /**
      * True when the app may install a package itself.
      *
@@ -36,19 +33,23 @@ object InstallPermissionHelper {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.packageManager.canRequestPackageInstalls()
         } else {
+            // The per-app grant does not exist below API 26: the global setting is the only gate
+            // there, and it was deprecated only once the per-app one replaced it.
+            @Suppress("DEPRECATION")
             Settings.Secure.getInt(context.contentResolver, Settings.Secure.INSTALL_NON_MARKET_APPS) == 1
         }
 
     /**
-     * Opens the system screen that grants install permission. Returns false when it could not be
-     * opened; the failure toast is shown here.
+     * Opens the system screen that grants install permission. [launch] starts the activity: callers
+     * that act on the result pass their own activity-result launcher, the others use the default.
+     * Returns false when it could not be opened; the failure toast is shown here.
      */
     fun openUnknownSourcesSettings(
         activity: Activity,
-        requestCode: Int = REQUEST_CODE_UNKNOWN_APP_SOURCES,
+        launch: (Intent) -> Unit = { activity.startActivity(it) },
     ): Boolean =
         try {
-            activity.startActivityForResult(unknownSourcesIntent(), requestCode)
+            launch(unknownSourcesIntent())
             true
         } catch (e: Exception) {
             e.printStackTrace()
@@ -94,7 +95,10 @@ object InstallPermissionHelper {
                 FileProvider.getUriForFile(context, context.packageName + ".provider", File(filePath))
             }
         val install =
-            Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
+            // ACTION_INSTALL_PACKAGE is deprecated in API 29 ("use PackageInstaller"): the system
+            // package installer handles ACTION_VIEW with the APK mime type for every supported
+            // release, and shows the same confirmation screen.
+            Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(uri, MimeTypeMap.getSingleton().getMimeTypeFromExtension("apk"))
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 if (context !is Activity) {

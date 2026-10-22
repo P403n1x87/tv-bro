@@ -1,16 +1,17 @@
 package com.phlox.tvwebbrowser.utils
 
 import android.app.Activity
-import android.app.ProgressDialog
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.text.Html
 import android.webkit.MimeTypeMap
+import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.FileProvider
+import androidx.core.text.HtmlCompat
 import com.phlox.tvwebbrowser.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -156,7 +157,7 @@ class UpdateChecker(
             }
         }
         val textView = TextView(context)
-        textView.text = Html.fromHtml(message)
+        textView.text = HtmlCompat.fromHtml(message, HtmlCompat.FROM_HTML_MODE_LEGACY)
         val padding = Utils.dpToPx(context, 25f).toInt()
         textView.setPadding(padding, padding, padding, padding)
         AlertDialog
@@ -174,11 +175,27 @@ class UpdateChecker(
         modelScope: CoroutineScope,
     ) {
         val update = versionCheckResult ?: return
-        val dialog = ProgressDialog(context)
-        dialog.setCancelable(true)
-        dialog.setMessage(context.getString(R.string.downloading_file))
-        dialog.isIndeterminate = false
-        dialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL)
+        // ProgressDialog is deprecated in API 26: the same message + progress bar is an AlertDialog
+        // with a plain ProgressBar in it.
+        val padding = Utils.dpToPx(context, 25f).toInt()
+        val progressBar =
+            ProgressBar(context, null, android.R.attr.progressBarStyleHorizontal).apply {
+                max = 100
+                isIndeterminate = false
+            }
+        val content =
+            LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(padding, padding, padding, padding)
+                addView(TextView(context).apply { text = context.getString(R.string.downloading_file) })
+                addView(progressBar)
+            }
+        val dialog =
+            AlertDialog
+                .Builder(context)
+                .setView(content)
+                .setCancelable(true)
+                .create()
         dialog.show()
         var downloaded = false
         var downloadedFile = Utils.createTempFile(context, UPDATE_APK_FILE_NAME)
@@ -214,8 +231,7 @@ class UpdateChecker(
                     var fileLength = connection.contentLength.toLong()
                     if (fileLength == -1L) {
                         withContext(Dispatchers.Main) {
-                            dialog.isIndeterminate = true
-                            dialog.setProgressStyle(ProgressDialog.STYLE_SPINNER)
+                            progressBar.isIndeterminate = true
                         }
                     }
 
@@ -236,7 +252,7 @@ class UpdateChecker(
                         if (fileLength != -1L && System.currentTimeMillis() >= nextDialogUpdateTime) {
                             withContext(Dispatchers.Main) {
                                 val progress = total * 100 / fileLength
-                                dialog.progress = progress.toInt()
+                                progressBar.progress = progress.toInt()
                             }
                             nextDialogUpdateTime += 50
                         }
@@ -275,7 +291,10 @@ class UpdateChecker(
                 downloadedFile,
             )
 
-        val install = Intent(Intent.ACTION_INSTALL_PACKAGE)
+        val install =
+            // See InstallPermissionHelper: the system installer handles ACTION_VIEW with the APK
+            // mime type, and ACTION_INSTALL_PACKAGE is deprecated in API 29.
+            Intent(Intent.ACTION_VIEW)
         install.setDataAndType(apkURI, mimeType)
         install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         install.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

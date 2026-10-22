@@ -261,22 +261,13 @@ open class WebViewEx(
 
             val allowDarkening = config.engineTuningConfig.webviewUseAlgorithmicDarkeningWithDarkUiMode
             val uiNightMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+            val darken = uiNightMode == Configuration.UI_MODE_NIGHT_YES && allowDarkening
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
-                    if (uiNightMode == Configuration.UI_MODE_NIGHT_YES && allowDarkening) {
-                        WebSettingsCompat.setAlgorithmicDarkeningAllowed(this, true)
-                    } else {
-                        WebSettingsCompat.setAlgorithmicDarkeningAllowed(this, false)
-                    }
+                    WebSettingsCompat.setAlgorithmicDarkeningAllowed(this, darken)
                 }
             } else {
-                if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
-                    if (uiNightMode == Configuration.UI_MODE_NIGHT_YES && allowDarkening) {
-                        WebSettingsCompat.setForceDark(this, WebSettingsCompat.FORCE_DARK_ON)
-                    } else {
-                        WebSettingsCompat.setForceDark(this, WebSettingsCompat.FORCE_DARK_OFF)
-                    }
-                }
+                setLegacyForceDark(darken)
             }
         }
 
@@ -739,6 +730,19 @@ open class WebViewEx(
         }
 
         addJavascriptInterface(jsInterface, "Odysseus")
+    }
+
+    /**
+     * Page darkening below API 29. Algorithmic darkening does not exist there, and FORCE_DARK is
+     * deprecated in androidx.webkit in favour of it, so it is the only choice on that branch.
+     */
+    @Suppress("DEPRECATION")
+    private fun setLegacyForceDark(darken: Boolean) {
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) return
+        WebSettingsCompat.setForceDark(
+            settings,
+            if (darken) WebSettingsCompat.FORCE_DARK_ON else WebSettingsCompat.FORCE_DARK_OFF,
+        )
     }
 
     override fun restoreState(inState: Bundle): WebBackForwardList? {

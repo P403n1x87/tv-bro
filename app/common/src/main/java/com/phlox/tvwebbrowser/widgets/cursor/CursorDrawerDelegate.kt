@@ -16,7 +16,6 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
-import android.view.WindowManager
 import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.utils.Utils
 
@@ -92,15 +91,12 @@ class CursorDrawerDelegate(
 
     fun init() {
         paint.isAntiAlias = true
-        val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        val display = wm.defaultDisplay
-        val displaySize = Point()
-        display.getSize(displaySize)
-        cursorStrokeWidth = (displaySize.x / 400).toFloat()
-        cursorRadius = displaySize.x / 100
+        val displaySize = context.resources.displayMetrics
+        cursorStrokeWidth = (displaySize.widthPixels / 400).toFloat()
+        cursorRadius = displaySize.widthPixels / 100
         cursorRadiusPressed = cursorRadius - Utils.dpToPx(context, 5f).toInt()
-        maxSpeedBaselinePx = (displaySize.x / 25).toFloat()
-        scrollStartPadding = displaySize.x / 15
+        maxSpeedBaselinePx = (displaySize.widthPixels / 25).toFloat()
+        scrollStartPadding = displaySize.widthPixels / 15
     }
 
     fun onSizeChanged(
@@ -617,7 +613,7 @@ class CursorDrawerDelegate(
             MotionEvent.obtain(
                 pinchZoomStartTime,
                 pinchZoomStartTime,
-                MotionEvent.ACTION_POINTER_2_DOWN,
+                ACTION_POINTER_SECOND_DOWN,
                 2,
                 properties,
                 pointerCoords,
@@ -734,7 +730,7 @@ class CursorDrawerDelegate(
                         MotionEvent.obtain(
                             pinchZoomStartTime,
                             now,
-                            MotionEvent.ACTION_POINTER_2_UP,
+                            ACTION_POINTER_SECOND_UP,
                             2,
                             properties,
                             pointerCoords,
@@ -780,6 +776,13 @@ class CursorDrawerDelegate(
         private const val CURSOR_DISAPPEAR_TIMEOUT = 5000
         private const val USE_SCROLL_HACK = true
         private const val SCROLL_HACK_PADDING = 300
+
+        // Deprecated in favour of spelling the pointer index out. ACTION_POINTER_2_* are the
+        // aliases for "second pointer" (index 1) of the generic actions.
+        private val ACTION_POINTER_SECOND_DOWN =
+            MotionEvent.ACTION_POINTER_DOWN or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT)
+        private val ACTION_POINTER_SECOND_UP =
+            MotionEvent.ACTION_POINTER_UP or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT)
 
         // 100ms more to let underlying view handle long press first
         // idea to let geckoview handle long press first (and receive ContentDelegate.onContextMenu callback)

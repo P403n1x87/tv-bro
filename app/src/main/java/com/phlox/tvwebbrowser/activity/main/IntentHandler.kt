@@ -21,7 +21,6 @@ class IntentHandler(
 ) {
     companion object {
         private val TAG = IntentHandler::class.java.simpleName
-        const val REQUEST_CODE_HISTORY_ACTIVITY = 10006
     }
 
     fun handleIntent(intent: Intent) {
@@ -43,7 +42,7 @@ class IntentHandler(
         )
     }
 
-    /** Handles the History activity result. Called only for [REQUEST_CODE_HISTORY_ACTIVITY]. */
+    /** Handles the History activity result, delivered through the host's activity-result launcher. */
     fun handleHistoryResult(
         resultCode: Int,
         data: Intent?,

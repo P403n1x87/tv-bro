@@ -101,13 +101,9 @@ class WebViewWebEngine(
         webView?.goForward()
     }
 
-    override fun canZoomIn(): Boolean = webView?.canZoomIn() ?: false
-
     override fun zoomIn() {
         webView?.zoomIn()
     }
-
-    override fun canZoomOut(): Boolean = webView?.canZoomOut() ?: false
 
     override fun zoomOut() {
         webView?.zoomOut()

@@ -99,7 +99,7 @@ class BookmarksController(
         val newItem = FavoriteItem()
         FavoriteEditorDialog(
             activity,
-            initialTitle = tab.title ?: url,
+            initialTitle = tab.title.ifBlank { url },
             initialUrl = url,
             newBookmark = true,
         ) { title, editedUrl ->
