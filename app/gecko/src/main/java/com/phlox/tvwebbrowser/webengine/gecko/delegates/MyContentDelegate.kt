@@ -189,9 +189,11 @@ class MyContentDelegate(
                 activeAlert = true
                 prompt.onSlowScriptPrompt(geckoSession, activity.getString(R.string.slow_script), result)
             }
-            return result.then<SlowScriptResponse?> { value: SlowScriptResponse? ->
+            return result.then<SlowScriptResponse> { value: SlowScriptResponse? ->
                 activeAlert = false
-                GeckoResult.fromValue<SlowScriptResponse?>(value)
+                // The dialog completes with CONTINUE or STOP; a null completion would leave Gecko
+                // without a response, so fall back to letting the script continue.
+                GeckoResult.fromValue(value ?: SlowScriptResponse.CONTINUE)
             }
         }
         return null

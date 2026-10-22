@@ -10,6 +10,8 @@ import android.webkit.WebStorage
 import android.widget.AbsListView
 import android.widget.AdapterView
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.phlox.tvwebbrowser.R
@@ -36,11 +38,23 @@ class HistoryActivity :
     private var adapter: HistoryAdapter? = null
     private lateinit var historyModel: HistoryModel
     private var focusedRow: HistoryItem? = null
+
+    // The explicit type breaks the inference cycle: the launcher's callback reads the helper, and
+    // the helper's start callback writes through the launcher.
+    private val voiceSearchLauncher: ActivityResultLauncher<Intent> =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            voiceSearchHelper.processActivityResult(
+                VOICE_SEARCH_REQUEST_CODE,
+                result.resultCode,
+                result.data,
+            )
+        }
     private val voiceSearchHelper =
         VoiceSearchHelper(
             this,
             VOICE_SEARCH_REQUEST_CODE,
             VOICE_SEARCH_PERMISSIONS_REQUEST_CODE,
+            startForResult = { voiceSearchLauncher.launch(it) },
         )
 
     internal var onListScrollListener: AbsListView.OnScrollListener =
@@ -253,17 +267,6 @@ class HistoryActivity :
             }
         }
         return super.dispatchKeyEvent(event)
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(
-        requestCode: Int,
-        resultCode: Int,
-        data: Intent?,
-    ) {
-        if (!voiceSearchHelper.processActivityResult(requestCode, resultCode, data)) {
-            super.onActivityResult(requestCode, resultCode, data)
-        }
     }
 
     override fun onRequestPermissionsResult(

@@ -70,17 +70,6 @@ android {
         versionName = appVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        javaCompileOptions {
-            annotationProcessorOptions {
-                arguments +=
-                    mapOf(
-                        "room.incremental" to "true",
-                        // used when AppDatabase @Database annotation exportSchema = true. Useful for migrations
-                        "room.schemaLocation" to "$projectDir/schemas",
-                    )
-            }
-        }
     }
 
     signingConfigs {
@@ -163,6 +152,16 @@ android {
     }
 }
 
+// Room is compiled by KSP, so the processor's options are KSP arguments: the annotation
+// processor path (javaCompileOptions.annotationProcessorOptions) is not read by KSP, and
+// without a schema location Room warns that it cannot export the schema of the database.
+// The exported schemas land in `app/schemas`, which is what a future migration is written
+// against.
+ksp {
+    arg("room.incremental", "true")
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     implementation(project(":app:common"))
     implementation(project(":app:player"))
@@ -179,7 +178,6 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
 
     implementation(libs.androidx.room.runtime)
-    annotationProcessor(libs.androidx.room.compiler)
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.room.ktx)
 

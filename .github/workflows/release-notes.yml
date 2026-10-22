@@ -15,9 +15,12 @@ on:
 
 jobs:
   tests:
-    runs-on: ubuntu-latest
+    #Pinned like the main workflow: `ubuntu-latest` is migrating to Ubuntu 26, and
+    #`actions/checkout@v5` is the first version that runs on Node.js 24 (v4 still targets
+    #Node.js 20 and GitHub warns about it on every run).
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Run the release-notes tests
         run: python3 -m unittest discover --start-directory scripts/tests --top-level-directory scripts

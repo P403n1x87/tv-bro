@@ -149,7 +149,8 @@ class DownloadService : Service() {
         }
         model.onDownloadEnded(task)
         if (model.activeDownloads.isEmpty()) {
-            stopForeground(true)
+            // remove the notification: the boolean overload is deprecated in API 33
+            stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
     }

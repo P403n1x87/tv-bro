@@ -29,6 +29,12 @@ class VoiceSearchHelper(
     private val activity: Activity,
     private val requestCode: Int,
     private val permissionRequestCode: Int,
+    /**
+     * Starts the recognizer activity and delivers its result back through
+     * [processActivityResult]. The host owns the launcher: `startActivityForResult` is deprecated
+     * in API 30, and the Activity Result API is registered before the activity starts.
+     */
+    private val startForResult: (Intent) -> Unit,
 ) {
     private var recognitionResultsRendererView: RecognitionResultsRendererView? = null
     private lateinit var languageModel: String
@@ -66,7 +72,7 @@ class VoiceSearchHelper(
                 )
                 intent.putExtra(RecognizerIntent.EXTRA_PROMPT, activity.getString(R.string.speak))
                 try {
-                    activity.startActivityForResult(intent, requestCode)
+                    startForResult(intent)
                 } catch (e: Exception) {
                     Toast.makeText(activity, R.string.error, Toast.LENGTH_SHORT).show()
                 }

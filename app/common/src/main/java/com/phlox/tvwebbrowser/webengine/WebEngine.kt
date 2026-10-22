@@ -25,11 +25,7 @@ interface WebEngine {
 
     fun goForward()
 
-    fun canZoomIn(): Boolean
-
     fun zoomIn()
-
-    fun canZoomOut(): Boolean
 
     fun zoomOut()
 

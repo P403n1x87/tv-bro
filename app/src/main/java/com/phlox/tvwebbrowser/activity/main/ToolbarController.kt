@@ -4,6 +4,9 @@ import android.app.Activity
 import android.view.View
 import android.view.WindowManager
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.isInvisible
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.databinding.ActivityMainBinding
@@ -71,23 +74,23 @@ class ToolbarController(
         vb.rlActionBar.visibility = View.GONE
         vb.llTabPanel.visibility = View.GONE
         activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        activity.window.decorView.systemUiVisibility = (
-            View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                or View.SYSTEM_UI_FLAG_FULLSCREEN
-                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-        )
+        // The SYSTEM_UI_FLAG_* bitmask is deprecated in API 30: the insets controller hides the
+        // same bars and keeps them transient on a swipe, like SYSTEM_UI_FLAG_IMMERSIVE_STICKY did.
+        insetsController.apply {
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            hide(WindowInsetsCompat.Type.systemBars())
+        }
     }
 
     fun exitFullscreen() {
         if (!keepScreenOn()) {
             activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
-        activity.window.decorView.systemUiVisibility =
-            View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+        insetsController.show(WindowInsetsCompat.Type.systemBars())
         isFullscreen = false
         vb.rlActionBar.visibility = View.VISIBLE
     }
+
+    private val insetsController: WindowInsetsControllerCompat
+        get() = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
 }

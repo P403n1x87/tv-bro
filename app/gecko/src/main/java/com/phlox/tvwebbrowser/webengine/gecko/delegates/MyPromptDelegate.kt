@@ -7,8 +7,8 @@ import android.content.DialogInterface
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.PorterDuff
+import android.graphics.PorterDuffColorFilter
 import android.net.Uri
-import android.os.Build
 import android.text.InputType
 import android.text.format.DateFormat
 import android.util.Log
@@ -235,7 +235,9 @@ class MyPromptDelegate(
             webEngine.callback?.getActivity()
                 ?: return GeckoResult.fromValue<PromptResponse>(prompt.dismiss())
         val builder = AlertDialog.Builder(activity)
-        val container = addStandardLayout(builder, prompt.title, prompt.message)
+        val container =
+            addStandardLayout(builder, prompt.title, prompt.message)
+                ?: return GeckoResult.fromValue(prompt.dismiss())
 
         val flags = prompt.authOptions.flags
         val level = prompt.authOptions.level
@@ -244,7 +246,7 @@ class MyPromptDelegate(
             username = EditText(builder.context)
             username.setHint(com.phlox.tvwebbrowser.common.R.string.username)
             username.setText(prompt.authOptions.username)
-            container!!.addView(username)
+            container.addView(username)
         } else {
             username = null
         }
@@ -253,12 +255,12 @@ class MyPromptDelegate(
         password.setHint(com.phlox.tvwebbrowser.common.R.string.password)
         password.setText(prompt.authOptions.password)
         password.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-        container!!.addView(password)
+        container.addView(password)
 
         if (level != AuthPrompt.AuthOptions.Level.NONE) {
             val secure = ImageView(builder.context)
             secure.setImageResource(android.R.drawable.ic_lock_lock)
-            container!!.addView(secure)
+            container.addView(secure)
         }
 
         val res = GeckoResult<PromptResponse>()
@@ -344,8 +346,8 @@ class MyPromptDelegate(
                             )
                     }
                     view!!.setBackgroundResource(android.R.drawable.editbox_background)
-                    view!!.background.setColorFilter(color, PorterDuff.Mode.MULTIPLY)
-                    return view!!
+                    view.background.colorFilter = PorterDuffColorFilter(color, PorterDuff.Mode.MULTIPLY)
+                    return view
                 }
             }
 
@@ -431,7 +433,7 @@ class MyPromptDelegate(
                 true,
             )
         val cal = formatter.calendar
-        cal.time = date
+        date?.let { cal.time = it }
 
         val builder = AlertDialog.Builder(activity)
         val inflater = LayoutInflater.from(builder.context)
@@ -870,7 +872,7 @@ class MyPromptDelegate(
                             view.isChecked = selected
                         }
                     }
-                    return view!!
+                    return view
                 }
             }
         addChoiceItems(type, adapter, choices, null) // indent
@@ -980,26 +982,16 @@ class MyPromptDelegate(
         picker: TimePicker,
         cal: Calendar,
     ) {
-        if (Build.VERSION.SDK_INT >= 23) {
-            picker.hour = cal[Calendar.HOUR_OF_DAY]
-            picker.minute = cal[Calendar.MINUTE]
-        } else {
-            picker.currentHour = cal[Calendar.HOUR_OF_DAY]
-            picker.currentMinute = cal[Calendar.MINUTE]
-        }
+        picker.hour = cal[Calendar.HOUR_OF_DAY]
+        picker.minute = cal[Calendar.MINUTE]
     }
 
     private fun setCalendarTime(
         cal: Calendar,
         picker: TimePicker,
     ) {
-        if (Build.VERSION.SDK_INT >= 23) {
-            cal[Calendar.HOUR_OF_DAY] = picker.hour
-            cal[Calendar.MINUTE] = picker.minute
-        } else {
-            cal[Calendar.HOUR_OF_DAY] = picker.currentHour
-            cal[Calendar.MINUTE] = picker.currentMinute
-        }
+        cal[Calendar.HOUR_OF_DAY] = picker.hour
+        cal[Calendar.MINUTE] = picker.minute
     }
 
     fun onFileCallbackResult(

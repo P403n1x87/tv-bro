@@ -182,7 +182,7 @@ class GeckoWebEngine(
     }
 
     private var webView: GeckoViewWithVirtualCursor? = null
-    lateinit var session: GeckoSession
+    var session: GeckoSession
     var callback: WebEngineWindowProviderCallback? = null
     val navigationDelegate = MyNavigationDelegate(this)
     val progressDelegate = MyProgressDelegate(this)
@@ -197,7 +197,7 @@ class GeckoWebEngine(
     var isForeground = true
         private set
     var appWebExtensionBackgroundPortDelegate: AppWebExtensionBackgroundPortDelegate? = null
-    private lateinit var webExtObserver: (WebExtension?) -> Unit
+    private var webExtObserver: (WebExtension?) -> Unit
 
     // Reloads the page and replays a live stream the native player gave up on (see MediaAutoReplay).
     private val autoReplay =
@@ -373,14 +373,10 @@ class GeckoWebEngine(
         session.goForward()
     }
 
-    override fun canZoomIn(): Boolean = true
-
     override fun zoomIn() {
         // appWebExtensionPortDelegate?.port?.postMessage(JSONObject("{\"action\":\"zoomIn\"}"))
         webView?.cursorDrawerDelegate?.tryZoomIn()
     }
-
-    override fun canZoomOut(): Boolean = true
 
     override fun zoomOut() {
         // appWebExtensionPortDelegate?.port?.postMessage(JSONObject("{\"action\":\"zoomOut\"}"))

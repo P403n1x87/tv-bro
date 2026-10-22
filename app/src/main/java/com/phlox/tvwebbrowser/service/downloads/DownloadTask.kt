@@ -108,7 +108,7 @@ class FileDownloadTask(
                 }
             } while (true)
 
-            input = connection!!.inputStream
+            input = connection.inputStream
 
             val fileLength = connection.contentLength
             downloadInfo.size = fileLength.toLong()

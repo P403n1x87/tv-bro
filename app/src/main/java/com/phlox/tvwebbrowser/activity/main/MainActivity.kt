@@ -14,11 +14,13 @@ import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
+import android.os.Looper
 import android.os.Process
 import android.text.format.Formatter
 import android.util.Log
@@ -34,6 +36,7 @@ import android.webkit.CookieManager
 import android.webkit.WebStorage
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
@@ -91,7 +94,6 @@ open class MainActivity :
     companion object {
         private val TAG = MainActivity::class.java.simpleName
         const val VOICE_SEARCH_REQUEST_CODE = 10001
-        const val PICK_FILE_REQUEST_CODE = 10005
         const val KEY_PROCESS_ID_TO_KILL = "proc_id_to_kill"
         private const val MY_PERMISSIONS_REQUEST_VOICE_SEARCH_PERMISSIONS = 10008
     }
@@ -107,7 +109,11 @@ open class MainActivity :
     protected lateinit var settingsModel: SettingsModel
     private lateinit var adblockModel: AdblockModel
     private lateinit var autoUpdateModel: AutoUpdateModel
-    private val uiHandler = Handler()
+
+    // The handler is posted to from background threads, so it must be bound to the main looper
+    // explicitly: the no-argument Handler() constructor that reads it from the creating thread is
+    // deprecated in API 30.
+    private val uiHandler = Handler(Looper.getMainLooper())
     private lateinit var panelController: PanelController
     private lateinit var toolbarController: ToolbarController
     private lateinit var mediaListPresenter: MediaListPresenter
@@ -120,11 +126,42 @@ open class MainActivity :
     private lateinit var sessionObservers: SessionObservers
     private lateinit var sessionStartup: SessionStartup
     protected val config = AppContext.provideConfig()
+
+    /**
+     * The activity-result plumbing, registered as properties so the registration happens before the
+     * activity is started (which is what the Activity Result API requires). Each launcher replaces
+     * one `startActivityForResult`/`onActivityResult` request-code pair.
+     */
+    private val historyLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            intentHandler.handleHistoryResult(result.resultCode, result.data)
+        }
+    private val fileChooserLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            tabsModel.currentTab.value
+                ?.webEngine
+                ?.onFilePicked(result.resultCode, result.data)
+        }
+    private val installPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            if (autoUpdateModel.needToShowUpdateDlgAgain) {
+                autoUpdateModel.showUpdateDialogIfNeeded(this)
+            }
+        }
+    private val voiceSearchLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            permissionOrchestrator.onActivityResult(
+                VOICE_SEARCH_REQUEST_CODE,
+                result.resultCode,
+                result.data,
+            )
+        }
     private val voiceSearchHelper =
         VoiceSearchHelper(
             this,
             VOICE_SEARCH_REQUEST_CODE,
             MY_PERMISSIONS_REQUEST_VOICE_SEARCH_PERMISSIONS,
+            startForResult = { voiceSearchLauncher.launch(it) },
         )
     private val downloadCoordinator by lazy {
         DownloadCoordinator(this) { onDownloadStarted(it) }
@@ -350,9 +387,11 @@ open class MainActivity :
                 context: Context,
                 intent: Intent,
             ) {
-                val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-                val activeNetwork = cm.activeNetworkInfo
-                val isConnected = activeNetwork != null && activeNetwork.isConnectedOrConnecting
+                val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+                // activeNetworkInfo/isConnectedOrConnecting are deprecated in API 29 (and do not
+                // cover VPNs and other modern transports): ask the active network's capabilities.
+                val capabilities = connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
+                val isConnected = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
                 val tab = tabsModel.currentTab.value ?: return
                 tab.webEngine.setNetworkAvailable(isConnected)
             }
@@ -409,10 +448,7 @@ open class MainActivity :
     }
 
     override fun showHistory() {
-        startActivityForResult(
-            Intent(this@MainActivity, HistoryActivity::class.java),
-            IntentHandler.REQUEST_CODE_HISTORY_ACTIVITY,
-        )
+        historyLauncher.launch(Intent(this@MainActivity, HistoryActivity::class.java))
         toolbarController.autoHideMenuOverlay()
     }
 
@@ -619,7 +655,8 @@ open class MainActivity :
         InstallPermissionHelper.showEnableUnknownSourcesDialog(this, onConfirm)
     }
 
-    override fun openInstallPermissionSettings(): Boolean = InstallPermissionHelper.openUnknownSourcesSettings(this)
+    override fun openInstallPermissionSettings(): Boolean =
+        InstallPermissionHelper.openUnknownSourcesSettings(this) { installPermissionLauncher.launch(it) }
 
     override fun downloadUpdate() {
         autoUpdateModel.modelScope.launch(Dispatchers.Main) {
@@ -813,38 +850,6 @@ open class MainActivity :
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(
-        requestCode: Int,
-        resultCode: Int,
-        data: Intent?,
-    ) {
-        if (permissionOrchestrator.onActivityResult(requestCode, resultCode, data)) {
-            return
-        }
-        when (requestCode) {
-            PICK_FILE_REQUEST_CODE -> {
-                tabsModel.currentTab.value
-                    ?.webEngine
-                    ?.onFilePicked(resultCode, data)
-            }
-
-            IntentHandler.REQUEST_CODE_HISTORY_ACTIVITY -> {
-                intentHandler.handleHistoryResult(resultCode, data)
-            }
-
-            InstallPermissionHelper.REQUEST_CODE_UNKNOWN_APP_SOURCES -> {
-                if (autoUpdateModel.needToShowUpdateDlgAgain) {
-                    autoUpdateModel.showUpdateDialogIfNeeded(this)
-                }
-            }
-
-            else -> {
-                super.onActivityResult(requestCode, resultCode, data)
-            }
-        }
-    }
-
     override fun onStart() {
         super.onStart()
         downloadCoordinator.bind()
@@ -912,10 +917,10 @@ open class MainActivity :
         }
     }
 
-    override fun search(aText: String) {
+    override fun search(text: String) {
         val url =
             AddressInputPolicy.resolveUrl(
-                aText,
+                text,
                 settingsModel.searchEngineURL,
             ) { Patterns.WEB_URL.matcher(it).matches() }
         if (url == null) {
@@ -1187,13 +1192,13 @@ open class MainActivity :
 
     override fun showFileChooser(intent: Intent): Boolean {
         try {
-            startActivityForResult(intent, PICK_FILE_REQUEST_CODE)
+            fileChooserLauncher.launch(intent)
         } catch (e: ActivityNotFoundException) {
             try {
                 // trying again with type */* (seems file pickers usually doesn't support specific types
                 // in intent filters but still can do the job)
                 intent.type = "*/*"
-                startActivityForResult(intent, PICK_FILE_REQUEST_CODE)
+                fileChooserLauncher.launch(intent)
             } catch (e: ActivityNotFoundException) {
                 Utils.showToast(applicationContext, getString(R.string.err_cant_open_file_chooser))
                 return false

@@ -312,9 +312,11 @@ class DownloadsActivity :
 
     private fun installAPK(download: Download) {
         // The downloads screen always lets the system installer handle the grant on API 26+ — it
-        // prompts the user itself; only below that does the global setting gate it.
+        // prompts the user itself; only below that does the global setting gate it (reading it is
+        // the only way to know there, which is why the deprecated call stays).
         val canInstallFromOtherSources =
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ||
+                @Suppress("DEPRECATION")
                 Settings.Secure.getInt(contentResolver, Settings.Secure.INSTALL_NON_MARKET_APPS) == 1
 
         if (canInstallFromOtherSources) {

@@ -7,9 +7,10 @@ import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Point
 import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.os.Build
 import android.os.Bundle
 import android.os.Parcel
-import android.view.WindowManager
 import android.webkit.WebResourceResponse
 import android.widget.Toast
 import org.json.JSONArray
@@ -34,11 +35,10 @@ object Utils {
      * Returns the screen/display size
      */
     fun getDisplaySize(context: Context): Point {
-        val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        val display = wm.defaultDisplay
-        val size = Point()
-        display.getSize(size)
-        return size
+        // DisplayManager.getDisplay()/Display.getSize() are deprecated in API 30; the resource
+        // metrics carry the same app-usable size (system decorations excluded) on every version.
+        val metrics = context.resources.displayMetrics
+        return Point(metrics.widthPixels, metrics.heightPixels)
     }
 
     /**
@@ -111,9 +111,11 @@ object Utils {
     }
 
     fun isNetworkConnected(context: Context): Boolean {
+        // activeNetworkInfo/isConnectedOrConnecting are deprecated in API 29: ask the active
+        // network's capabilities instead (this also covers VPNs and other modern transports).
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val activeNetwork = cm.activeNetworkInfo
-        return activeNetwork != null && activeNetwork.isConnectedOrConnecting
+        val capabilities = cm.getNetworkCapabilities(cm.activeNetwork)
+        return capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
     }
 
     fun isSameDate(
@@ -163,14 +165,28 @@ object Utils {
     fun isInstalledByGooglePlay(context: Context): Boolean {
         // A list with valid installers package name
         val validInstallers = ArrayList(Arrays.asList("com.android.vending", "com.google.android.feedback"))
-        val installer = context.packageManager.getInstallerPackageName(context.packageName)
+        val installer = installerPackageName(context)
         return installer != null && validInstallers.contains(installer)
     }
 
     fun isInstalledByAPK(context: Context): Boolean {
-        val installer = context.packageManager.getInstallerPackageName(context.packageName)
+        val installer = installerPackageName(context)
         return installer == null || "com.google.android.packageinstaller".equals(installer)
     }
+
+    /**
+     * The package that installed this app, or null when there is none (sideloaded).
+     *
+     * getInstallerPackageName is deprecated in API 30 in favour of the richer InstallSourceInfo;
+     * below that it remains the only call.
+     */
+    private fun installerPackageName(context: Context): String? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            context.packageManager.getInstallSourceInfo(context.packageName).installingPackageName
+        } else {
+            @Suppress("DEPRECATION")
+            context.packageManager.getInstallerPackageName(context.packageName)
+        }
 
     fun convertJsonToBundle(json: JSONObject): Bundle? {
         val bundle = Bundle()
