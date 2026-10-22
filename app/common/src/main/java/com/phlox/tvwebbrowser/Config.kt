@@ -48,6 +48,9 @@ class Config(
         const val HOME_PAGE_MODE = "home_page_mode"
         const val WEB_ENGINE = "web_engine"
         const val BLOCK_AUTOMATIC_REDIRECTS_KEY = "block_automatic_redirects"
+        const val HIDE_TOOLBAR_WHEN_BROWSING_KEY = "hide_toolbar_when_browsing"
+
+        @Deprecated("Use HIDE_TOOLBAR_WHEN_BROWSING_KEY")
         const val KEEP_TOOLBAR_OPEN_KEY = "keep_toolbar_open"
         const val RESTORE_TABS_ON_STARTUP_KEY = "restore_tabs_on_startup"
 
@@ -187,10 +190,23 @@ class Config(
             prefs.edit().putBoolean(BLOCK_AUTOMATIC_REDIRECTS_KEY, value).apply()
         }
 
-    var keepToolbarOpen: Boolean
-        get() = prefs.getBoolean(KEEP_TOOLBAR_OPEN_KEY, true)
+    var hideToolbarWhenBrowsing: Boolean
+        get() =
+            if (prefs.contains(HIDE_TOOLBAR_WHEN_BROWSING_KEY)) {
+                prefs.getBoolean(HIDE_TOOLBAR_WHEN_BROWSING_KEY, false)
+            } else if (prefs.contains(KEEP_TOOLBAR_OPEN_KEY)) {
+                !prefs.getBoolean(KEEP_TOOLBAR_OPEN_KEY, true)
+            } else {
+                false
+            }
         set(value) {
-            prefs.edit().putBoolean(KEEP_TOOLBAR_OPEN_KEY, value).apply()
+            prefs.edit().putBoolean(HIDE_TOOLBAR_WHEN_BROWSING_KEY, value).apply()
+        }
+
+    var keepToolbarOpen: Boolean
+        get() = !hideToolbarWhenBrowsing
+        set(value) {
+            hideToolbarWhenBrowsing = !value
         }
 
     var restoreTabsOnStartup: Boolean

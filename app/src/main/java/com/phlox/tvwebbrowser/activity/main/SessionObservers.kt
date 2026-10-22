@@ -77,7 +77,7 @@ class SessionObservers(
 
         // The toolbar overlay style follows the setting live, so the settings page never touches the
         // activity to restyle it.
-        settingsModel.keepToolbarOpen.subscribe(activity.lifecycle) {
+        settingsModel.hideToolbarWhenBrowsing.subscribe(activity.lifecycle) {
             toolbarController.applyOverlayStyle()
         }
 

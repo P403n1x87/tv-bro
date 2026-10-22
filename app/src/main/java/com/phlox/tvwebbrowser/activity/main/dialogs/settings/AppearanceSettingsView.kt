@@ -39,10 +39,10 @@ class AppearanceSettingsView(
             add(
                 SettingsItem.Toggle(
                     iconRes = R.drawable.ic_settings_toolbar_24dp,
-                    titleRes = R.string.settings_keep_toolbar_open,
-                    summaryRes = R.string.settings_keep_toolbar_open_summary,
-                    isChecked = { settingsModel.keepToolbarOpen.value },
-                    onCheckedChange = { settingsModel.keepToolbarOpen.value = it },
+                    titleRes = R.string.settings_hide_toolbar_when_browsing,
+                    summaryRes = R.string.settings_hide_toolbar_when_browsing_summary,
+                    isChecked = { settingsModel.hideToolbarWhenBrowsing.value },
+                    onCheckedChange = { settingsModel.hideToolbarWhenBrowsing.value = it },
                 ),
             )
             add(

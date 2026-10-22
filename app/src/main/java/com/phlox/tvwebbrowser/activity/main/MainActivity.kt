@@ -278,7 +278,7 @@ open class MainActivity :
                 uiHandler,
                 lifecycleScope,
                 cacheDir = { cacheDir },
-                keepToolbarOpen = { settingsModel.keepToolbarOpen.value },
+                keepToolbarOpen = { !settingsModel.hideToolbarWhenBrowsing.value },
                 isCurrentTab = { tabByTitleIndex(vb.vTabs.current) == it },
             )
         sessionObservers =
@@ -330,6 +330,16 @@ open class MainActivity :
 
         vb.vActionBar.callback = this
 
+        vb.flWebViewContainer.setOnFocusChangeListener { _, hasFocus ->
+            if (!toolbarController.isFullscreen && settingsModel.hideToolbarWhenBrowsing.value) {
+                if (hasFocus) {
+                    toolbarController.hideTopBar()
+                } else {
+                    toolbarController.showTopBar()
+                }
+            }
+        }
+
         // The cursor menu asks the host about (and reports back) the "direct navigation" hint
         // instead of reading global config itself.
         vb.vCursorMenu.shouldSuppressDirectNavigationHint = { settingsModel.directNavigationModeHintSuppress }
@@ -347,6 +357,9 @@ open class MainActivity :
             ?.webEngine
             ?.getView()
             ?.requestFocus()
+        if (!toolbarController.isFullscreen && settingsModel.hideToolbarWhenBrowsing.value) {
+            toolbarController.hideTopBar()
+        }
     }
 
     /**
@@ -1084,7 +1097,12 @@ open class MainActivity :
         } else if (vb.flWebViewContainer.hasFocus()) {
             // Focus is on the page: BACK must give the remote a way back to the UI,
             // otherwise the user is stuck in the WebView with no focused control.
-            toolbarController.showMenuOverlay()
+            if (settingsModel.hideToolbarWhenBrowsing.value) {
+                toolbarController.showTopBar()
+                vb.vActionBar.catchFocus()
+            } else {
+                toolbarController.toggleMenu()
+            }
         } else {
             toolbarController.toggleMenu()
         }
