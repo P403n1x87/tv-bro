@@ -107,15 +107,21 @@ class SettingsModel(
         }
 
     /** Observable because the changed value restyles the toolbar the host is showing right now. */
-    var keepToolbarOpen =
-        object : ObservableValue<Boolean>(config.keepToolbarOpen) {
-            override var value: Boolean = config.keepToolbarOpen
+    var hideToolbarWhenBrowsing =
+        object : ObservableValue<Boolean>(config.hideToolbarWhenBrowsing) {
+            override var value: Boolean = config.hideToolbarWhenBrowsing
                 set(value) {
-                    config.keepToolbarOpen = value
                     field = value
+                    config.hideToolbarWhenBrowsing = value
                     notifyObservers()
                 }
-                get() = config.keepToolbarOpen
+                get() = config.hideToolbarWhenBrowsing
+        }
+
+    var keepToolbarOpen: Boolean
+        get() = !hideToolbarWhenBrowsing.value
+        set(value) {
+            hideToolbarWhenBrowsing.value = !value
         }
 
     // Playback

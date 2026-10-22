@@ -39,7 +39,10 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_below="@+id/rlActionBar"
-        android:id="@+id/flWebViewContainer" />
+        android:id="@+id/flWebViewContainer"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:descendantFocusability="afterDescendants" />
 
     <ImageView
         android:id="@+id/ivMiniatures"

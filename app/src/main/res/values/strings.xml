@@ -247,6 +247,8 @@
     <string name="settings_algorithmic_darkening_summary">Dark theme for web pages (WebView only, needs restart)</string>
     <string name="settings_keep_toolbar_open">Keep toolbar open</string>
     <string name="settings_keep_toolbar_open_summary">Stays visible after actions</string>
+    <string name="settings_hide_toolbar_when_browsing">Hide toolbar when browsing</string>
+    <string name="settings_hide_toolbar_when_browsing_summary">Hide the top bar when focus is on the web page; press Back to show it</string>
     <string name="settings_video_player">Video player</string>
     <string name="settings_video_player_summary">Player used for the streams detected on the page</string>
     <string name="settings_web_engine">Web browser engine</string>

@@ -54,6 +54,17 @@ class ToolbarController(
         vb.vActionBar.catchFocus()
     }
 
+    fun hideTopBar() {
+        if (isFullscreen) return
+        vb.rlActionBar.visibility = View.GONE
+    }
+
+    fun showTopBar() {
+        if (isFullscreen) return
+        applyOverlayStyle()
+        vb.rlActionBar.visibility = View.VISIBLE
+    }
+
     /**
      * Kept for the auto-hide call sites (tab switch, URL done, history, voice search, …). With the
      * "keep toolbar open" behaviour the overlay stays up, so this is intentionally a no-op.
