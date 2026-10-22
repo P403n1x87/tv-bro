@@ -338,6 +338,17 @@ open class MainActivity :
                     toolbarController.showTopBar()
                 }
             }
+            if (hasFocus) {
+                panelController.hideAllPanels()
+            }
+        }
+        vb.flWebViewContainer.setOnTouchListener { _, event ->
+            if (event.action == android.view.MotionEvent.ACTION_DOWN) {
+                if (panelController.isTabsPanelVisible || panelController.isBookmarksPanelVisible) {
+                    panelController.hideAllPanels()
+                }
+            }
+            false
         }
 
         // The cursor menu asks the host about (and reports back) the "direct navigation" hint
@@ -1022,6 +1033,19 @@ open class MainActivity :
         val localCallback = window.callback
         window.callback =
             object : Window.Callback by localCallback {
+                override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+                    if (ev.action == MotionEvent.ACTION_DOWN) {
+                        val v = currentFocus
+                        if (v == vb.vTabs || v == vb.vBookmarks || vb.llTabPanel.isVisible || vb.rlBookmarksPanel.isVisible) {
+                            // if focus is in panels, let panels handle; else close
+                            if (vb.llTabPanel.isVisible || vb.rlBookmarksPanel.isVisible) {
+                                // check if touch is outside panels? simple: if touching webview area, close
+                            }
+                        }
+                    }
+                    return localCallback.dispatchTouchEvent(ev)
+                }
+
                 override fun dispatchKeyEvent(event: KeyEvent): Boolean {
                     // Log.d(TAG, "dispatchKeyEvent event: $event")
                     backNavigationEventsAdapter.dispatchKeyEvent(event)
