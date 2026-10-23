@@ -6,6 +6,7 @@ import com.phlox.tvwebbrowser.config.PlaybackConfig
 import com.phlox.tvwebbrowser.domain.HomePagePolicy
 import com.phlox.tvwebbrowser.utils.activemodel.ActiveModel
 import com.phlox.tvwebbrowser.utils.observable.ObservableValue
+import com.phlox.tvwebbrowser.utils.observable.observableValue
 
 class SettingsModel(
     private val config: Config = AppContext.provideConfig(),
@@ -43,16 +44,7 @@ class SettingsModel(
             "",
         )
 
-    var keepScreenOn =
-        object : ObservableValue<Boolean>(config.keepScreenOn) {
-            override var value: Boolean = config.keepScreenOn
-                set(value) {
-                    config.keepScreenOn = value
-                    field = value
-                    notifyObservers()
-                }
-                get() = config.keepScreenOn
-        } // makeObservable(config::keepScreenOn)
+    var keepScreenOn = observableValue({ config.keepScreenOn }, { config.keepScreenOn = it })
 
     // One-shot hints the user dismissed for good ("don't show again"): the screens flip them here,
     // so no view writes those Config flags directly.
@@ -108,15 +100,7 @@ class SettingsModel(
 
     /** Observable because the changed value restyles the toolbar the host is showing right now. */
     var hideToolbarWhenBrowsing =
-        object : ObservableValue<Boolean>(config.hideToolbarWhenBrowsing) {
-            override var value: Boolean = config.hideToolbarWhenBrowsing
-                set(value) {
-                    field = value
-                    config.hideToolbarWhenBrowsing = value
-                    notifyObservers()
-                }
-                get() = config.hideToolbarWhenBrowsing
-        }
+        observableValue({ config.hideToolbarWhenBrowsing }, { config.hideToolbarWhenBrowsing = it })
 
     var keepToolbarOpen: Boolean
         get() = !hideToolbarWhenBrowsing.value

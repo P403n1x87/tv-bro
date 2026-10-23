@@ -32,8 +32,8 @@ class SessionStartup(
     private val tabsModel: TabsModel,
     private val toolbarController: ToolbarController,
     private val handleIntent: (Intent) -> Unit,
-    /** (url, index, needToHideMenuOverlay, navigateImmediately), the activity's own tab opener. */
-    private val openInNewTab: (url: String?, index: Int, needToHideMenuOverlay: Boolean, navigateImmediately: Boolean) -> Unit,
+    /** (url, index), the activity's own tab opener; it always loads the url. */
+    private val openInNewTab: (url: String?, index: Int) -> Unit,
     private val changeTab: (WebTabState) -> Unit,
     /**
      * Runs the host's own post-load work (the update badge and the startup update check) once the
@@ -84,8 +84,7 @@ class SessionStartup(
      */
     private fun restoreSavedTabOrOpenHome() {
         if (tabsModel.tabsStates.isEmpty()) {
-            // (url, index, needToHideMenuOverlay, navigateImmediately)
-            openInNewTab(settingsModel.homePage, 0, true, true)
+            openInNewTab(settingsModel.homePage, 0)
             return
         }
         for (i in tabsModel.tabsStates.indices) {

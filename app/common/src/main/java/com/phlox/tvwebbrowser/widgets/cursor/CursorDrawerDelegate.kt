@@ -496,11 +496,11 @@ class CursorDrawerDelegate(
         }
 
     fun tryZoomIn() {
-        generateZoomGesture(true)
+        generateZoomGesture(pinchZoomIn = true)
     }
 
     fun tryZoomOut() {
-        generateZoomGesture(false)
+        generateZoomGesture(pinchZoomIn = false)
     }
 
     fun animateAppearing() {

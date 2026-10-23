@@ -14,6 +14,7 @@ import com.phlox.tvwebbrowser.databinding.ActivityMainBinding
 import com.phlox.tvwebbrowser.domain.LinkActionPolicy
 import com.phlox.tvwebbrowser.model.WebTabState
 import com.phlox.tvwebbrowser.utils.BackNavigationEventsAdapter
+import com.phlox.tvwebbrowser.webengine.NewTabLoad
 import com.phlox.tvwebbrowser.webengine.WebEngineWindowProviderCallback
 import com.phlox.tvwebbrowser.widgets.cursor.CursorDrawerDelegate
 
@@ -102,7 +103,7 @@ class CursorMenuController(
                 it.setOnMenuItemClickListener { menuItem ->
                     when (menuItem.itemId) {
                         R.id.miRefreshPage -> tab.webEngine.reload()
-                        R.id.miOpenInNewTab -> callback.onOpenInNewTabRequested(url!!, true)
+                        R.id.miOpenInNewTab -> callback.onOpenInNewTabRequested(url!!, NewTabLoad.Immediate)
                         R.id.miOpenInExternalApp -> callback.onOpenInExternalAppRequested(url!!)
                         R.id.miDownload -> callback.onDownloadRequested(url!!)
                         R.id.miCopyToClipboard -> callback.onCopyTextToClipboardRequested(url!!)

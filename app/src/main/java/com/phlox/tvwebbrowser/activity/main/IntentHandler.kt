@@ -14,7 +14,7 @@ import com.phlox.tvwebbrowser.model.WebTabState
  */
 class IntentHandler(
     private val tabsModel: TabsModel,
-    private val openInNewTab: (url: String?, index: Int, navigateImmediately: Boolean) -> Unit,
+    private val openInNewTab: (url: String?, index: Int) -> Unit,
     private val navigate: (String) -> Unit,
     private val changeTab: (WebTabState) -> Unit,
     private val autoHideMenuOverlay: () -> Unit,
@@ -38,7 +38,6 @@ class IntentHandler(
         openInNewTab(
             intent.data.toString(),
             tabsModel.tabsStates.size,
-            true,
         )
     }
 

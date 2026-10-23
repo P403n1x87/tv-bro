@@ -62,6 +62,27 @@ cross-reference from `ARCHITECTURE-OVERVIEW.md` stays valid):
 | 6 | ~~Test shape, not count~~ **Done** | Was 164 tests, all model/repository units, with nothing pinned for panel focus, D-pad, toolbar URL box or back handling. Now 216: `ActionBarTest` (the address box state machine, the key handling, the focus flags behind the D-pad chain), `PanelRowFocusDelegateTest` (the row hand-off), `PanelControllerTest` (panel focus claim/mutual exclusion/return) and `BackNavigationEventsAdapterTest` (press/release, cross-channel suppression, controller long-press) — all Robolectric over the real inflated layouts (`app/src/test`, same task as the rest of the suite). | Done — a full `MainActivity` launch stays out of reach on the JVM (the ad-block model loads a native library; the download-service binding's shadow passes a null `ComponentName`), so that level got an instrumented `androidTest` setup: `MainScreenSmokeTest` (`app/src/androidTest`) drives the whole activity on a device — cold start, VIEW-intent page load, history back navigation, bookmarks panel — through `:app:connected<Flavor>DebugAndroidTest`. |
 | 7 | Packaging | `:app:common` is 4092 LOC (Config + singletons + utils + cursor widgets); the engine factory/provider seam is the last global inside it. Gecko only sees `:app:common` (correct), but `common` is a grab-bag. | High / low–medium |
 
+## Boolean-trap / dead-code cleanup (Oct 23 2026)
+An audit pass over boolean parameters, hard activity casts and commented-out code closed these:
+
+| Area | Change |
+|---|---|
+| `MainActivity.openInNewTab` | The `needToHideMenuOverlay` flag only gated the documented no-op `autoHideMenuOverlay`, so it went; the remaining load decision is the `NewTabLoad` enum (`Immediate`/`Deferred`) at the engine seam, so `onOpenInNewTabRequested` no longer takes a bare boolean either. |
+| `TabsModel.findHostConfig` | Split into `findHostConfig` (read only) and `getOrCreateHostConfig` (read or insert); the `createIfNotFound` boolean is gone from the call sites. |
+| `VersionSettingsView` | Dropped the `activity as MainActivity` cast: installing the update and opening a link go through `SettingsDeps` callbacks supplied by the composition root. |
+| `TabsAdapter` / `BookmarksAdapter` | Replaced `(itemView.activity as AppCompatActivity).lifecycleScope` with the item's own `findViewTreeLifecycleOwner()`; a detached item simply skips the favicon load. |
+| `SettingsModel` | The two hand-written `ObservableValue` subclasses became one `observableValue(read, write)` helper in `common`, replacing the commented-out reflective `makeObservable`. |
+| Dead code | Removed the empty `dispatchTouchEvent` override in `MainActivity.onAttachedToWindow`, `TabsAdapter`'s unused `uiHandler`/`transparentBackground`, the unused parameter of `ToolbarController.autoHideMenuOverlay`, and stale commented blocks (`SimpleObservable`, `AndroidJSInterface`, `MainActivity.createWebView`). |
+| `WebEngineCallback.onVisited` | Logs history against the callback's own tab instead of whichever tab is selected, so a background tab no longer borrows the current tab's title/favicon. |
+| Boolean call sites | Literal booleans now name their parameter where the meaning was not already in the function name (`newTab =`, `forceReload =`, `force =`, `deleteAll =`, `pinchZoomIn =`). |
+
+The audit also looked for test-only branches in application code and found none (no `BuildConfig.DEBUG`/
+`isTest` checks; the only `mock` string is the Gecko test-account address). The remaining large
+functions were reviewed and deliberately left alone: `MyPromptDelegate.onChoicePromptImpl` (198 lines,
+a recursive choice-dialog builder), `NativeVideoActivity.onStart` (178 lines of player wiring),
+`UpdateChecker.downloadUpdate` (131 lines) and `CursorDrawerDelegate.run` (124 lines) are long but
+cohesive, and splitting them is a separate, riskier change than this pass.
+
 ## Recommendation
 The first margin is closed: the main screen is decomposed into constructor-injected collaborators,
 models own their state without touching Activity/dialog classes, the host seams (`TabViewHost`,

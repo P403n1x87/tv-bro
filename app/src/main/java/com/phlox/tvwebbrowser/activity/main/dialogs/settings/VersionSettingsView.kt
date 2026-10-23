@@ -1,13 +1,8 @@
 package com.phlox.tvwebbrowser.activity.main.dialogs.settings
 
 import android.content.Context
-import android.content.Intent
-import androidx.core.net.toUri
 import com.phlox.tvwebbrowser.BuildConfig
 import com.phlox.tvwebbrowser.R
-import com.phlox.tvwebbrowser.activity.IncognitoModeMainActivity
-import com.phlox.tvwebbrowser.activity.main.MainActivity
-import com.phlox.tvwebbrowser.utils.activity
 import com.phlox.tvwebbrowser.webengine.WebEngineFactory
 
 /**
@@ -27,7 +22,6 @@ class VersionSettingsView(
             "https://raw.githubusercontent.com/truefedex/tv-bro/refs/heads/master/PRIVACY.md"
     }
 
-    private val settingsModel = deps.settings
     private val autoUpdateModel = deps.autoUpdate
     var callback: Callback? = null
 
@@ -115,7 +109,7 @@ class VersionSettingsView(
                         titleRes = R.string.settings_install_update,
                         onClick = {
                             callback?.onNeedToCloseSettings()
-                            autoUpdateModel.showUpdateDialogIfNeeded(activity as MainActivity, true)
+                            deps.installUpdate()
                         },
                         visible = { hasUpdate() },
                     ),
@@ -168,7 +162,7 @@ class VersionSettingsView(
     private fun ensureUpdateInfo() {
         if (!BuildConfig.BUILT_IN_AUTO_UPDATE) return
         if (autoUpdateModel.updateChecker.versionCheckResult != null) return
-        autoUpdateModel.checkUpdate(false) {
+        autoUpdateModel.checkUpdate(force = false) {
             callback?.onUpdateStateChanged()
             post { rebuild() }
         }
@@ -176,14 +170,6 @@ class VersionSettingsView(
 
     private fun loadUrl(url: String) {
         callback?.onNeedToCloseSettings()
-        val activityClass =
-            if (settingsModel.incognitoMode) {
-                IncognitoModeMainActivity::class.java
-            } else {
-                MainActivity::class.java
-            }
-        val intent = Intent(activity, activityClass)
-        intent.data = url.toUri()
-        activity?.startActivity(intent)
+        deps.openUrl(url)
     }
 }

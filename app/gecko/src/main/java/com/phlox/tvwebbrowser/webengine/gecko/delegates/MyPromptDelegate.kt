@@ -77,7 +77,7 @@ class MyPromptDelegate(
         prompt: GeckoSession.PromptDelegate.AlertPrompt,
     ): GeckoResult<GeckoSession.PromptDelegate.PromptResponse>? {
         if (webEngine.callback?.isDialogsBlockingEnabled() == true) {
-            webEngine.callback?.onBlockedDialog(true)
+            webEngine.callback?.onBlockedDialog(newTab = true)
             return GeckoResult.fromValue(prompt.dismiss())
         }
         val activity: Activity =
@@ -132,7 +132,7 @@ class MyPromptDelegate(
         prompt: GeckoSession.PromptDelegate.RepostConfirmPrompt,
     ): GeckoResult<GeckoSession.PromptDelegate.PromptResponse>? {
         if (webEngine.callback?.isDialogsBlockingEnabled() == true) {
-            webEngine.callback?.onBlockedDialog(true)
+            webEngine.callback?.onBlockedDialog(newTab = true)
             return GeckoResult.fromValue(prompt.dismiss())
         }
         val activity: Activity =
@@ -169,7 +169,7 @@ class MyPromptDelegate(
         prompt: GeckoSession.PromptDelegate.ButtonPrompt,
     ): GeckoResult<GeckoSession.PromptDelegate.PromptResponse>? {
         if (webEngine.callback?.isDialogsBlockingEnabled() == true) {
-            webEngine.callback?.onBlockedDialog(true)
+            webEngine.callback?.onBlockedDialog(newTab = true)
             return GeckoResult.fromValue(prompt.dismiss())
         }
         val activity: Activity =
@@ -203,7 +203,7 @@ class MyPromptDelegate(
         prompt: GeckoSession.PromptDelegate.TextPrompt,
     ): GeckoResult<GeckoSession.PromptDelegate.PromptResponse>? {
         if (webEngine.callback?.isDialogsBlockingEnabled() == true) {
-            webEngine.callback?.onBlockedDialog(true)
+            webEngine.callback?.onBlockedDialog(newTab = true)
             return GeckoResult.fromValue(prompt.dismiss())
         }
         val activity: Activity =
@@ -305,7 +305,7 @@ class MyPromptDelegate(
         prompt: GeckoSession.PromptDelegate.ColorPrompt,
     ): GeckoResult<GeckoSession.PromptDelegate.PromptResponse>? {
         if (webEngine.callback?.isDialogsBlockingEnabled() == true) {
-            webEngine.callback?.onBlockedDialog(true)
+            webEngine.callback?.onBlockedDialog(newTab = true)
             return GeckoResult.fromValue(prompt.dismiss())
         }
         val activity: Activity =
@@ -391,7 +391,7 @@ class MyPromptDelegate(
         prompt: GeckoSession.PromptDelegate.DateTimePrompt,
     ): GeckoResult<GeckoSession.PromptDelegate.PromptResponse>? {
         if (webEngine.callback?.isDialogsBlockingEnabled() == true) {
-            webEngine.callback?.onBlockedDialog(true)
+            webEngine.callback?.onBlockedDialog(newTab = true)
             return GeckoResult.fromValue(prompt.dismiss())
         }
         val activity: Activity =
@@ -611,7 +611,7 @@ class MyPromptDelegate(
         prompt: GeckoSession.PromptDelegate.PopupPrompt,
     ): GeckoResult<GeckoSession.PromptDelegate.PromptResponse>? {
         if (webEngine.callback?.shouldBlockNewWindow(dialog = false, userGesture = false) == true) {
-            webEngine.callback?.onBlockedDialog(true)
+            webEngine.callback?.onBlockedDialog(newTab = true)
             return GeckoResult.fromValue(prompt.dismiss())
         }
         return GeckoResult.fromValue(prompt.confirm(AllowOrDeny.ALLOW))
@@ -757,7 +757,7 @@ class MyPromptDelegate(
         res: GeckoResult<PromptResponse>,
     ) {
         if (webEngine.callback?.isDialogsBlockingEnabled() == true) {
-            webEngine.callback?.onBlockedDialog(true)
+            webEngine.callback?.onBlockedDialog(newTab = true)
             res.complete(prompt.dismiss())
             return
         }

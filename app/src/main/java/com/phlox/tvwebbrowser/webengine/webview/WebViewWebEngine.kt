@@ -18,6 +18,7 @@ import com.phlox.tvwebbrowser.domain.UserAgentPolicy
 import com.phlox.tvwebbrowser.model.WebTabState
 import com.phlox.tvwebbrowser.utils.Utils
 import com.phlox.tvwebbrowser.webengine.MediaCandidate
+import com.phlox.tvwebbrowser.webengine.NewTabLoad
 import com.phlox.tvwebbrowser.webengine.WebEngine
 import com.phlox.tvwebbrowser.webengine.WebEngineFactory
 import com.phlox.tvwebbrowser.webengine.WebEngineProvider
@@ -281,7 +282,7 @@ class WebViewWebEngine(
             override fun getActivity(): Activity? = callback?.getActivity()
 
             override fun onOpenInNewTabRequested(url: String) {
-                callback?.onOpenInNewTabRequested(url, true)
+                callback?.onOpenInNewTabRequested(url, NewTabLoad.Immediate)
             }
 
             override fun onDownloadRequested(url: String) {

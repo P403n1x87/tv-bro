@@ -96,9 +96,9 @@ class HistoryActivity :
         vb.btnClose.setOnClickListener { finish() }
         vb.btnDelete.setOnClickListener {
             if (adapter!!.isMultiselectMode && adapter!!.selectedItems.isNotEmpty()) {
-                showDeleteDialog(false)
+                showDeleteDialog(deleteAll = false)
             } else {
-                showDeleteDialog(true)
+                showDeleteDialog(deleteAll = true)
             }
         }
         vb.btnClearBrowsingData.setOnClickListener { showClearBrowsingDataDialog() }

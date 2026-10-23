@@ -52,10 +52,6 @@ interface Subscribable<O> {
         notifyOnSubscribe: Boolean = true,
         observer: O,
     ) {
-        /*if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
-            subscribe(observer, notifyOnSubscribe)
-        }*/
-
         lifecycle.addObserver(
             object : LifecycleEventObserver {
                 override fun onStateChanged(
@@ -136,17 +132,23 @@ open class ObservableValue<T>(
     }
 }
 
-/*fun <T>makeObservable(property: KMutableProperty<T>): ObservableValue<T> {
-    return object : ObservableValue<T>(property.getter.call()) {
-        override var value: T = property.getter.call()
-            set(value) {
-                property.setter.call(value)
-                field = value
+/**
+ * An [ObservableValue] over an externally stored value: reads and writes go through [read] and
+ * [write], and every write notifies the observers. Used for settings that live in `Config`, where
+ * the observable mirrors the stored value instead of keeping a second copy that could drift from it.
+ */
+fun <T> observableValue(
+    read: () -> T,
+    write: (T) -> Unit,
+): ObservableValue<T> =
+    object : ObservableValue<T>(read()) {
+        override var value: T
+            get() = read()
+            set(newValue) {
+                write(newValue)
                 notifyObservers()
             }
-            get() = property.getter.call()
     }
-}*/
 
 typealias EventObserver = () -> Unit
 

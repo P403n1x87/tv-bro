@@ -56,7 +56,6 @@ class TabsView
                         .getColor(context, R.color.top_bar_background)
                 },
             )
-            adapter.transparentBackground = transparent
         }
 
         init {
