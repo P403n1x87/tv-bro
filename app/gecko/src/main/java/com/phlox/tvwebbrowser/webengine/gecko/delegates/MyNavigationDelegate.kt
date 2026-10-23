@@ -1,6 +1,7 @@
 package com.phlox.tvwebbrowser.webengine.gecko.delegates
 
 import android.util.Log
+import com.phlox.tvwebbrowser.webengine.NewTabLoad
 import com.phlox.tvwebbrowser.webengine.gecko.GeckoWebEngine
 import kotlinx.coroutines.runBlocking
 import org.mozilla.geckoview.AllowOrDeny
@@ -103,10 +104,10 @@ class MyNavigationDelegate(
         Log.d(TAG, "onNewSession: $uri")
         val callback = webEngine.callback ?: return null
         if (webEngine.callback?.shouldBlockNewWindow(dialog = false, userGesture = false) == true) {
-            callback.onBlockedDialog(true)
+            callback.onBlockedDialog(newTab = true)
             return null
         }
-        val engine = webEngine.callback?.onOpenInNewTabRequested(uri, false)
+        val engine = webEngine.callback?.onOpenInNewTabRequested(uri, NewTabLoad.Deferred)
         return if (engine == null) {
             null
         } else {

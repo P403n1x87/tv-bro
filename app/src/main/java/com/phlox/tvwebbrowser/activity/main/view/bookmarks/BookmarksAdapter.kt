@@ -3,7 +3,7 @@ package com.phlox.tvwebbrowser.activity.main.view.bookmarks
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.findViewTreeLifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
 import com.phlox.tvwebbrowser.Config
@@ -12,7 +12,6 @@ import com.phlox.tvwebbrowser.databinding.ViewBookmarkItemBinding
 import com.phlox.tvwebbrowser.domain.HomePagePolicy
 import com.phlox.tvwebbrowser.model.FavoriteItem
 import com.phlox.tvwebbrowser.singleton.FaviconsPool
-import com.phlox.tvwebbrowser.utils.activity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -64,9 +63,9 @@ class BookmarksAdapter(
             vb.ivFavicon.setImageResource(R.drawable.ic_not_available)
 
             val url = item.url
-            if (url != null && !HomePagePolicy.isHomePageUrl(url, Config.localHomePageUrl)) {
-                val scope = (itemView.activity as AppCompatActivity).lifecycleScope
-                scope.launch(Dispatchers.Main) {
+            val lifecycleOwner = itemView.findViewTreeLifecycleOwner()
+            if (url != null && lifecycleOwner != null && !HomePagePolicy.isHomePageUrl(url, Config.localHomePageUrl)) {
+                lifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
                     val favicon = FaviconsPool.get(url)
                     if (url != item.url) return@launch // url was changed while loading favicon
                     if (!itemView.isAttachedToWindow) return@launch

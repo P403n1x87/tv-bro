@@ -38,7 +38,7 @@ class AdblockModel(
     val loadError = ObservableValue(false)
 
     init {
-        loadAdBlockList(false)
+        loadAdBlockList(forceReload = false)
     }
 
     @Suppress("BlockingMethodInNonBlockingContext")

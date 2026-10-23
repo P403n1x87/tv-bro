@@ -70,6 +70,7 @@ import com.phlox.tvwebbrowser.utils.Utils
 import com.phlox.tvwebbrowser.utils.VoiceSearchHelper
 import com.phlox.tvwebbrowser.utils.activemodel.ActiveModelsRepository
 import com.phlox.tvwebbrowser.utils.sameDay
+import com.phlox.tvwebbrowser.webengine.NewTabLoad
 import com.phlox.tvwebbrowser.webengine.WebEngine
 import com.phlox.tvwebbrowser.webengine.WebEngineFactory
 import com.phlox.tvwebbrowser.webengine.WebEngineWindowProviderCallback
@@ -247,9 +248,7 @@ open class MainActivity :
         intentHandler =
             IntentHandler(
                 tabsModel = tabsModel,
-                openInNewTab = { url, index, navigateImmediately ->
-                    openInNewTab(url, index, needToHideMenuOverlay = true, navigateImmediately = navigateImmediately)
-                },
+                openInNewTab = { url, index -> openInNewTab(url, index) },
                 navigate = { navigate(it) },
                 changeTab = { changeTab(it) },
                 autoHideMenuOverlay = { toolbarController.autoHideMenuOverlay() },
@@ -304,9 +303,7 @@ open class MainActivity :
                 tabsModel,
                 toolbarController,
                 handleIntent = { handleIntent(it) },
-                openInNewTab = { url, index, needToHideMenuOverlay, navigateImmediately ->
-                    openInNewTab(url, index, needToHideMenuOverlay, navigateImmediately)
-                },
+                openInNewTab = { url, index -> openInNewTab(url, index) },
                 changeTab = { changeTab(it) },
                 onLoaded = {
                     checkForUpdatesOnStartup()
@@ -384,7 +381,7 @@ open class MainActivity :
         ) {
             return
         }
-        autoUpdateModel.checkUpdate(false) {
+        autoUpdateModel.checkUpdate(force = false) {
             updateUpdateBadge()
             if (autoUpdateModel.updateChecker.hasUpdate()) {
                 autoUpdateModel.showUpdateDialogIfNeeded(this)
@@ -451,8 +448,6 @@ open class MainActivity :
                 this@MainActivity.openInNewTab(
                     settingsModel.homePage,
                     tabIndex,
-                    needToHideMenuOverlay = false,
-                    navigateImmediately = true,
                 )
             }
         }
@@ -483,7 +478,23 @@ open class MainActivity :
     private fun tabByTitleIndex(index: Int) = if (index >= 0 && index < tabsModel.tabsStates.size) tabsModel.tabsStates[index] else null
 
     override fun showSettings() {
-        SettingsDialog(this, SettingsDeps(settingsModel, adblockModel, autoUpdateModel))
+        val deps =
+            SettingsDeps(
+                settingsModel,
+                adblockModel,
+                autoUpdateModel,
+                installUpdate = { autoUpdateModel.showUpdateDialogIfNeeded(this, force = true) },
+                openUrl = { url ->
+                    val activityClass =
+                        if (settingsModel.incognitoMode) {
+                            IncognitoModeMainActivity::class.java
+                        } else {
+                            MainActivity::class.java
+                        }
+                    startActivity(Intent(this, activityClass).setData(Uri.parse(url)))
+                },
+            )
+        SettingsDialog(this, deps)
             .apply {
                 // The ad-block toggle is global (adblockModel.adBlockEnabled) while the overlay zapper is a
                 // document-start script registered per WebView; re-sync every open tab on dismiss so
@@ -561,8 +572,6 @@ open class MainActivity :
                         openInNewTab(
                             settingsModel.homePage,
                             tabsModel.tabsStates.size,
-                            needToHideMenuOverlay = false,
-                            navigateImmediately = true,
                         )
                     }
 
@@ -735,14 +744,9 @@ open class MainActivity :
     private fun openInNewTab(
         url: String?,
         index: Int = 0,
-        needToHideMenuOverlay: Boolean = true,
-        navigateImmediately: Boolean,
+        load: NewTabLoad = NewTabLoad.Immediate,
     ): WebEngine? {
-        Log.d(
-            TAG,
-            "openInNewTab: url: $url, index: $index, needToHideMenuOverlay: $needToHideMenuOverlay, " +
-                "navigateImmediately: $navigateImmediately",
-        )
+        Log.d(TAG, "openInNewTab: url: $url, index: $index, load: $load")
         if (url == null) {
             return null
         }
@@ -750,11 +754,8 @@ open class MainActivity :
         createWebView(tab) ?: return null
         tabsModel.onOpenTab(tab, index)
         changeTab(tab)
-        if (navigateImmediately) {
+        if (load == NewTabLoad.Immediate) {
             navigate(url)
-        }
-        if (needToHideMenuOverlay) {
-            toolbarController.autoHideMenuOverlay(true)
         }
         return tab.webEngine
     }
@@ -764,9 +765,9 @@ open class MainActivity :
         tabsModel.onCloseTab(
             tab,
             switchTo = { changeTab(it) },
-            openNewTab = { openInNewTab(settingsModel.homePage, 0, needToHideMenuOverlay = true, navigateImmediately = true) },
+            openNewTab = { openInNewTab(settingsModel.homePage, 0) },
         )
-        toolbarController.autoHideMenuOverlay(true)
+        toolbarController.autoHideMenuOverlay()
     }
 
     override fun changeTab(newTab: WebTabState) {
@@ -792,7 +793,6 @@ open class MainActivity :
     override fun createWebView(tab: WebTabState): View? {
         val webView: View
         try {
-            // was: WebViewEx(this, WebViewCallback(tab), AndroidJSInterface(this, viewModel, tabsModel, tab))
             webView = tab.webEngine.getOrCreateView(this)
         } catch (e: Throwable) {
             e.printStackTrace()
@@ -914,7 +914,7 @@ open class MainActivity :
 
     private suspend fun showPopupBlockOptions() {
         val tab = tabsModel.currentTab.value ?: return
-        val currentHostConfig = tabsModel.findHostConfig(tab, false)
+        val currentHostConfig = tabsModel.findHostConfig(tab)
         val currentBlockPopupsLevelValue = currentHostConfig?.popupBlockLevel ?: HostConfig.DEFAULT_BLOCK_POPUPS_VALUE
         val hostName =
             currentHostConfig?.hostName ?: try {
@@ -937,7 +937,7 @@ open class MainActivity :
         Log.d(TAG, "navigate: $url")
         vb.vActionBar.setAddressBoxTextColor(ContextCompat.getColor(this@MainActivity, R.color.default_url_color))
         if (!tabsModel.navigateTo(url)) {
-            openInNewTab(url, 0, needToHideMenuOverlay = true, navigateImmediately = true)
+            openInNewTab(url, 0)
         }
     }
 
@@ -1033,19 +1033,6 @@ open class MainActivity :
         val localCallback = window.callback
         window.callback =
             object : Window.Callback by localCallback {
-                override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-                    if (ev.action == MotionEvent.ACTION_DOWN) {
-                        val v = currentFocus
-                        if (v == vb.vTabs || v == vb.vBookmarks || vb.llTabPanel.isVisible || vb.rlBookmarksPanel.isVisible) {
-                            // if focus is in panels, let panels handle; else close
-                            if (vb.llTabPanel.isVisible || vb.rlBookmarksPanel.isVisible) {
-                                // check if touch is outside panels? simple: if touching webview area, close
-                            }
-                        }
-                    }
-                    return localCallback.dispatchTouchEvent(ev)
-                }
-
                 override fun dispatchKeyEvent(event: KeyEvent): Boolean {
                     // Log.d(TAG, "dispatchKeyEvent event: $event")
                     backNavigationEventsAdapter.dispatchKeyEvent(event)
@@ -1138,8 +1125,6 @@ open class MainActivity :
             openInNewTab(
                 settingsModel.homePage,
                 if (vb.vTabs.current < 0) 0 else tabsModel.tabsStates.size,
-                needToHideMenuOverlay = true,
-                navigateImmediately = true,
             )
         } else if (!tab.selected) {
             changeTab(tab)
@@ -1178,8 +1163,8 @@ open class MainActivity :
     override fun openInNewTabAt(
         url: String,
         index: Int,
-        navigateImmediately: Boolean,
-    ): WebEngine? = openInNewTab(url, index, needToHideMenuOverlay = true, navigateImmediately = navigateImmediately)
+        load: NewTabLoad,
+    ): WebEngine? = openInNewTab(url, index, load)
 
     override fun showLoadingProgress(progress: Int) {
         vb.progressBar.visibility = View.VISIBLE

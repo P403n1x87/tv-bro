@@ -1,12 +1,10 @@
 package com.phlox.tvwebbrowser.activity.main.view.tabs
 
-import android.os.Handler
-import android.os.Looper
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.findViewTreeLifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
@@ -18,7 +16,6 @@ import com.phlox.tvwebbrowser.databinding.ViewHorizontalWebtabItemBinding
 import com.phlox.tvwebbrowser.domain.HomePagePolicy
 import com.phlox.tvwebbrowser.model.WebTabState
 import com.phlox.tvwebbrowser.singleton.FaviconsPool
-import com.phlox.tvwebbrowser.utils.activity
 import com.phlox.tvwebbrowser.widgets.CheckableContainer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -35,16 +32,7 @@ class TabsAdapter(
         ArrayList<WebTabState>().apply { addAll(tabsModel?.tabsStates ?: emptyList()) }
     var current: Int = 0
     var listener: Listener? = null
-    val uiHandler = Handler(Looper.getMainLooper())
     var checkedView: CheckableContainer? = null
-    var transparentBackground: Boolean = false
-        set(value) {
-            if (field == value) return
-            field = value
-            notifyDataSetChanged()
-        }
-    private val tabBackgroundRes: Int
-        get() = R.drawable.tab_panel_item_bg_selector
 
     interface Listener {
         fun onTitleChanged(index: Int)
@@ -97,7 +85,7 @@ class TabsAdapter(
             position: Int,
         ) {
             vb.root.tag = tabState
-            vb.root.setBackgroundResource(tabBackgroundRes)
+            vb.root.setBackgroundResource(R.drawable.tab_panel_item_bg_selector)
 
             vb.tvTitle.text = tabState.title
 
@@ -110,9 +98,9 @@ class TabsAdapter(
             vb.ivFavicon.setImageResource(R.drawable.ic_launcher)
 
             val url = tabState.url
-            if (!HomePagePolicy.isHomePageUrl(url, Config.localHomePageUrl)) {
-                val scope = (itemView.activity as AppCompatActivity).lifecycleScope
-                scope.launch(Dispatchers.Main) {
+            val lifecycleOwner = itemView.findViewTreeLifecycleOwner()
+            if (lifecycleOwner != null && !HomePagePolicy.isHomePageUrl(url, Config.localHomePageUrl)) {
+                lifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
                     val favicon = FaviconsPool.get(url)
                     val ts = vb.root.tag as WebTabState
                     if (url != ts.url) return@launch // url was changed while loading favicon

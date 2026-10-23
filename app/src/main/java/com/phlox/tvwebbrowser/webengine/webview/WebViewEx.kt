@@ -286,7 +286,7 @@ open class WebViewEx(
                     result: JsResult,
                 ): Boolean =
                     if (callback.isDialogsBlockingEnabled()) {
-                        callback.onBlockedDialog(false)
+                        callback.onBlockedDialog(newTab = false)
                         result.cancel()
                         true
                     } else {
@@ -300,7 +300,7 @@ open class WebViewEx(
                     result: JsResult,
                 ): Boolean =
                     if (callback.isDialogsBlockingEnabled()) {
-                        callback.onBlockedDialog(false)
+                        callback.onBlockedDialog(newTab = false)
                         result.cancel()
                         true
                     } else {
@@ -315,7 +315,7 @@ open class WebViewEx(
                     result: JsPromptResult,
                 ): Boolean =
                     if (callback.isDialogsBlockingEnabled()) {
-                        callback.onBlockedDialog(false)
+                        callback.onBlockedDialog(newTab = false)
                         result.cancel()
                         true
                     } else {

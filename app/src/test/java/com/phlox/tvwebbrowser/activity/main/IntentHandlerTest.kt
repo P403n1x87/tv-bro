@@ -33,7 +33,7 @@ class IntentHandlerTest {
     private lateinit var db: AppDatabase
     private lateinit var tabsModel: TabsModel
 
-    private val opened = mutableListOf<Triple<String?, Int, Boolean>>()
+    private val opened = mutableListOf<Pair<String?, Int>>()
     private val navigated = mutableListOf<String>()
     private val changed = mutableListOf<WebTabState>()
     private var overlayHidden = 0
@@ -58,7 +58,7 @@ class IntentHandlerTest {
     private fun handler() =
         IntentHandler(
             tabsModel = tabsModel,
-            openInNewTab = { url, index, navigateImmediately -> opened += Triple(url, index, navigateImmediately) },
+            openInNewTab = { url, index -> opened += url to index },
             navigate = { navigated += it },
             changeTab = { changed += it },
             autoHideMenuOverlay = { overlayHidden++ },
@@ -80,7 +80,7 @@ class IntentHandlerTest {
 
         handler().handleIntent(viewIntent("https://example.com/"))
 
-        assertEquals(listOf(Triple("https://example.com/", 2, true)), opened)
+        assertEquals(listOf("https://example.com/" to 2), opened)
         assertTrue("a plain deep link must not navigate in place", navigated.isEmpty())
     }
 
@@ -100,7 +100,7 @@ class IntentHandlerTest {
     fun theSameTabExtraWithoutTabsFallsBackToANewTab() {
         handler().handleIntent(viewIntent("https://example.com/", sameTab = true))
 
-        assertEquals(listOf(Triple("https://example.com/", 0, true)), opened)
+        assertEquals(listOf("https://example.com/" to 0), opened)
     }
 
     @Test

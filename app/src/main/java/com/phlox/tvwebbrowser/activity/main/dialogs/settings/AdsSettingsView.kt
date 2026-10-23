@@ -59,7 +59,7 @@ class AdsSettingsView(
                     iconRes = R.drawable.ic_refresh_grey_900_24dp,
                     titleRes = R.string.settings_update_ad_block_list,
                     isInProgress = { adblockModel.clientLoading.value },
-                    onClick = { adblockModel.loadAdBlockList(true) },
+                    onClick = { adblockModel.loadAdBlockList(forceReload = true) },
                     visible = { adblockModel.adBlockEnabled },
                 ),
             )

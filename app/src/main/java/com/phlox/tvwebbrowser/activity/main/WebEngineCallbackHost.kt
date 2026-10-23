@@ -5,6 +5,7 @@ import android.content.Intent
 import android.view.View
 import com.phlox.tvwebbrowser.model.Download
 import com.phlox.tvwebbrowser.model.WebTabState
+import com.phlox.tvwebbrowser.webengine.NewTabLoad
 import com.phlox.tvwebbrowser.webengine.WebEngine
 import com.phlox.tvwebbrowser.webengine.WebEngineWindowProviderCallback
 import com.phlox.tvwebbrowser.widgets.cursor.CursorDrawerDelegate
@@ -26,7 +27,7 @@ interface WebEngineCallbackHost {
     fun openInNewTabAt(
         url: String,
         index: Int,
-        navigateImmediately: Boolean,
+        load: NewTabLoad,
     ): WebEngine?
 
     // -- page lifecycle repainting -----------------------------------------------------------

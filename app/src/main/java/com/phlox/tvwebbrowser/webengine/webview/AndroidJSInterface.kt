@@ -36,8 +36,6 @@ class AndroidJSInterface(
     @JavascriptInterface
     fun getStringByName(name: String): String {
         val ctx = context
-        // val resId = ctx.resources.getIdentifier(name, "string", ctx.packageName)
-        // return ctx.getString(resId)
         when (name) {
             "connection_isnt_secure" -> return ctx.getString(R.string.connection_isnt_secure)
             "hostname" -> return ctx.getString(R.string.hostname)

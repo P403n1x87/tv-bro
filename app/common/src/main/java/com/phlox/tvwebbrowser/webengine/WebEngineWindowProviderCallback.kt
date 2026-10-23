@@ -15,7 +15,7 @@ interface WebEngineWindowProviderCallback {
 
     fun onOpenInNewTabRequested(
         url: String,
-        navigateImmediately: Boolean,
+        load: NewTabLoad,
     ): WebEngine?
 
     fun onDownloadRequested(url: String)

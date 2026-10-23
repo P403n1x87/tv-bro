@@ -69,8 +69,7 @@ class ToolbarController(
      * Kept for the auto-hide call sites (tab switch, URL done, history, voice search, …). With the
      * "keep toolbar open" behaviour the overlay stays up, so this is intentionally a no-op.
      */
-    @Suppress("UNUSED_PARAMETER")
-    fun autoHideMenuOverlay(hideBottomButtons: Boolean = true) {
+    fun autoHideMenuOverlay() {
     }
 
     fun hideMenuOverlay(hideBottomButtons: Boolean = true) {

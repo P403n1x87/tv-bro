@@ -19,6 +19,7 @@ import com.phlox.tvwebbrowser.model.HomePageLink
 import com.phlox.tvwebbrowser.model.WebTabState
 import com.phlox.tvwebbrowser.utils.DownloadUtils
 import com.phlox.tvwebbrowser.utils.Utils
+import com.phlox.tvwebbrowser.webengine.NewTabLoad
 import com.phlox.tvwebbrowser.webengine.WebEngine
 import com.phlox.tvwebbrowser.webengine.WebEngineWindowProviderCallback
 import com.phlox.tvwebbrowser.widgets.cursor.CursorDrawerDelegate
@@ -51,11 +52,11 @@ class WebEngineCallback(
 
     override fun onOpenInNewTabRequested(
         url: String,
-        navigateImmediately: Boolean,
+        load: NewTabLoad,
     ): WebEngine? {
         val index =
             NewTabPositionPolicy.insertIndexAfter(tabsModel.tabsStates.indexOf(tabsModel.currentTab.value), tabsModel.tabsStates.size)
-        return host.openInNewTabAt(url, index, navigateImmediately)
+        return host.openInNewTabAt(url, index, load)
     }
 
     override fun onDownloadRequested(url: String) {
@@ -260,8 +261,12 @@ class WebEngineCallback(
         // here: the lookup resumes from Room's query executor, and a dispatcher like
         // Dispatchers.Main.immediate would post the resumption to a queue that this blocked thread
         // never drains again (deadlock/ANR).
-        val hostConfig = runBlocking { tabsModel.findHostConfig(tab, false) }
-        return PopupPolicy.shouldBlockNewWindow(dialog, userGesture, hostConfig?.popupBlockLevel)
+        val hostConfig = runBlocking { tabsModel.findHostConfig(tab) }
+        return PopupPolicy.shouldBlockNewWindow(
+            dialog = dialog,
+            userGesture = userGesture,
+            popupBlockLevel = hostConfig?.popupBlockLevel,
+        )
     }
 
     override fun onBlockedAd(uri: String) {
@@ -280,7 +285,7 @@ class WebEngineCallback(
         userGesture: Boolean,
     ): View? {
         if (shouldBlockNewWindow(dialog, userGesture)) {
-            onBlockedDialog(!dialog)
+            onBlockedDialog(newTab = !dialog)
             return null
         }
         val tab = WebTabState(incognito = settingsModel.incognitoMode)
@@ -343,11 +348,10 @@ class WebEngineCallback(
     }
 
     override fun onVisited(url: String) {
-        val tab = tabsModel.currentTab.value ?: return
-
-        if (!settingsModel.incognitoMode) {
-            viewModel.logVisitedHistory(tab.title, url, tab.faviconHash)
-        }
+        // Use this callback's own tab, not whichever tab happens to be current: the visited event
+        // belongs to the page that navigated, and its title/favicon are what the history entry wants.
+        if (settingsModel.incognitoMode) return
+        viewModel.logVisitedHistory(tab.title, url, tab.faviconHash)
     }
 
     override fun onContextMenu(

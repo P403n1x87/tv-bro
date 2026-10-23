@@ -285,8 +285,8 @@ class TabsModel(
         tab.blockedPopups = 0
         // Warm the per-tab host config off the main thread, so the synchronous popup callback
         // (WebEngineCallback.shouldBlockNewWindow) resolves it from memory instead of blocking the
-        // UI thread on a database read. findHostConfig only reads (createIfNotFound is false).
-        modelScope.launch { findHostConfig(tab, false) }
+        // UI thread on a database read. findHostConfig only reads.
+        modelScope.launch { findHostConfig(tab) }
     }
 
     fun onPageFinished(
@@ -335,7 +335,13 @@ class TabsModel(
         }
     }
 
-    suspend fun findHostConfig(
+    /** The stored per-host config of [tab]'s current url, or null while the host has none. */
+    suspend fun findHostConfig(tab: WebTabState): HostConfig? = resolveHostConfig(tab, createIfNotFound = false)
+
+    /** Like [findHostConfig], but stores a fresh config when the host does not have one yet. */
+    suspend fun getOrCreateHostConfig(tab: WebTabState): HostConfig? = resolveHostConfig(tab, createIfNotFound = true)
+
+    private suspend fun resolveHostConfig(
         tab: WebTabState,
         createIfNotFound: Boolean,
     ): HostConfig? {
@@ -363,7 +369,7 @@ class TabsModel(
         newLevel: Int,
         tab: WebTabState,
     ) {
-        val hostConfig = findHostConfig(tab, true) ?: return
+        val hostConfig = getOrCreateHostConfig(tab) ?: return
         hostConfig.popupBlockLevel = newLevel
         hostsRepository.update(hostConfig)
     }
