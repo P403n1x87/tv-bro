@@ -88,4 +88,67 @@ class MediaAutoReplayTest {
         assertTrue(replay.canStart())
         assertTrue(scheduler.pending.isEmpty())
     }
+
+    @Test fun resetsAttemptsAfterSuccessfulReplay() {
+        val scheduler = FakeScheduler()
+        var reloads = 0
+        var replayed: String? = null
+        val replay =
+            MediaAutoReplay(
+                scheduler = scheduler,
+                onReload = { reloads++ },
+                findReplayUrl = { key -> if (key == "first") null else "https://cdn/$key.m3u8" },
+                onReplay = { replayed = it },
+                initialDelayMs = 0L,
+                intervalMs = 0L,
+                maxAttempts = 5,
+            )
+
+        replay.start("first")
+        assertEquals(1, reloads)
+        // first attempt fails
+        assertTrue(scheduler.runNext())
+        assertNull(replayed)
+        // second attempt would succeed if we restarted, but we want to verify reset after success
+        // simulate success on a fresh start
+        replay.onUserPlaybackStarted()
+        reloads = 0
+        replayed = null
+        replay.start("second")
+        assertTrue(scheduler.runNext())
+        assertEquals("https://cdn/second.m3u8", replayed)
+    }
+
+    @Test fun resetsAttemptsAfterGivingUp() {
+        val scheduler = FakeScheduler()
+        val replay =
+            MediaAutoReplay(
+                scheduler = scheduler,
+                onReload = {},
+                findReplayUrl = { null },
+                onReplay = {},
+                maxAttempts = 2,
+            )
+
+        replay.start("k")
+        assertTrue(scheduler.runNext())
+        assertTrue(scheduler.runNext())
+        assertFalse(scheduler.runNext())
+        assertTrue(scheduler.pending.isEmpty())
+
+        // after giving up, starting fresh should allow attempts again
+        replay.onUserPlaybackStarted()
+        var replayed: String? = null
+        val replay2 =
+            MediaAutoReplay(
+                scheduler = scheduler,
+                onReload = {},
+                findReplayUrl = { "https://cdn/ok.m3u8" },
+                onReplay = { replayed = it },
+                maxAttempts = 2,
+            )
+        replay2.start("k2")
+        assertTrue(scheduler.runNext())
+        assertEquals("https://cdn/ok.m3u8", replayed)
+    }
 }

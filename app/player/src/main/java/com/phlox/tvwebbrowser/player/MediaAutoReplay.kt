@@ -70,6 +70,7 @@ class MediaAutoReplay(
         val url = findReplayUrl(key)
         if (url != null) {
             pendingKey = null
+            attempts = 0
             onReplay(url)
             return
         }
@@ -77,6 +78,7 @@ class MediaAutoReplay(
             scheduler.postDelayed(intervalMs, tick)
         } else {
             pendingKey = null
+            attempts = 0
         }
     }
 
