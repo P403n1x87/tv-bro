@@ -1,1 +1,1 @@
-- Reset live stream retry attempts after a successful replay or when giving up
+* Reset live stream retry attempts after a successful replay or when giving up
