@@ -84,7 +84,10 @@ class ActionBar
         private val etUrlKeyListener =
             OnKeyListener { _, keyCode, keyEvent ->
                 if (urlEditMode) {
-                    if (keyCode == KeyEvent.KEYCODE_ENTER) {
+                    // In edit mode the central button (or a keyboard's ENTER) runs the search and
+                    // drops back to the button-like state, so the remote can leave the box with the
+                    // D-pad again instead of staying in the text field.
+                    if (keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_DPAD_CENTER) {
                         if (keyEvent.action == KeyEvent.ACTION_UP) commitUrl()
                         return@OnKeyListener true
                     }

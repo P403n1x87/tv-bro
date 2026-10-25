@@ -159,6 +159,21 @@ class ActionBarTest {
     }
 
     @Test
+    fun okOnTheActivatedAddressBoxSearchesAndLeavesEditMode() {
+        actionBar.setAddressBoxText("http://example.com/page")
+        assertTrue(etUrl.requestFocus())
+        pressOnUrlBox(KeyEvent.KEYCODE_DPAD_CENTER)
+        assertTrue(etUrl.isCursorVisible)
+
+        etUrl.setText("example.org")
+        pressOnUrlBox(KeyEvent.KEYCODE_DPAD_CENTER)
+
+        assertEquals(listOf("example.org"), callback.searched)
+        assertFalse(etUrl.isCursorVisible)
+        assertEquals(1, callback.inputDoneCalls)
+    }
+
+    @Test
     fun rightFromTheAddressBoxReachesTheNextButton() {
         assertTrue(etUrl.requestFocus())
 
