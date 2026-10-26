@@ -1,0 +1,1 @@
+Pressing Back while the web page has focus now reliably returns focus to the top bar.
