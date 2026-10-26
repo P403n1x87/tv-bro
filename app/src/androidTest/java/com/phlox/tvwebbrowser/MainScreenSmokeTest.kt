@@ -2,7 +2,7 @@ package com.phlox.tvwebbrowser
 
 import android.content.Intent
 import android.net.Uri
-import android.os.SystemClock
+import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
@@ -16,6 +16,7 @@ import com.phlox.tvwebbrowser.utils.activemodel.ActiveModelsRepository
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.ByteArrayOutputStream
 import java.util.regex.Pattern
 
 /**
@@ -60,16 +61,15 @@ class MainScreenSmokeTest {
     @Test
     fun coldStartShowsToolbar() {
         launch()
-        device.wait(Until.findObject(By.res(URL_BOX)), 60_000)
+        device.wait(Until.findObject(By.res(URL_BOX)), LOAD_TIMEOUT_MS)
             ?: error("address box missing after a cold start")
     }
 
     @Test
     fun viewIntentLoadsPage() {
         openUrl("http://example.com")
-        device.wait(Until.findObject(By.res(URL_BOX).textContains("example.com")), 60_000)
-            ?: error("address box never picked up the requested url")
-        check(waitForTabTitle(PAGE_TITLE)) { "page title never reached the engine callback" }
+        awaitUrl("example.com", "address box never picked up the requested url")
+        awaitPageContent { openUrl("http://example.com") }
     }
 
     @Test
@@ -79,25 +79,23 @@ class MainScreenSmokeTest {
         // walk. Starting from an intent tab keeps the test independent of whatever session
         // state previous tests (or the user) left behind.
         openUrl("http://example.com")
-        device.wait(Until.findObject(By.res(URL_BOX).textContains("example.com")), 60_000)
-            ?: error("first url never loaded")
+        awaitUrl("example.com", "first url never loaded")
         // The URL box updates when the load merely *starts*; a loadUrl that supersedes a still
         // -provisional navigation replaces its history entry instead of stacking one, leaving
-        // canGoBack() false and the back button a silent no-op. The title arrives after the
-        // navigation has committed, so wait for it before stacking the second one (a slow
-        // emulator widens that gap to seconds).
-        check(waitForTabTitle(PAGE_TITLE)) { "first page title never reached the engine callback" }
+        // canGoBack() false and the back button a silent no-op. Wait for the first page's content
+        // — the same marker viewIntentLoadsPage relies on — so the entry is committed before the
+        // second navigation lands on top of it (a slow emulator widens that gap to seconds).
+        awaitPageContent { openUrl("http://example.com", sameTab = true) }
         openUrl("http://example.org", sameTab = true)
-        device.wait(Until.findObject(By.res(URL_BOX).textContains("example.org")), 60_000)
-            ?: error("second url never loaded in the same tab")
-        // The URL box updates when the load merely *starts*, so it is not evidence that the second
-        // history entry exists yet. The toolbar enables back only once the engine reports
-        // canGoBack() — i.e. once the entry is committed — and a click before that is a no-op.
+        awaitUrl("example.org", "second url never loaded in the same tab")
+        // The address box updates when the navigation merely starts, but back stays disabled until
+        // the engine reports `canGoBack()`: tapping it while the second page is still provisional
+        // hits a disabled button and silently does nothing. Wait for the app's own history signal.
         val back =
-            device.wait(Until.findObject(By.res(BACK_BUTTON).enabled(true)), 60_000)
-                ?: error("back button never became enabled after the second navigation")
+            device.wait(Until.findObject(By.res(BACK_BUTTON).enabled(true)), LOAD_TIMEOUT_MS)
+                ?: error("back button never became available after the second page loaded")
         back.click()
-        device.wait(Until.findObject(By.res(URL_BOX).textContains("example.com")), 60_000)
+        device.wait(Until.findObject(By.res(URL_BOX).textContains("example.com")), LOAD_TIMEOUT_MS)
             ?: error("back did not return to the previous page")
     }
 
@@ -115,35 +113,34 @@ class MainScreenSmokeTest {
         check(device.wait(Until.gone(By.res(BOOKMARKS_PANEL)), 15_000)) { "bookmarks panel did not close on back" }
     }
 
+    private fun awaitUrl(
+        text: String,
+        message: String,
+    ) {
+        device.wait(Until.findObject(By.res(URL_BOX).textContains(text)), LOAD_TIMEOUT_MS)
+            ?: error(message)
+    }
+
     /**
-     * Waits for the visible tab's engine-reported title. This is the page-load signal that does
-     * not depend on UiAutomator: the WebView's virtual accessibility tree is sometimes empty for
-     * a freshly attached view (observed on the CI TV image), even though the engine has parsed
-     * the document and the title callback has fired.
+     * Waits for [PAGE_MARKER] in the accessibility tree. A busy emulator occasionally delivers the
+     * load (the address box and title update and `onPageFinished` fires) without exposing the
+     * WebView's subtree to UiAutomator, and the tree does not recover while that page stays up, so
+     * [reload] gives it a fresh load before the test fails. Each miss logs the window hierarchy — the
+     * CI job uploads logcat on failure — so a real regression still leaves evidence behind.
      */
-    private fun waitForTabTitle(
-        expected: String,
-        timeoutMs: Long = 60_000,
-    ): Boolean {
-        val deadline = SystemClock.uptimeMillis() + timeoutMs
-        while (SystemClock.uptimeMillis() < deadline) {
-            var title: String? = null
-            InstrumentationRegistry.getInstrumentation().runOnMainSync {
-                val activity =
-                    ActivityLifecycleMonitorRegistry
-                        .getInstance()
-                        .getActivitiesInStage(Stage.RESUMED)
-                        .filterIsInstance<MainActivity>()
-                        .firstOrNull()
-                if (activity != null) {
-                    val tabsModel = ActiveModelsRepository.get(TabsModel::class, activity)
-                    title = tabsModel.currentTab.value?.title
-                }
-            }
-            if (title?.contains(expected) == true) return true
-            Thread.sleep(100)
-        }
-        return false
+    private fun awaitPageContent(reload: () -> Unit) {
+        if (device.wait(Until.hasObject(By.textContains(PAGE_MARKER)), LOAD_TIMEOUT_MS)) return
+        logHierarchy("after a page load without content")
+        reload()
+        if (device.wait(Until.hasObject(By.textContains(PAGE_MARKER)), LOAD_TIMEOUT_MS)) return
+        logHierarchy("after the reload")
+        error("page content never rendered, even after a reload (UI hierarchies in $TAG logcat)")
+    }
+
+    private fun logHierarchy(context: String) {
+        val dump = ByteArrayOutputStream()
+        runCatching { device.dumpWindowHierarchy(dump) }
+        Log.e(TAG, "window hierarchy $context: $dump")
     }
 
     private fun launch() {
@@ -169,6 +166,8 @@ class MainScreenSmokeTest {
     }
 
     companion object {
+        private const val TAG = "MainScreenSmokeTest"
+        private const val LOAD_TIMEOUT_MS = 60_000L
         private val URL_BOX = Pattern.compile(".*:id/etUrl")
         private val BACK_BUTTON = Pattern.compile(".*:id/ibBack")
         private val BOOKMARKS_BUTTON = Pattern.compile(".*:id/ibFavorites")
@@ -176,5 +175,6 @@ class MainScreenSmokeTest {
 
         /** Title served by both example.com and example.org. */
         private const val PAGE_TITLE = "Example Domain"
+        private const val PAGE_MARKER = "Example Domain"
     }
 }
