@@ -277,7 +277,7 @@ open class MainActivity :
                 uiHandler,
                 lifecycleScope,
                 cacheDir = { cacheDir },
-                keepToolbarOpen = { !settingsModel.hideToolbarWhenBrowsing.value },
+                keepToolbarOpen = { settingsModel.keepToolbarOpen.value },
                 isCurrentTab = { tabByTitleIndex(vb.vTabs.current) == it },
             )
         sessionObservers =
@@ -328,13 +328,6 @@ open class MainActivity :
         vb.vActionBar.callback = this
 
         vb.flWebViewContainer.setOnFocusChangeListener { _, hasFocus ->
-            if (!toolbarController.isFullscreen && settingsModel.hideToolbarWhenBrowsing.value) {
-                if (hasFocus) {
-                    toolbarController.hideTopBar()
-                } else {
-                    toolbarController.showTopBar()
-                }
-            }
             if (hasFocus) {
                 panelController.hideAllPanels()
             }
@@ -365,9 +358,6 @@ open class MainActivity :
             ?.webEngine
             ?.getView()
             ?.requestFocus()
-        if (!toolbarController.isFullscreen && settingsModel.hideToolbarWhenBrowsing.value) {
-            toolbarController.hideTopBar()
-        }
     }
 
     /**
@@ -1080,6 +1070,19 @@ open class MainActivity :
         return true
     }
 
+    private fun isDescendantOf(
+        parent: View,
+        child: View?,
+    ): Boolean {
+        if (child == null) return false
+        var current: View? = child
+        while (current != null) {
+            if (current == parent) return true
+            current = current.parent as? View
+        }
+        return false
+    }
+
     private fun handleBackNavigation() {
         Log.d(TAG, "handleBackNavigation")
         if (tabsModel.currentTab.value
@@ -1105,12 +1108,16 @@ open class MainActivity :
             bookmarksController.hide()
         } else if (panelController.isTabsPanelVisible) {
             panelController.hideTabsPanel()
-        } else if (vb.flWebViewContainer.hasFocus()) {
+        } else if (
+            vb.flWebViewContainer.hasFocus() ||
+            vb.flWebViewContainer.findFocus() != null ||
+            (currentFocus is android.view.View && isDescendantOf(vb.flWebViewContainer, currentFocus))
+        ) {
             // Focus is on the page: BACK must give the remote a way back to the UI,
             // otherwise the user is stuck in the WebView with no focused control.
-            if (settingsModel.hideToolbarWhenBrowsing.value) {
+            if (!toolbarController.isFullscreen) {
                 toolbarController.showTopBar()
-                vb.vActionBar.catchFocus()
+                vb.vActionBar.post { vb.vActionBar.catchFocus() }
             } else {
                 toolbarController.toggleMenu()
             }
