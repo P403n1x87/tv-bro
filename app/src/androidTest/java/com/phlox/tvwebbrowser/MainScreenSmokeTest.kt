@@ -27,10 +27,10 @@ import java.util.regex.Pattern
  *
  * Runs against any flavor with a booted device/emulator:
  * `./gradlew :app:connectedP403n1x87GeckoIncludedDebugAndroidTest`.
- * Selectors are resource-id based, so nothing depends on the screen language. Page loads are
- * detected through the engine's reported title rather than the WebView's accessibility text: a
- * freshly attached WebView on the CI image occasionally keeps its virtual text tree empty while
- * the page itself has loaded, which made a text-marker wait time out (see `waitForTabTitle`).
+ * Selectors are resource-id based, so nothing depends on the screen language. The page load is
+ * followed through the address box; the rendered content is then checked in the WebView's
+ * accessibility tree, which a freshly attached WebView on a busy emulator can occasionally keep
+ * empty even though the page loaded, so `awaitPageContent` retries once after a reload.
  * The instrumentation runs inside the app process (so no `pm clear` resets here — they would
  * kill the run): every test is written to be state-independent instead, and can run in any order
  * on a device with any data.
@@ -56,6 +56,10 @@ class MainScreenSmokeTest {
         } catch (ignored: Exception) {
             // pre-T devices, permission not requested, or already granted: nothing to do
         }
+        // On some system images the WebView only exposes its content subtree to UiAutomator
+        // when accessibility is enabled; without this the page loads but its text is invisible
+        // to the page-content waits (the app's own views are always visible).
+        runCatching { device.executeShellCommand("settings put secure accessibility_enabled 1") }
     }
 
     @Test
@@ -173,8 +177,10 @@ class MainScreenSmokeTest {
         private val BOOKMARKS_BUTTON = Pattern.compile(".*:id/ibFavorites")
         private val BOOKMARKS_PANEL = Pattern.compile(".*:id/vBookmarks")
 
-        /** Title served by both example.com and example.org. */
-        private const val PAGE_TITLE = "Example Domain"
-        private const val PAGE_MARKER = "Example Domain"
+        /**
+         * Body text served by both example.com and example.org. The `Example Domain` heading only
+         * survives in the document title now, so it can not be used as a content marker.
+         */
+        private const val PAGE_MARKER = "This domain is for use in documentation examples"
     }
 }
