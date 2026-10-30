@@ -1,6 +1,7 @@
 plugins {
     id("tvbro.android.application")
     alias(libs.plugins.ksp)
+    alias(libs.plugins.androidx.room)
 }
 
 // The app version is driven by git tags, so cutting a release is just pushing a "vX.Y.Z" tag: the
@@ -153,13 +154,17 @@ android {
 }
 
 // Room is compiled by KSP, so the processor's options are KSP arguments: the annotation
-// processor path (javaCompileOptions.annotationProcessorOptions) is not read by KSP, and
-// without a schema location Room warns that it cannot export the schema of the database.
-// The exported schemas land in `app/schemas`, which is what a future migration is written
-// against.
+// processor path (javaCompileOptions.annotationProcessorOptions) is not read by KSP.
+// The Room Gradle plugin gives every KSP task its own schema output directory and copies the
+// results to `app/schemas` afterwards, which is what a future migration is written against.
+// Passing a shared `room.schemaLocation` instead lets concurrent KSP tasks read and rewrite the
+// same file, truncating it mid-read (JsonDecodingException: ... had 'EOF' instead).
 ksp {
     arg("room.incremental", "true")
-    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
+room {
+    schemaDirectory("$projectDir/schemas")
 }
 
 dependencies {
