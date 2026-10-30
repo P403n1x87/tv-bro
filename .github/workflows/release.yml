@@ -78,14 +78,6 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5
 
-      #KSP keeps its incremental state in `build/kspCaches`, a local-state directory. A crash
-      #mid-write leaves a zero-byte JSON that the next task dies decoding (`JsonDecodingException:
-      #... had 'EOF' instead`), which is how one release run failed while an identical master run
-      #had passed. The directory is disposable — Gradle's build cache still restores the generated
-      #outputs — so start every job from a clean slate instead of trusting what the cache restored.
-      - name: Clean stale KSP caches
-        run: find . -type d -path '*/build/kspCaches' -prune -exec rm -rf {} +
-
       #All three suites in one invocation: Gradle tasks must run serially (concurrent builds
       #corrupt the Kotlin incremental state).
       - name: Run unit tests
@@ -131,9 +123,6 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5
 
-      - name: Clean stale KSP caches
-        run: find . -type d -path '*/build/kspCaches' -prune -exec rm -rf {} +
-
       #Spotless (ktlint) first — cheapest, and it catches what Android lint doesn't. Then Android
       #lint, which compiles what it analyzes, so the job doubles as a compile gate. One invocation:
       #Gradle tasks must run serially (concurrent builds corrupt the Kotlin incremental state).
@@ -174,9 +163,6 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5
-
-      - name: Clean stale KSP caches
-        run: find . -type d -path '*/build/kspCaches' -prune -exec rm -rf {} +
 
       #One invocation, and the connected task itself installs/boots the emulator first. The tests
       #are written state-independent (no `pm clear`: the instrumentation runs inside the app
@@ -259,9 +245,6 @@ jobs:
       #on one useful entry instead of one per PR.
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5
-
-      - name: Clean stale KSP caches
-        run: find . -type d -path '*/build/kspCaches' -prune -exec rm -rf {} +
 
       - name: Enable release signing
         run: |
