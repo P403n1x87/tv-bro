@@ -13,5 +13,7 @@
 __pycache__/
 *.pyc
 
-# artwork workspace is local-only (rebuild with artwork/build.py)
-/artwork/
+# artwork build outputs (regenerate with artwork/build.py); only the sources are tracked
+/artwork/parts/
+/artwork/variants/
+/artwork/preview/
