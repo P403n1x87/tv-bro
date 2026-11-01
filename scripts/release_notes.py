@@ -10,12 +10,12 @@ tag, so the notes of a release are always recoverable — there is nothing to ar
 hand.
 
 This tool concatenates the fragments — in the order they landed in the repository, which
-is the order of the work — and appends an automatically generated section that lists
-everything the commit history holds since the previous release.  That section is
-reconstructed from the git history alone — the previous tag, the commits in between, the
-diffstat — so it never depends on anything stored in the working tree.  The first release
-of the fork is compared against the fork point (the `fork-point` tag), because the
-releases before it belong to the upstream project.
+is the order of the work — and appends an automatically generated section that lists the
+new features and the fixes of the commits since the previous release.  That section is
+reconstructed from the git history alone — the previous tag, the commits in between — so
+it never depends on anything stored in the working tree.  The first release of the fork
+is compared against the fork point (the `fork-point` tag), because the releases before it
+belong to the upstream project.
 
 The documentation of the notes lives in `docs/release-notes.md`.
 
@@ -48,8 +48,6 @@ NOTES_README = "README.md"
 # baseline of the first release of the fork: the releases before it belong to the
 # upstream project and are not ours to describe.
 FORK_POINT_TAG = "fork-point"
-# The hash of the empty tree, used to diff against when a release has no predecessor.
-EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
 VERSION_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$")
 # A pull request reference at the end of a subject, the way GitHub writes it when a
@@ -59,30 +57,16 @@ PR_RE = re.compile(r"\(#(\d+)\)\s*$")
 CONVENTIONAL_RE = re.compile(r"^(?P<type>[a-zA-Z]+)(?:\((?P<scope>[^)]*)\))?(?P<breaking>!)?: (?P<subject>.+)$")
 
 # The commit types that get a section of their own, in the order they are printed.
-# Anything else lands in "Other changes".
+# A release body describes what the user gets: the new features and the fixes. The other
+# conventional-commit types (refactors, tests, CI, docs, housekeeping, ...) are the work
+# that led there, not a change worth announcing, so they get no section.
 CATEGORY_TITLES = {
     "feat": "New features",
     "fix": "Fixes",
-    "perf": "Performance",
-    "refactor": "Refactoring",
-    "style": "Code style",
-    "test": "Tests",
-    "ci": "Build and CI",
-    "build": "Build and CI",
-    "docs": "Documentation",
-    "chore": "Housekeeping",
 }
 CATEGORY_ORDER = [
     "New features",
     "Fixes",
-    "Performance",
-    "Refactoring",
-    "Code style",
-    "Tests",
-    "Build and CI",
-    "Documentation",
-    "Housekeeping",
-    "Other changes",
 ]
 
 
@@ -268,27 +252,6 @@ def commit_subjects(repo_root: Path, previous: str | None, commit: str) -> list[
     return subjects
 
 
-def diff_shortstat(repo_root: Path, previous: str | None, commit: str) -> str:
-    """The one-line summary of the diff against the previous release.
-
-    The notes are left out: the line describes the change of the product, not the
-    bookkeeping of the release.
-    """
-    if not commit:
-        return ""
-    revision = f"{previous}..{commit}" if previous else f"{EMPTY_TREE}..{commit}"
-    listed = git(
-        repo_root,
-        "diff",
-        "--shortstat",
-        revision,
-        "--",
-        ".",
-        f":(exclude){NOTES_DIR_NAME}",
-    )
-    return listed.strip()
-
-
 def github_repo_url(repo_root: Path) -> str | None:
     """The browsable URL of the repository, read from the `origin` remote.
 
@@ -425,17 +388,18 @@ def split_pull_request(subject: str) -> tuple[str, str | None]:
     return subject[: match.start()].strip(), match.group(1)
 
 
-def classify(subject: str) -> tuple[str, str, str | None]:
+def classify(subject: str) -> tuple[str | None, str, str | None]:
     """Splits a subject into the section it belongs to, its text and its scope.
 
-    The text is the subject without the pull request reference, which is rendered as a
-    link of its own.
+    The section is None for a commit that does not announce anything to the user: a
+    refactor, a test, a CI tweak, a non-conventional subject, ... The text is the subject
+    without the pull request reference, which is rendered as a link of its own.
     """
     text, _ = split_pull_request(subject)
     match = CONVENTIONAL_RE.match(text)
     if not match:
-        return "Other changes", text, None
-    category = CATEGORY_TITLES.get(match.group("type").lower(), "Other changes")
+        return None, text, None
+    category = CATEGORY_TITLES.get(match.group("type").lower())
     scope = match.group("scope")
     body = match.group("subject").strip()
     if match.group("breaking"):
@@ -458,10 +422,12 @@ def format_entry(subject: str, repo_url: str | None) -> str:
 
 
 def changelog_section(repo_root: Path, version: str | None) -> str:
-    """The generated section: everything the commit history holds since the previous release.
+    """The generated section: the new features and the fixes since the previous release.
 
-    Everything it shows comes from the git history: the previous tag, the commits in
-    between and the diffstat. Nothing is read from the notes folder.
+    Everything it shows comes from the git history: the previous tag and the commits in
+    between. A commit that does not announce anything to the user — a refactor, a test, a
+    CI tweak, a non-conventional subject — is left out. Nothing is read from the notes
+    folder.
     """
     tag = current_release(repo_root, version)
     commit = resolve_commit(repo_root, tag)
@@ -471,38 +437,31 @@ def changelog_section(repo_root: Path, version: str | None) -> str:
     subjects = commit_subjects(repo_root, reference, commit)
     repo_url = github_repo_url(repo_root)
 
-    lines: list[str] = []
-    if reference:
-        lines.append(f"## Changes since {baseline_label(reference, is_fork_point)}")
-        stats = diff_shortstat(repo_root, reference, commit)
-        if not subjects:
-            # Everything that happened since the previous release was the bookkeeping of
-            # the notes: there is no change of the product to describe.
-            lines.append("_No change of the product since the previous release._")
-        else:
-            summary = f"_{len(subjects)} commit{'s' if len(subjects) != 1 else ''}"
-            if stats:
-                summary += f", {stats}"
-            lines.append(summary + "._")
-    else:
+    if not reference:
         # Without a predecessor there is no diff to show: the whole history is not a
         # comparison, and listing it would bury the notes of the release.
-        lines.append("## Changes")
-        lines.append(f"_{len(subjects)} commits — the whole history of the repository._")
+        lines = ["## Changes", f"_{len(subjects)} commits — the whole history of the repository._"]
         return "\n".join(lines)
 
     grouped: dict[str, list[str]] = {}
     for subject in subjects:
         category, _, _ = classify(subject)
+        if category is None:
+            continue
         grouped.setdefault(category, []).append(format_entry(subject, repo_url))
 
-    for category in CATEGORY_ORDER:
-        entries = grouped.get(category)
-        if not entries:
-            continue
+    lines = [f"## Changes since {baseline_label(reference, is_fork_point)}"]
+    if not grouped:
         lines.append("")
-        lines.append(f"### {category}")
-        lines.extend(f"* {entry}" for entry in entries)
+        lines.append("_No new features or fixes since the previous release._")
+    else:
+        for category in CATEGORY_ORDER:
+            entries = grouped.get(category)
+            if not entries:
+                continue
+            lines.append("")
+            lines.append(f"### {category}")
+            lines.extend(f"* {entry}" for entry in entries)
 
     if tag and repo_url:
         lines.append("")
