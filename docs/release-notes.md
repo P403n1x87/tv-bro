@@ -19,9 +19,9 @@ There is nothing to archive by hand.
 
 The release body published on GitHub is the list of those fragments — **in the order they
 landed in the repository**, which is the order of the work — plus an automatically
-generated section that lists everything the commit history holds since the previous
-release. The hand-written fragments tell the story; the generated section makes sure
-nothing is missed.
+generated section that lists the new features and the fixes since the previous release.
+The hand-written fragments tell the story; the generated section makes sure no feature or
+fix is missed.
 
 ## Adding a note to a pull request
 
@@ -72,16 +72,17 @@ published again.
 
 `build` appends a `## Changes since <previous tag>` section built from the commit history
 between the previous release tag and this one. It is reconstructed from the git history
-alone — the previous tag, the commits in between, the diffstat — and reads nothing from
-the notes folder:
+alone — the previous tag and the commits in between — and reads nothing from the notes
+folder:
 
-- the commits are grouped by their conventional-commit type (`feat`, `fix`, `refactor`,
-  `ci`, …); anything else lands in "Other changes";
+- only the commits the user cares about get a section: `feat` lands in "New features" and
+  `fix` in "Fixes"; the other conventional-commit types (`refactor`, `test`, `ci`, `docs`,
+  …) and the non-conventional subjects are left out — they are the work that led there,
+  not a change worth announcing;
 - merge commits are skipped — they only repeat the title of the branch they brought in;
 - the commits that only touched the notes are skipped as well — the one that clears the
   fragments the previous release shipped is the bookkeeping of a release, not a change of
-  the product, and the diffstat leaves the notes out for the same reason (a release that
-  changed nothing but the notes says so, instead of listing an empty diff);
+  the product;
 - a subject that references a pull request (`… (#42)`) links to it;
 - the section ends with a link to the compare view of the two versions.
 

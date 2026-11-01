@@ -126,9 +126,9 @@ the model/host seam polish. Work on a feature branch; **open a PR only when aske
   then `python3 scripts/release_notes.py check vX.Y.Z` (errors block the release, warnings do
   not). `build` concatenates the fragments — in the order they landed in the repository — and
   appends a generated `## Changes since <previous tag>` section reconstructed from the git
-  history alone (grouped by conventional-commit type, merge commits skipped, pull requests
-  linked). The first release of the fork is compared against the `fork-point` tag (the commit
-  where this repo left `truefedex/tv-bro`) instead of a previous release: the upstream
+  history alone (only `feat`/`fix` commits, merge commits skipped, pull requests linked).
+  The first release of the fork is compared against the `fork-point` tag (the commit where
+  this repo left `truefedex/tv-bro`) instead of a previous release: the upstream
   releases are not ours to describe. The tag is deliberately not `v*`, so pushing it cannot cut
   a release. The tool's own tests: `python3 -m unittest discover -s scripts/tests -t scripts`
   (the `tests` CI job runs them).

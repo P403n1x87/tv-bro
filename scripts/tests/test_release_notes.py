@@ -176,7 +176,7 @@ class BuildTest(unittest.TestCase):
 
 
 class ChangelogTest(unittest.TestCase):
-    def test_groups_the_commits_by_type(self):
+    def test_lists_only_the_new_features_and_the_fixes(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = make_repo(Path(directory))
             commit(repo, "first commit")
@@ -184,6 +184,8 @@ class ChangelogTest(unittest.TestCase):
             commit(repo, "feat: add a thing (#12)")
             commit(repo, "fix: repair a thing")
             commit(repo, "refactor: move a thing")
+            commit(repo, "test: cover a thing")
+            commit(repo, "ci: tweak a thing")
             commit(repo, "History screen: header bar (#13)")
             run("git", "tag", "v3.1.0", cwd=repo)
 
@@ -193,9 +195,15 @@ class ChangelogTest(unittest.TestCase):
             self.assertIn("* Add a thing ([#12](https://github.com/owner/repo/pull/12))", section)
             self.assertIn("### Fixes", section)
             self.assertIn("* Repair a thing", section)
-            self.assertIn("### Refactoring", section)
-            self.assertIn("### Other changes", section)
-            self.assertIn("* History screen: header bar ([#13](https://github.com/owner/repo/pull/13))", section)
+            # A release body announces what the user gets: the work that led there stays out.
+            self.assertNotIn("Refactoring", section)
+            self.assertNotIn("Tests", section)
+            self.assertNotIn("Build and CI", section)
+            self.assertNotIn("Other changes", section)
+            self.assertNotIn("Move a thing", section)
+            self.assertNotIn("Cover a thing", section)
+            self.assertNotIn("Tweak a thing", section)
+            self.assertNotIn("History screen: header bar", section)
             self.assertIn(
                 "[Compare v3.0.0...v3.1.0](https://github.com/owner/repo/compare/v3.0.0...v3.1.0)",
                 section,
@@ -206,7 +214,7 @@ class ChangelogTest(unittest.TestCase):
             repo = make_repo(Path(directory))
             commit(repo, "the old work")
             run("git", "tag", "v3.0.0", cwd=repo)
-            commit(repo, "the new work")
+            commit(repo, "feat: the new work")
             run("git", "tag", "v3.1.0", cwd=repo)
 
             section = release_notes.changelog_section(repo, "v3.1.0")
@@ -219,7 +227,7 @@ class ChangelogTest(unittest.TestCase):
             commit(repo, "the work")
             run("git", "tag", "v3.0.0", cwd=repo)
             run("git", "checkout", "-q", "-b", "topic", cwd=repo)
-            commit(repo, "the topic work")
+            commit(repo, "feat: the topic work")
             run("git", "checkout", "-q", "main", cwd=repo)
             run("git", "merge", "-q", "--no-ff", "-m", "Merge pull request #1 from owner/topic", "topic", cwd=repo)
             run("git", "tag", "v3.1.0", cwd=repo)
@@ -234,10 +242,10 @@ class ChangelogTest(unittest.TestCase):
             commit(repo, "the work")
             run("git", "tag", "v3.0.0", cwd=repo)
             run("git", "checkout", "-q", "-b", "side", cwd=repo)
-            commit(repo, "the side work")
+            commit(repo, "feat: the side work")
             run("git", "tag", "v9.9.9", cwd=repo)
             run("git", "checkout", "-q", "main", cwd=repo)
-            commit(repo, "the main work")
+            commit(repo, "feat: the main work")
             run("git", "tag", "v3.1.0", cwd=repo)
 
             section = release_notes.changelog_section(repo, "v3.1.0")
@@ -250,7 +258,7 @@ class ChangelogTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             repo = make_repo(Path(directory))
             commit(repo, "the old work")
-            commit(repo, "the new work")
+            commit(repo, "feat: the new work")
             run("git", "tag", "v3.1.0", cwd=repo)
 
             section = release_notes.changelog_section(repo, "v3.1.0")
@@ -259,6 +267,7 @@ class ChangelogTest(unittest.TestCase):
             # The whole history is not a diff against a previous version: it would bury the
             # notes of the release.
             self.assertNotIn("The old work", section)
+            self.assertNotIn("The new work", section)
 
     def test_a_commit_that_only_touches_the_notes_is_not_listed(self):
         # The commit that clears the fragments the previous release shipped is the
@@ -277,33 +286,20 @@ class ChangelogTest(unittest.TestCase):
             self.assertNotIn("clear the notes", section)
             self.assertIn("The new work", section)
 
-    def test_the_diffstat_leaves_the_notes_out(self):
+    def test_a_release_without_a_feature_or_a_fix_says_so(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = make_repo(Path(directory))
             commit(repo, "the work")
             run("git", "tag", "v3.0.0", cwd=repo)
-            commit(repo, "feat: the new work")
-            write_fragment(repo, "a-feature.md", "\n".join(f"line {index}" for index in range(100)))
-            run("git", "add", "-A", cwd=repo)
-            run("git", "commit", "-q", "-m", "the notes", cwd=repo)
-            run("git", "tag", "v3.1.0", cwd=repo)
-
-            section = release_notes.changelog_section(repo, "v3.1.0")
-            self.assertIn("1 file changed, 1 insertion(+)", section)
-
-    def test_a_release_without_a_product_change_says_so(self):
-        with tempfile.TemporaryDirectory() as directory:
-            repo = make_repo(Path(directory))
-            commit(repo, "the work")
-            run("git", "tag", "v3.0.0", cwd=repo)
-            write_fragment(repo, "a-feature.md", "* A feature")
-            run("git", "add", "-A", cwd=repo)
-            run("git", "commit", "-q", "-m", "the notes", cwd=repo)
+            commit(repo, "refactor: move a thing")
+            commit(repo, "chore: tidy a thing")
             run("git", "tag", "v3.1.0", cwd=repo)
 
             section = release_notes.changelog_section(repo, "v3.1.0")
             self.assertIn("## Changes since v3.0.0", section)
-            self.assertIn("No change of the product", section)
+            self.assertIn("No new features or fixes", section)
+            self.assertNotIn("Move a thing", section)
+            self.assertNotIn("Tidy a thing", section)
 
     def test_the_section_is_reconstructed_from_the_history_alone(self):
         # The notes folder holds no versioned copy of the diff: the section is what the

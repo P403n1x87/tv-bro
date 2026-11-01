@@ -61,7 +61,7 @@ Every pull request is built with the same pipeline as a release, so a broken bui
 cannot reach a tag. Releases are cut by pushing a `vX.Y.Z` tag — the tag becomes the app version and
 drives the GitHub release, whose body is assembled from the note fragments in
 [`release-notes/`](release-notes/) — one file per feature, so no two pull requests touch the same
-one — plus the changes since the previous release, read from the git history (see
+one — plus the new features and fixes since the previous release, read from the git history (see
 [docs/release-notes.md](docs/release-notes.md)).
 
 See [AGENTS.md](AGENTS.md) for the full build, test and debug instructions, and
