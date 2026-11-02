@@ -22,7 +22,13 @@ python3 artwork/verify.py   # re-derive variants analytically, diff renders and 
 
 `build.py` also writes the deliverables into the app:
 
-- `res/drawable-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi}/ic_launcher.png`
+- `res/drawable-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi}/ic_launcher.png` (legacy bitmap,
+  still used by in-app favicons/notifications)
+- `res/mipmap-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi}/ic_launcher.png` (legacy launcher
+  fallback for API < 26)
+- `res/drawable-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi}/ic_launcher_foreground.png`
+  (adaptive-icon foreground; the amber background lives in `res/values/colors.xml`
+  and the layer composition in `res/mipmap-anydpi-v26/ic_launcher.xml`)
 - `res/drawable-xhdpi/banner.png` (leanback banner)
 - `metadata/en-US/images/{icon,featureGraphic,tvBanner}.png`
 - `assets/pages/home/{title,title-dark,watermark,watermark-dark}.png`

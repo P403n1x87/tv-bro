@@ -18,6 +18,8 @@ SRC = f"{BASE}/source/odysseus-art.svg"
 PARTS = f"{BASE}/parts"
 VARIANTS = f"{BASE}/variants"
 PREVIEW = f"{BASE}/preview"
+for _dir in (PARTS, VARIANTS, PREVIEW):
+    os.makedirs(_dir, exist_ok=True)
 NS = "http://www.w3.org/2000/svg"
 ET.register_namespace("", NS)
 ET.register_namespace("inkscape", "http://www.inkscape.org/namespaces/inkscape")
@@ -297,6 +299,13 @@ sz = (512, 512)
 items = [(part_files["galley"], tf_contain(GAL_INK, 56, 56, 400, 400))]
 emit("icon-galley", sz, items, bg=AMBER)
 
+# Adaptive-icon foreground: the galley alone on transparency, sized to the
+# 66/108 dp safe zone of a 108 dp layer. The amber background is supplied by
+# the adaptive icon's <background> colour, not baked into this layer.
+sz = (432, 432)
+items = [(part_files["galley"], tf_contain(GAL_INK, 84, 84, 264, 264))]
+emit("icon-adaptive-foreground", sz, items)
+
 # --- lockups (transparent) ---
 lock_h, h_items = horizontal(300)
 emit("lockup-horizontal", lock_h, h_items)
@@ -411,6 +420,18 @@ INSTALL = [
     (CHOSEN_ICON, 96, 96, "app/src/main/res/drawable-xhdpi/ic_launcher.png"),
     (CHOSEN_ICON, 144, 144, "app/src/main/res/drawable-xxhdpi/ic_launcher.png"),
     (CHOSEN_ICON, 192, 192, "app/src/main/res/drawable-xxxhdpi/ic_launcher.png"),
+    # legacy launcher icons (API < 26) referenced by the manifest via @mipmap
+    (CHOSEN_ICON, 48, 48, "app/src/main/res/mipmap-mdpi/ic_launcher.png"),
+    (CHOSEN_ICON, 72, 72, "app/src/main/res/mipmap-hdpi/ic_launcher.png"),
+    (CHOSEN_ICON, 96, 96, "app/src/main/res/mipmap-xhdpi/ic_launcher.png"),
+    (CHOSEN_ICON, 144, 144, "app/src/main/res/mipmap-xxhdpi/ic_launcher.png"),
+    (CHOSEN_ICON, 192, 192, "app/src/main/res/mipmap-xxxhdpi/ic_launcher.png"),
+    # adaptive-icon foreground (API 26+): 108 dp layer at each density
+    ("icon-adaptive-foreground", 108, 108, "app/src/main/res/drawable-mdpi/ic_launcher_foreground.png"),
+    ("icon-adaptive-foreground", 162, 162, "app/src/main/res/drawable-hdpi/ic_launcher_foreground.png"),
+    ("icon-adaptive-foreground", 216, 216, "app/src/main/res/drawable-xhdpi/ic_launcher_foreground.png"),
+    ("icon-adaptive-foreground", 324, 324, "app/src/main/res/drawable-xxhdpi/ic_launcher_foreground.png"),
+    ("icon-adaptive-foreground", 432, 432, "app/src/main/res/drawable-xxxhdpi/ic_launcher_foreground.png"),
     (CHOSEN_ICON, 192, 192, "metadata/en-US/images/icon.png"),
     # TV launcher banner (manifest android:banner)
     ("banner-leanback", 640, 360, "app/src/main/res/drawable-xhdpi/banner.png"),
