@@ -151,6 +151,16 @@ INSTALL = [
     ("icon-galley", 96, 96, "app/src/main/res/drawable-xhdpi/ic_launcher.png", True),
     ("icon-galley", 144, 144, "app/src/main/res/drawable-xxhdpi/ic_launcher.png", True),
     ("icon-galley", 192, 192, "app/src/main/res/drawable-xxxhdpi/ic_launcher.png", True),
+    ("icon-galley", 48, 48, "app/src/main/res/mipmap-mdpi/ic_launcher.png", True),
+    ("icon-galley", 72, 72, "app/src/main/res/mipmap-hdpi/ic_launcher.png", True),
+    ("icon-galley", 96, 96, "app/src/main/res/mipmap-xhdpi/ic_launcher.png", True),
+    ("icon-galley", 144, 144, "app/src/main/res/mipmap-xxhdpi/ic_launcher.png", True),
+    ("icon-galley", 192, 192, "app/src/main/res/mipmap-xxxhdpi/ic_launcher.png", True),
+    ("icon-adaptive-foreground", 108, 108, "app/src/main/res/drawable-mdpi/ic_launcher_foreground.png", False),
+    ("icon-adaptive-foreground", 162, 162, "app/src/main/res/drawable-hdpi/ic_launcher_foreground.png", False),
+    ("icon-adaptive-foreground", 216, 216, "app/src/main/res/drawable-xhdpi/ic_launcher_foreground.png", False),
+    ("icon-adaptive-foreground", 324, 324, "app/src/main/res/drawable-xxhdpi/ic_launcher_foreground.png", False),
+    ("icon-adaptive-foreground", 432, 432, "app/src/main/res/drawable-xxxhdpi/ic_launcher_foreground.png", False),
     ("icon-galley", 192, 192, "metadata/en-US/images/icon.png", True),
     ("banner-leanback", 640, 360, "app/src/main/res/drawable-xhdpi/banner.png", True),
     ("feature-graphic-amber", 1024, 500, "metadata/en-US/images/featureGraphic.png", True),
@@ -162,7 +172,7 @@ INSTALL = [
     ("readme-banner", 1200, 300, "docs/branding/readme-banner.png", False),
     ("readme-banner-dark", 1200, 300, "docs/branding/readme-banner-dark.png", False),
 ]
-APP = "/home/gabriele/Projects/tv-bro"
+APP = os.path.dirname(BASE)
 
 
 def mean_rgba_diff(a, b):
