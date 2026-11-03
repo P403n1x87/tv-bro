@@ -54,6 +54,7 @@ import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.config.PlaybackConfig.PlayerKind
 import com.phlox.tvwebbrowser.domain.HomePagePolicy
 import com.phlox.tvwebbrowser.domain.HomePagePolicy.HomeAliasTarget
+import com.phlox.tvwebbrowser.domain.MediaCandidatePolicy
 import com.phlox.tvwebbrowser.player.HandlerScheduler
 import com.phlox.tvwebbrowser.player.MediaAutoReplay
 import com.phlox.tvwebbrowser.player.MediaDiscoveryNotifier
@@ -537,27 +538,28 @@ open class WebViewEx(
                         // HLS the master playlist is usually requested first, so it ends
                         // up first in the list and is the best pick.
                         val u = request.url.toString()
-                        if (isMediaCandidate(u) && detectedMedia.size < MAX_DETECTED_MEDIA) {
-                            val identity = MediaUrlIdentity.key(u)
+                        val candidateUrl = MediaCandidatePolicy.candidateFor(u)?.url
+                        if (candidateUrl != null && detectedMedia.size < MAX_DETECTED_MEDIA) {
+                            val identity = MediaUrlIdentity.key(candidateUrl)
                             val previous = detectedMediaIdentities[identity]
                             when {
                                 previous == null -> {
-                                    detectedMedia[u] = request.requestHeaders ?: emptyMap()
-                                    detectedMediaIdentities[identity] = u
+                                    detectedMedia[candidateUrl] = request.requestHeaders ?: emptyMap()
+                                    detectedMediaIdentities[identity] = candidateUrl
                                     MediaDiscoveryNotifier.notifyChanged()
                                 }
 
-                                previous != u -> {
+                                previous != candidateUrl -> {
                                     // Same resource with rotated credentials (e.g. a new signature):
                                     // swap in the freshest URL without disturbing the list order.
                                     val headers = request.requestHeaders ?: emptyMap()
                                     val rebuilt = LinkedHashMap<String, Map<String, String>>(detectedMedia.size)
                                     for ((key, value) in detectedMedia) {
-                                        if (key == previous) rebuilt[u] = headers else rebuilt[key] = value
+                                        if (key == previous) rebuilt[candidateUrl] = headers else rebuilt[key] = value
                                     }
                                     detectedMedia.clear()
                                     detectedMedia.putAll(rebuilt)
-                                    detectedMediaIdentities[identity] = u
+                                    detectedMediaIdentities[identity] = candidateUrl
                                     MediaDiscoveryNotifier.notifyChanged()
                                 }
                             }
@@ -961,69 +963,13 @@ open class WebViewEx(
 
     //region media casting
 
-    /** Generic patterns that mark a URL as a possible media stream, not per-site rules. */
-    private fun isMediaCandidate(u: String): Boolean {
-        val path = u.substringBefore('?').lowercase()
-        return path.endsWith(".m3u8") || path.endsWith(".mpd") ||
-            isProgressiveFile(u) || isMaskedManifest(path) || isUrlManifest(path) ||
-            u.contains("action=redirect") || path.contains("/api/er/get") ||
-            queryNamesManifest(u)
-    }
-
-    /**
-     * Some players fetch the manifest from an extensionless gateway with the real file
-     * name tucked in the query, e.g. ".../stream.php?path=ab12/index.m3u8&sig=...".
-     */
-    private fun queryNamesManifest(u: String): Boolean {
-        if (!u.contains('?')) return false
-        val query = Uri.decode(u.substringAfter('?')).lowercase()
-        return query.contains(".m3u8") || query.contains(".mpd")
-    }
-
-    /** Some sites disguise the HLS manifest behind a harmless extension. */
-    private fun isMaskedManifest(path: String): Boolean =
-        (path.endsWith(".txt") || path.endsWith(".json")) &&
-            (
-                path.contains("/hls/") || path.contains("master") || path.contains("playlist") ||
-                    path.contains("manifest") || path.contains("sublist") || path.contains("chunklist")
-            )
-
-    /** Some player services serve the manifest with no extension at all, behind .../q/<n>. */
-    private fun isUrlManifest(path: String): Boolean {
-        val qIdx = path.lastIndexOf("/q/")
-        return qIdx >= 0 && path.substring(qIdx + 3).toIntOrNull() != null
-    }
-
-    private fun isProgressiveFile(u: String): Boolean {
-        val p = u.substringBefore('?').lowercase()
-        return p.endsWith(".mp4") || p.endsWith(".m4v") || p.endsWith(".webm") ||
-            p.endsWith(".mkv") || p.endsWith(".mov")
-    }
-
-    private fun inferCastKind(u: String): MediaRequestCatalog.Kind {
-        val path = u.substringBefore('?').lowercase()
-        return when {
-            path.endsWith(".mpd") -> {
-                MediaRequestCatalog.Kind.DASH
-            }
-
-            path.endsWith(".m3u8") || isMaskedManifest(path) || isUrlManifest(path) -> {
-                MediaRequestCatalog.Kind.HLS
-            }
-
-            queryNamesManifest(u) -> {
-                if (Uri.decode(u.substringAfter('?')).lowercase().contains(".mpd")) {
-                    MediaRequestCatalog.Kind.DASH
-                } else {
-                    MediaRequestCatalog.Kind.HLS
-                }
-            }
-
-            else -> {
-                MediaRequestCatalog.Kind.PROGRESSIVE
-            }
+    private fun inferCastKind(u: String): MediaRequestCatalog.Kind =
+        when (MediaCandidatePolicy.candidateFor(u)?.kind) {
+            MediaCandidatePolicy.Kind.HLS -> MediaRequestCatalog.Kind.HLS
+            MediaCandidatePolicy.Kind.DASH -> MediaRequestCatalog.Kind.DASH
+            MediaCandidatePolicy.Kind.PROGRESSIVE -> MediaRequestCatalog.Kind.PROGRESSIVE
+            null -> MediaRequestCatalog.Kind.PROGRESSIVE
         }
-    }
 
     /**
      * Orders the candidates by how likely they are to be the real stream. No
@@ -1037,7 +983,7 @@ open class WebViewEx(
         // sortedBy is stable, so the detection order survives within each group
         return urls
             .map { CastCandidate(it, detectedMedia[it] ?: emptyMap(), inferCastKind(it)) }
-            .sortedBy { if (isProgressiveFile(it.url)) 1 else 0 }
+            .sortedBy { if (it.kind == MediaRequestCatalog.Kind.PROGRESSIVE) 1 else 0 }
     }
 
     /**
@@ -1046,9 +992,11 @@ open class WebViewEx(
      * file: otherwise every ordinary page (e.g. the home page) would list itself as
      * "PROGRESSIVE".
      */
-    fun mediaCandidates(): List<MediaCandidate> =
-        orderedCandidates(currentOriginalUrl?.toString()?.takeIf(::isMediaCandidate))
+    fun mediaCandidates(): List<MediaCandidate> {
+        val pageCandidate = currentOriginalUrl?.toString()?.let { MediaCandidatePolicy.candidateFor(it)?.url }
+        return orderedCandidates(pageCandidate)
             .map { MediaCandidate(it.url, it.kind.toCandidateKind()) }
+    }
 
     /** Warms the metadata cache for manifests on the page; plain files carry no parseable metadata. */
     fun prefetchMediaMetadata() {
