@@ -1,0 +1,1 @@
+- Fix embedded stream loading blocked by 403 errors on anti-bot protected players

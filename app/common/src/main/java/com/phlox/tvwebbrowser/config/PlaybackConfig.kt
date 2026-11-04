@@ -12,6 +12,7 @@ class PlaybackConfig(
     companion object {
         const val PLAYER_KIND_KEY = "player_kind"
         const val ALLOW_AUTOPLAY_MEDIA = "allow_autoplay_media"
+        const val ACCEPT_THIRD_PARTY_COOKIES = "accept_third_party_cookies"
     }
 
     /** Player a detected stream is handed to. Default is the built-in ExoPlayer. */
@@ -37,5 +38,11 @@ class PlaybackConfig(
         get() = prefs.getBoolean(ALLOW_AUTOPLAY_MEDIA, false)
         set(value) {
             prefs.edit().putBoolean(ALLOW_AUTOPLAY_MEDIA, value).apply()
+        }
+
+    var acceptThirdPartyCookies: Boolean
+        get() = prefs.getBoolean(ACCEPT_THIRD_PARTY_COOKIES, true)
+        set(value) {
+            prefs.edit().putBoolean(ACCEPT_THIRD_PARTY_COOKIES, value).apply()
         }
 }

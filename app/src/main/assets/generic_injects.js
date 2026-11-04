@@ -26,6 +26,13 @@ if (!window.odysseusClicksListener) {
     document.addEventListener("click", window.odysseusClicksListener);
 }
 
+// Stub for blocked ad/pop libraries
+if (typeof window.aclib === 'undefined') {
+    window.aclib = {
+        runPop: function() {}
+    };
+}
+
 // video playback control support
 Object.defineProperty(HTMLMediaElement.prototype, 'playing', {
     get: function(){

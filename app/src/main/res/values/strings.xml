@@ -251,6 +251,8 @@
     <string name="settings_hide_toolbar_when_browsing_summary">Hide the top bar when focus is on the web page; press Back to show it</string>
     <string name="settings_video_player">Video player</string>
     <string name="settings_video_player_summary">Player used for the streams detected on the page</string>
+    <string name="settings_accept_third_party_cookies">Accept third-party cookies</string>
+    <string name="settings_accept_third_party_cookies_summary">Allow embedded iframes to store third-party cookies (needed for some media streams)</string>
     <string name="settings_web_engine">Web browser engine</string>
     <string name="settings_web_engine_summary">Temporary setting, reverted on restart</string>
     <string name="settings_web_engine_debug">Web engine debugging</string>

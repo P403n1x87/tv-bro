@@ -72,6 +72,15 @@ class AdsSettingsView(
                     onCheckedChange = { adblockModel.blockAutomaticRedirects = it },
                 ),
             )
+            add(
+                SettingsItem.Toggle(
+                    iconRes = R.drawable.ic_settings_block_24dp,
+                    titleRes = R.string.settings_accept_third_party_cookies,
+                    summaryRes = R.string.settings_accept_third_party_cookies_summary,
+                    isChecked = { deps.settings.acceptThirdPartyCookies },
+                    onCheckedChange = { deps.settings.acceptThirdPartyCookies = it },
+                ),
+            )
         }
 
     private fun lastUpdateText(): CharSequence {
