@@ -6,8 +6,10 @@ import android.content.Context
 import android.os.Looper
 import android.view.View
 import com.phlox.tvwebbrowser.Config
+import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.databinding.ActivityMainBinding
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -72,5 +74,28 @@ class ToolbarControllerTest {
         assertEquals(View.GONE, binding.rlActionBar.visibility)
         toolbarController.showTopBar()
         assertEquals(View.GONE, binding.rlActionBar.visibility)
+    }
+
+    @Test
+    fun focusTopBarBringsThePinnedBarIntoFocus() {
+        binding.flWebViewContainer.requestFocus()
+        assertTrue(binding.flWebViewContainer.hasFocus())
+
+        toolbarController.focusTopBar()
+
+        assertEquals(View.VISIBLE, binding.rlActionBar.visibility)
+        assertTrue(binding.vActionBar.hasFocus())
+        assertTrue(binding.vActionBar.findViewById<View>(R.id.ibBack).hasFocus())
+    }
+
+    @Test
+    fun focusTopBarShowsAHiddenBarAndFocusesIt() {
+        binding.flWebViewContainer.requestFocus()
+        toolbarController.hideTopBar()
+
+        toolbarController.focusTopBar()
+
+        assertEquals(View.VISIBLE, binding.rlActionBar.visibility)
+        assertTrue(binding.vActionBar.hasFocus())
     }
 }

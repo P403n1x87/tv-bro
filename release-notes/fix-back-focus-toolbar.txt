@@ -1,0 +1,1 @@
+Pressing Back while a page has focus now always returns focus to the top bar, even when the toolbar is pinned.
