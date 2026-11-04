@@ -39,7 +39,6 @@ class PlaybackSettingsView(
                     },
                 ),
             )
-
         }
 
     private fun playerLabels(): List<CharSequence> =

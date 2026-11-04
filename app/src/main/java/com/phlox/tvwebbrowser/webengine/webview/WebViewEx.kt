@@ -597,8 +597,6 @@ open class WebViewEx(
                         }
                     }
 
-
-
                     if (!callback.isAdBlockingEnabled()) {
                         return super.shouldInterceptRequest(view, request)
                     }
