@@ -121,6 +121,12 @@ class SettingsModel(
             config.playbackConfig.playerKind = value
         }
 
+    var acceptThirdPartyCookies: Boolean
+        get() = config.playbackConfig.acceptThirdPartyCookies
+        set(value) {
+            config.playbackConfig.acceptThirdPartyCookies = value
+        }
+
     // Controls
     var disableMotionAxesDpadNavigation: Boolean
         get() = config.cursorConfig.disableMotionAxesDpadNavigation

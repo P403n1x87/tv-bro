@@ -256,6 +256,7 @@ open class WebViewEx(
             setNeedInitialFocus(false)
 
             domStorageEnabled = true
+            CookieManager.getInstance().setAcceptThirdPartyCookies(this@WebViewEx, config.playbackConfig.acceptThirdPartyCookies)
             if (config.engineTuningConfig.webEngineDebug) {
                 setWebContentsDebuggingEnabled(true)
             }
@@ -717,6 +718,24 @@ open class WebViewEx(
                         }.setNegativeButton(android.R.string.cancel) { _: DialogInterface, _: Int ->
                             handler?.cancel()
                         }.show()
+                }
+
+                override fun onReceivedHttpError(
+                    view: WebView,
+                    request: WebResourceRequest,
+                    errorResponse: WebResourceResponse,
+                ) {
+                    super.onReceivedHttpError(view, request, errorResponse)
+                    Log.e(TAG, "onReceivedHttpError status: ${errorResponse.statusCode} for url: ${request.url}")
+                }
+
+                override fun onReceivedError(
+                    view: WebView,
+                    request: WebResourceRequest,
+                    error: android.webkit.WebResourceError,
+                ) {
+                    super.onReceivedError(view, request, error)
+                    Log.e(TAG, "onReceivedError code: ${error.errorCode} desc: ${error.description} for url: ${request.url}")
                 }
             }
 
