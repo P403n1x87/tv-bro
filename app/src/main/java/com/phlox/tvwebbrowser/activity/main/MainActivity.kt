@@ -56,6 +56,7 @@ import com.phlox.tvwebbrowser.activity.main.view.CursorMenuView
 import com.phlox.tvwebbrowser.activity.main.view.tabs.TabsAdapter.Listener
 import com.phlox.tvwebbrowser.databinding.ActivityMainBinding
 import com.phlox.tvwebbrowser.domain.AddressInputPolicy
+import com.phlox.tvwebbrowser.domain.BackNavigationPolicy
 import com.phlox.tvwebbrowser.domain.WebEnginePolicy
 import com.phlox.tvwebbrowser.model.HostConfig
 import com.phlox.tvwebbrowser.model.WebTabState
@@ -1082,40 +1083,50 @@ open class MainActivity :
 
     private fun handleBackNavigation() {
         Log.d(TAG, "handleBackNavigation")
-        if (tabsModel.currentTab.value
-                ?.webEngine
-                ?.isVirtualCursorMode() == false
-        ) {
-            tabsModel.currentTab.value
-                ?.webEngine
-                ?.setVirtualCursorMode(true)
-            backNavigationEventsAdapter.gameControllersLongPressBForBackNavigation = false
-            return
-        }
+        val currentTab = tabsModel.currentTab.value
+        val action =
+            BackNavigationPolicy.decide(
+                cursorModeDisabled = currentTab?.webEngine?.isVirtualCursorMode() == false,
+                cursorMenuVisible = vb.vCursorMenu.isVisible,
+                cursorDrawerHandlesBack = vb.flWebViewContainer.cursorDrawerDelegate.canHandleBackNavigation(),
+                fullscreen = toolbarController.isFullscreen,
+                bookmarksPanelVisible = panelController.isBookmarksPanelVisible,
+                tabsPanelVisible = panelController.isTabsPanelVisible,
+                pageFocused = vb.flWebViewContainer.hasFocus(),
+            )
+        when (action) {
+            BackNavigationPolicy.Action.ENABLE_CURSOR -> {
+                currentTab?.webEngine?.setVirtualCursorMode(true)
+                backNavigationEventsAdapter.gameControllersLongPressBForBackNavigation = false
+            }
 
-        if (vb.vCursorMenu.isVisible) {
-            vb.vCursorMenu.close(CursorMenuView.CloseAnimation.ROTATE_OUT)
-        } else if (vb.flWebViewContainer.cursorDrawerDelegate.canHandleBackNavigation()) {
-            vb.flWebViewContainer.cursorDrawerDelegate.handleBackNavigation()
-        } else if (toolbarController.isFullscreen) {
-            tabsModel.currentTab.value
-                ?.webEngine
-                ?.hideFullscreenView()
-        } else if (panelController.isBookmarksPanelVisible) {
-            bookmarksController.hide()
-        } else if (panelController.isTabsPanelVisible) {
-            panelController.hideTabsPanel()
-        } else if (vb.flWebViewContainer.hasFocus()) {
-            // Focus is on the page: BACK must give the remote a way back to the UI,
-            // otherwise the user is stuck in the WebView with no focused control.
-            if (settingsModel.hideToolbarWhenBrowsing.value) {
-                toolbarController.showTopBar()
-                vb.vActionBar.catchFocus()
-            } else {
+            BackNavigationPolicy.Action.CLOSE_CURSOR_MENU -> {
+                vb.vCursorMenu.close(CursorMenuView.CloseAnimation.ROTATE_OUT)
+            }
+
+            BackNavigationPolicy.Action.HANDLE_CURSOR_DRAWER -> {
+                vb.flWebViewContainer.cursorDrawerDelegate.handleBackNavigation()
+            }
+
+            BackNavigationPolicy.Action.EXIT_FULLSCREEN -> {
+                currentTab?.webEngine?.hideFullscreenView()
+            }
+
+            BackNavigationPolicy.Action.HIDE_BOOKMARKS -> {
+                bookmarksController.hide()
+            }
+
+            BackNavigationPolicy.Action.HIDE_TABS -> {
+                panelController.hideTabsPanel()
+            }
+
+            BackNavigationPolicy.Action.FOCUS_TOP_BAR -> {
+                toolbarController.focusTopBar()
+            }
+
+            BackNavigationPolicy.Action.TOGGLE_TOOLBAR -> {
                 toolbarController.toggleMenu()
             }
-        } else {
-            toolbarController.toggleMenu()
         }
     }
 

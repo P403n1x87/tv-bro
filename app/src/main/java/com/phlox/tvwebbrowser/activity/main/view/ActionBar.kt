@@ -320,6 +320,10 @@ class ActionBar
          * Back/Forward are disabled when the tab has no history and a disabled view cannot take focus,
          * so it falls back to the first shown, focusable button. Without that fallback the remote could
          * stay stuck in the page on a fresh tab.
+         *
+         * `requestFocusFromTouch()` (rather than `requestFocus()`) leaves touch mode first: the
+         * buttons are not focusable in touch mode, so on a device that happens to be in it a plain
+         * request would silently fail and the focus would stay on the page.
          */
         fun catchFocus() {
             val candidates =
@@ -333,6 +337,6 @@ class ActionBar
                     vb.ibSettings,
                     vb.ibMenu,
                 )
-            candidates.firstOrNull { it.isShown && it.isFocusable }?.requestFocus()
+            candidates.firstOrNull { it.isShown && it.isFocusable }?.requestFocusFromTouch()
         }
     }

@@ -66,6 +66,16 @@ class ToolbarController(
     }
 
     /**
+     * Brings the top bar into view and hands it the focus. Used when BACK is pressed while the
+     * page has the focus: the bar may already be pinned or it may have been hidden while browsing,
+     * but either way the remote must land on a real control instead of staying in the WebView.
+     */
+    fun focusTopBar() {
+        showTopBar()
+        vb.vActionBar.catchFocus()
+    }
+
+    /**
      * Kept for the auto-hide call sites (tab switch, URL done, history, voice search, …). With the
      * "keep toolbar open" behaviour the overlay stays up, so this is intentionally a no-op.
      */
