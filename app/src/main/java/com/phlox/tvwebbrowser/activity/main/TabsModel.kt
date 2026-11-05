@@ -224,30 +224,40 @@ class TabsModel(
     ) {
         if (currentTab.value == newTab && newTab.webEngine.getView() != null) return
         if (currentTab.value != newTab) {
-            tabsStates.forEach {
-                it.selected = false
-            }
-            currentTab.value?.apply {
-                webEngine.onDetachFromWindow(completely = false, destroyTab = false)
-                onPause()
-                modelScope.launch { saveTab(this@apply) }
-            }
-
+            deselectCurrentTab()
             newTab.selected = true
             currentTab.value = newTab
         }
-        var needReloadUrl = false
-        if (newTab.webEngine.getView() == null) {
-            if (!viewHost.createView(newTab)) {
-                return
-            }
-            needReloadUrl = !newTab.restoreWebView(filesDir())
-        }
+        val needReloadUrl = prepareViewForTab(newTab, viewHost) ?: return
         viewHost.attachEngineToWindow(newTab, webEngineWindowProviderCallback)
         if (needReloadUrl) {
             newTab.webEngine.loadUrl(newTab.url)
         }
         newTab.webEngine.setNetworkAvailable(networkAvailable())
+    }
+
+    /** Detaches, pauses and persists the currently selected tab, clearing its selection. */
+    private fun deselectCurrentTab() {
+        tabsStates.forEach { it.selected = false }
+        currentTab.value?.apply {
+            webEngine.onDetachFromWindow(completely = false, destroyTab = false)
+            onPause()
+            modelScope.launch { saveTab(this@apply) }
+        }
+    }
+
+    /**
+     * Materialises [tab]'s engine view when it has none, restoring its saved WebView state.
+     * Returns true when the tab's URL should (re)loaded, false when view creation failed and the
+     * switch should be aborted.
+     */
+    private fun prepareViewForTab(
+        tab: WebTabState,
+        viewHost: TabViewHost,
+    ): Boolean? {
+        if (tab.webEngine.getView() != null) return false
+        if (!viewHost.createView(tab)) return null
+        return !tab.restoreWebView(filesDir())
     }
 
     /**

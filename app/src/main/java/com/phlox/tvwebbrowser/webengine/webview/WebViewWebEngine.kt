@@ -256,7 +256,7 @@ class WebViewWebEngine(
             it.evaluateJavascript(Scripts.LONG_PRESS_SCRIPT) { href ->
                 val linkUrl = if (href == "null") null else href
                 webViewCallback.onContextMenu(
-                    it.currentOriginalUrl.toString(),
+                    it.currentOriginalUrl?.toString(),
                     linkUrl,
                     x,
                     y,
