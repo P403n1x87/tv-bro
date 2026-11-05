@@ -546,76 +546,25 @@ open class MainActivity :
     override fun onShowMenu() {
         val currentTab = tabsModel.currentTab.value
         val items =
-            arrayListOf(
-                getString(R.string.navigate_home),
-                getString(R.string.new_tab),
-                getString(R.string.add_bookmark),
-                getString(R.string.toggle_ads_blocking),
-                getString(R.string.block_popups),
-                getString(R.string.history),
-                getString(R.string.downloads),
-                getString(R.string.incognito_mode),
-                getString(R.string.voice_search),
-                getString(R.string.toggle_theme),
-                getString(R.string.close_tab),
-                getString(R.string.close_application),
-            ).toTypedArray()
+            listOf(
+                R.string.navigate_home to { navigate(settingsModel.homePage) },
+                R.string.new_tab to { openInNewTab(settingsModel.homePage, tabsModel.tabsStates.size) },
+                R.string.add_bookmark to { bookmarksController.addCurrentPage() },
+                R.string.toggle_ads_blocking to { toggleAdBlockForTab() },
+                R.string.block_popups to { lifecycleScope.launch(Dispatchers.Main) { showPopupBlockOptions() } },
+                R.string.history to { showHistory() },
+                R.string.downloads to { showDownloads() },
+                R.string.incognito_mode to { toggleIncognitoMode() },
+                R.string.voice_search to { initiateVoiceSearch() },
+                R.string.toggle_theme to { toggleTheme() },
+                R.string.close_tab to { currentTab?.let { closeTab(it) } },
+                R.string.close_application to { closeWindow() },
+            )
         AlertDialog
             .Builder(this)
             .setTitle(R.string.menu)
-            .setItems(items) { _, which ->
-                when (which) {
-                    0 -> {
-                        navigate(settingsModel.homePage)
-                    }
-
-                    1 -> {
-                        openInNewTab(
-                            settingsModel.homePage,
-                            tabsModel.tabsStates.size,
-                        )
-                    }
-
-                    2 -> {
-                        bookmarksController.addCurrentPage()
-                    }
-
-                    3 -> {
-                        toggleAdBlockForTab()
-                    }
-
-                    4 -> {
-                        lifecycleScope.launch(Dispatchers.Main) { showPopupBlockOptions() }
-                    }
-
-                    5 -> {
-                        showHistory()
-                    }
-
-                    6 -> {
-                        showDownloads()
-                    }
-
-                    7 -> {
-                        toggleIncognitoMode()
-                    }
-
-                    8 -> {
-                        initiateVoiceSearch()
-                    }
-
-                    9 -> {
-                        toggleTheme()
-                    }
-
-                    10 -> {
-                        currentTab?.let { closeTab(it) }
-                    }
-
-                    11 -> {
-                        closeWindow()
-                    }
-                }
+            .setItems(items.map { getString(it.first) }.toTypedArray()) { _, which ->
+                items[which].second()
             }.show()
     }
 

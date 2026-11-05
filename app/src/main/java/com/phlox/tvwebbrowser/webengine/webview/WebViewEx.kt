@@ -533,69 +533,13 @@ open class WebViewEx(
                     request: WebResourceRequest,
                 ): WebResourceResponse? {
                     Log.d(TAG, "shouldInterceptRequest url: ${request.url}")
-                    run {
-                        // Collect media stream candidates. These are generic patterns,
-                        // not per-site rules. Order is kept (LinkedHashMap) because with
-                        // HLS the master playlist is usually requested first, so it ends
-                        // up first in the list and is the best pick.
-                        val u = request.url.toString()
-                        val candidateUrl = MediaCandidatePolicy.candidateFor(u)?.url
-                        if (candidateUrl != null && detectedMedia.size < MAX_DETECTED_MEDIA) {
-                            val identity = MediaUrlIdentity.key(candidateUrl)
-                            val previous = detectedMediaIdentities[identity]
-                            when {
-                                previous == null -> {
-                                    detectedMedia[candidateUrl] = request.requestHeaders ?: emptyMap()
-                                    detectedMediaIdentities[identity] = candidateUrl
-                                    MediaDiscoveryNotifier.notifyChanged()
-                                }
+                    recordMediaCandidate(request)
 
-                                previous != candidateUrl -> {
-                                    // Same resource with rotated credentials (e.g. a new signature):
-                                    // swap in the freshest URL without disturbing the list order.
-                                    val headers = request.requestHeaders ?: emptyMap()
-                                    val rebuilt = LinkedHashMap<String, Map<String, String>>(detectedMedia.size)
-                                    for ((key, value) in detectedMedia) {
-                                        if (key == previous) rebuilt[candidateUrl] = headers else rebuilt[key] = value
-                                    }
-                                    detectedMedia.clear()
-                                    detectedMedia.putAll(rebuilt)
-                                    detectedMediaIdentities[identity] = candidateUrl
-                                    MediaDiscoveryNotifier.notifyChanged()
-                                }
-                            }
-                        }
-                    }
                     val currentPageUrl = currentOriginalUrl
                     val requestUrl = request.url.toString()
 
-                    // The built-in home page and its `favicon://` quick-link icons are always served from
-                    // the bundled assets. Do not gate this on [currentOriginalUrl]: on a Back/Forward
-                    // history navigation the document request arrives before onPageStarted commits the
-                    // new URL, so a stale gate lets the outdated remote copy of the home page load
-                    // instead - its markup differs and the injected renderSections call then fails.
-                    if (request.url.scheme == "favicon" ||
-                        requestUrl.startsWith(Config.HOME_PAGE_URL, ignoreCase = true)
-                    ) {
-                        HomePageHelper.shouldInterceptRequest(view, request)?.let {
-                            return it
-                        }
-                        if (requestUrl.startsWith(Config.HOME_PAGE_URL, ignoreCase = true)) {
-                            var relativePath = requestUrl.substring(Config.HOME_PAGE_URL.length)
-                            if (relativePath.isEmpty() || relativePath == "/") {
-                                relativePath = "index.html"
-                            }
-                            val assetsPath = "pages/home/$relativePath"
-                            val response = Utils.getWebResourceResponseFromAssets(view.context, assetsPath)
-                            if (response != null) {
-                                Log.d(TAG, "shouldInterceptRequest url: ${request.url} -> $assetsPath")
-                                return response
-                            } else {
-                                Log.w(TAG, "shouldInterceptRequest url: ${request.url} -> not found in assets")
-                            }
-                            return response ?: super.shouldInterceptRequest(view, request)
-                        }
-                    }
+                    val homePageResponse = interceptHomePageRequest(view, request)
+                    if (homePageResponse != null) return homePageResponse
 
                     if (!callback.isAdBlockingEnabled()) {
                         return super.shouldInterceptRequest(view, request)
@@ -611,6 +555,80 @@ open class WebViewEx(
                     } else {
                         super.shouldInterceptRequest(view, request)
                     }
+                }
+
+                /**
+                 * Records [request] as a media-stream candidate when its URL matches a known media
+                 * pattern. Rotated credentials (new signature on the same identity) swap in the
+                 * freshest URL without disturbing the detection order.
+                 */
+                private fun recordMediaCandidate(request: WebResourceRequest) {
+                    // Collect media stream candidates. These are generic patterns,
+                    // not per-site rules. Order is kept (LinkedHashMap) because with
+                    // HLS the master playlist is usually requested first, so it ends
+                    // up first in the list and is the best pick.
+                    val u = request.url.toString()
+                    val candidateUrl = MediaCandidatePolicy.candidateFor(u)?.url
+                    if (candidateUrl == null || detectedMedia.size >= MAX_DETECTED_MEDIA) return
+                    val identity = MediaUrlIdentity.key(candidateUrl)
+                    val previous = detectedMediaIdentities[identity]
+                    when {
+                        previous == null -> {
+                            detectedMedia[candidateUrl] = request.requestHeaders ?: emptyMap()
+                            detectedMediaIdentities[identity] = candidateUrl
+                            MediaDiscoveryNotifier.notifyChanged()
+                        }
+
+                        previous != candidateUrl -> {
+                            // Same resource with rotated credentials (e.g. a new signature):
+                            // swap in the freshest URL without disturbing the list order.
+                            val headers = request.requestHeaders ?: emptyMap()
+                            val rebuilt = LinkedHashMap<String, Map<String, String>>(detectedMedia.size)
+                            for ((key, value) in detectedMedia) {
+                                if (key == previous) rebuilt[candidateUrl] = headers else rebuilt[key] = value
+                            }
+                            detectedMedia.clear()
+                            detectedMedia.putAll(rebuilt)
+                            detectedMediaIdentities[identity] = candidateUrl
+                            MediaDiscoveryNotifier.notifyChanged()
+                        }
+                    }
+                }
+
+                /**
+                 * Serves the built-in home page and its `favicon://` quick-link icons from bundled
+                 * assets. Returns null when the request is not a home-page resource.
+                 *
+                 * Does not gate on [currentOriginalUrl]: on a Back/Forward history navigation the
+                 * document request arrives before onPageStarted commits the new URL, so a stale gate
+                 * lets the outdated remote copy of the home page load instead.
+                 */
+                private fun interceptHomePageRequest(
+                    view: WebView,
+                    request: WebResourceRequest,
+                ): WebResourceResponse? {
+                    val requestUrl = request.url.toString()
+                    if (request.url.scheme != "favicon" &&
+                        !requestUrl.startsWith(Config.HOME_PAGE_URL, ignoreCase = true)
+                    ) {
+                        return null
+                    }
+
+                    HomePageHelper.shouldInterceptRequest(view, request)?.let { return it }
+
+                    if (!requestUrl.startsWith(Config.HOME_PAGE_URL, ignoreCase = true)) return null
+                    var relativePath = requestUrl.substring(Config.HOME_PAGE_URL.length)
+                    if (relativePath.isEmpty() || relativePath == "/") {
+                        relativePath = "index.html"
+                    }
+                    val assetsPath = "pages/home/$relativePath"
+                    val response = Utils.getWebResourceResponseFromAssets(view.context, assetsPath)
+                    if (response != null) {
+                        Log.d(TAG, "shouldInterceptRequest url: ${request.url} -> $assetsPath")
+                        return response
+                    }
+                    Log.w(TAG, "shouldInterceptRequest url: ${request.url} -> not found in assets")
+                    return response
                 }
 
                 override fun onPageStarted(
@@ -791,47 +809,48 @@ open class WebViewEx(
 
     override fun loadUrl(url: String) {
         when {
-            Config.HOME_URL_ALIAS == url -> {
-                when (val target = HomePagePolicy.homeAliasTarget(config.homePageMode, config.homePage)) {
-                    HomeAliasTarget.Blank -> {
-                        loadDataWithBaseURL(null, "", "text/html", "UTF-8", null)
-                    }
+            Config.HOME_URL_ALIAS == url -> loadHomePageAlias()
+            url.startsWith(INTERNAL_SCHEME) -> loadInternalUrl(url)
+            else -> loadRegularUrl(url)
+        }
+    }
 
-                    is HomeAliasTarget.Load -> {
-                        try {
-                            currentOriginalUrl = target.url.toUri()
-                            super.loadUrl(target.url)
-                        } catch (e: Exception) {
-                            Log.e(TAG, "LoadUrl error", e)
-                            loadDataWithBaseURL(null, "", "text/html", "UTF-8", null)
-                        }
-                    }
-                }
+    /** Loads the `about:home` alias according to the configured home-page mode. */
+    private fun loadHomePageAlias() {
+        when (val target = HomePagePolicy.homeAliasTarget(config.homePageMode, config.homePage)) {
+            HomeAliasTarget.Blank -> {
+                loadDataWithBaseURL(null, "", "text/html", "UTF-8", null)
             }
 
-            url.startsWith(INTERNAL_SCHEME) -> {
-                val uri = Uri.parse(url)
-                when (uri.authority) {
-                    INTERNAL_SCHEME_WARNING_DOMAIN -> {
-                        when (uri.getQueryParameter("type")) {
-                            INTERNAL_SCHEME_WARNING_DOMAIN_TYPE_CERT -> {
-                                val data =
-                                    context.assets
-                                        .open("pages/warning-certificate.html")
-                                        .bufferedReader()
-                                        .use { it.readText() }
-                                loadDataWithBaseURL("file:///android_asset/", data, "text/html", "UTF-8", uri.getQueryParameter("url"))
-                            }
-                        }
-                    }
+            is HomeAliasTarget.Load -> {
+                try {
+                    currentOriginalUrl = target.url.toUri()
+                    super.loadUrl(target.url)
+                } catch (e: Exception) {
+                    Log.e(TAG, "LoadUrl error", e)
+                    loadDataWithBaseURL(null, "", "text/html", "UTF-8", null)
                 }
-            }
-
-            else -> {
-                currentOriginalUrl = Uri.parse(url)
-                super.loadUrl(url)
             }
         }
+    }
+
+    /** Loads an `internal://` URL (built-in warning pages, etc.). */
+    private fun loadInternalUrl(url: String) {
+        val uri = Uri.parse(url)
+        if (uri.authority != INTERNAL_SCHEME_WARNING_DOMAIN) return
+        if (uri.getQueryParameter("type") != INTERNAL_SCHEME_WARNING_DOMAIN_TYPE_CERT) return
+        val data =
+            context.assets
+                .open("pages/warning-certificate.html")
+                .bufferedReader()
+                .use { it.readText() }
+        loadDataWithBaseURL("file:///android_asset/", data, "text/html", "UTF-8", uri.getQueryParameter("url"))
+    }
+
+    /** Loads a regular (non-internal, non-alias) URL. */
+    private fun loadRegularUrl(url: String) {
+        currentOriginalUrl = Uri.parse(url)
+        super.loadUrl(url)
     }
 
     private fun getGenericJSInjects(): String {
