@@ -29,4 +29,22 @@ object PopupPolicy {
             HostConfig.POPUP_BLOCK_NEW_AUTO_OPENED_TABS -> dialog || !userGesture
             else -> true
         }
+
+    /**
+     * Whether a popup target leaves the opener's site and the user asked for cross-site popups to
+     * be blocked. The check is deliberately domain-based: a popup to another page of the same
+     * registrable domain stays allowed, while the ad networks that hijack player controls are
+     * cross-site. Unknown hosts (about:blank, data:, custom schemes) are never treated as
+     * cross-site, so the engine can still use its normal popup policy for them.
+     */
+    fun shouldBlockCrossSitePopup(
+        openerUrl: String?,
+        popupUrl: String?,
+        enabled: Boolean,
+    ): Boolean {
+        if (!enabled) return false
+        val openerHost = SiteDomains.hostFromUrl(openerUrl) ?: return false
+        val popupHost = SiteDomains.hostFromUrl(popupUrl) ?: return false
+        return SiteDomains.isDifferentSite(openerHost, popupHost)
+    }
 }

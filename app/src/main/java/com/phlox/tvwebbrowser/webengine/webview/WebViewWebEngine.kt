@@ -217,6 +217,11 @@ class WebViewWebEngine(
         onResume()
     }
 
+    override fun bindCallback(callback: WebEngineWindowProviderCallback) {
+        this.callback = callback
+        webView?.onUpdateAdblockSetting(callback.isAdBlockingEnabled())
+    }
+
     override fun onDetachFromWindow(
         completely: Boolean,
         destroyTab: Boolean,

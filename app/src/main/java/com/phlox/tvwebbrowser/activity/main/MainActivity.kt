@@ -695,17 +695,29 @@ open class MainActivity :
         url: String?,
         index: Int = 0,
         load: NewTabLoad = NewTabLoad.Immediate,
+        focus: Boolean = true,
+        popupOpenerUrl: String? = null,
     ): WebEngine? {
-        Log.d(TAG, "openInNewTab: url: $url, index: $index, load: $load")
+        Log.d(TAG, "openInNewTab: url: $url, index: $index, load: $load, focus: $focus")
         if (url == null) {
             return null
         }
         val tab = WebTabState(url = url, incognito = settingsModel.incognitoMode)
+        tab.popupOpenerUrl = popupOpenerUrl
         createWebView(tab) ?: return null
         tabsModel.onOpenTab(tab, index)
-        changeTab(tab)
-        if (load == NewTabLoad.Immediate) {
-            navigate(url)
+        if (focus) {
+            changeTab(tab)
+            if (load == NewTabLoad.Immediate) {
+                navigate(url)
+            }
+        } else {
+            // Background popup: keep the current tab in the window, but let this engine report its
+            // page events through its own per-tab callback.
+            tab.webEngine.bindCallback(WebEngineCallback(this, tab, tabsModel, adblockModel, settingsModel, viewModel))
+            if (load == NewTabLoad.Immediate) {
+                tab.webEngine.loadUrl(url)
+            }
         }
         return tab.webEngine
     }
@@ -1124,7 +1136,9 @@ open class MainActivity :
         url: String,
         index: Int,
         load: NewTabLoad,
-    ): WebEngine? = openInNewTab(url, index, load)
+        focus: Boolean,
+        popupOpenerUrl: String?,
+    ): WebEngine? = openInNewTab(url, index, load, focus, popupOpenerUrl)
 
     override fun showLoadingProgress(progress: Int) {
         vb.progressBar.visibility = View.VISIBLE

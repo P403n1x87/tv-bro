@@ -71,6 +71,12 @@ interface WebEngine {
         parent: ViewGroup,
     )
 
+    /**
+     * Gives the engine its per-tab callback before the view is attached. Used by popup tabs that
+     * open in the background: they must report page events while the current tab keeps the window.
+     */
+    fun bindCallback(callback: WebEngineWindowProviderCallback) {}
+
     fun onDetachFromWindow(
         completely: Boolean,
         destroyTab: Boolean,

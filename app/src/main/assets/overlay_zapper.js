@@ -2,31 +2,57 @@
 //
 // Registered through WebViewCompat.addDocumentStartJavaScript() for "*" (all
 // frames) when the ad-block setting is on, so it runs before any page script in
-// the top document and in cross-origin player iframes alike.
+// the top document and in cross-origin player iframes alike. Re-applied whenever
+// the ad-block setting changes (WebViewEx.onUpdateAdblockSetting).
 //
-// It targets three patterns seen in the wild that network filtering cannot
-// catch (they are created by first-party scripts):
-//   1. transparent, empty, max-z-index absolute/fixed layers used as click traps;
-//   2. hidden off-screen <a> popunder anchors;
-//   3. fixed/absolute max-z-index ad boxes living inside open shadow roots
-//      (invisible to normal DOM scans) — the host is removed instead.
+// It targets four patterns seen in the wild that network filtering cannot catch
+// (they are created by first-party scripts):
+//   1. transparent / invisible, empty, high-z-index absolute/fixed layers used
+//      as click traps (including opacity:0 or z-index below the old 1e6 bar);
+//   2. hidden or far off-screen <a> popunder anchors;
+//   3. fixed/absolute high-z-index ad boxes living inside open shadow roots
+//      (invisible to normal DOM scans) — the shadow host is removed instead;
+//   4. re-sweeps the DOM continuously so late/attribute-driven injections do not
+//      survive long enough to be clicked.
+//
+// False-positive safeguards:
+//   * elements that pass clicks through (pointer-events: none) are never removed;
+//   * elements that carry visible content or real child elements are never removed,
+//     so icon/child-bearing traps and legit control containers stay intact;
+//   * only empty, transparently-invisible, click-capturing layers are zapped.
 (function () {
   "use strict";
   try {
     if (window.__tvbroOverlayZapper) return;
     window.__tvbroOverlayZapper = true;
 
-    var HIGH_Z = 1000000;
+    var HIGH_Z = 100000;
     var AD_HREF = /\/(ad|ads|adv|advert)\/|[\?&]ad=|visit\.php|popunder|clickunder|onclickads|adserv|adserver|doubleclick|googlesyndication|adnxs|adsterra|propeller/i;
     var AD_TEXT = /close\s*ad|skip\s*ad|learn\s*more|sponsored|advertisement/i;
 
-    function transparent(cs) {
-      var bg = cs.backgroundColor;
+    function isTransparent(cs) {
+      var bg = cs && cs.backgroundColor;
       if (!bg || bg === "transparent") return true;
-      return /^rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)$/.test(bg);
+      if (/^rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)$/.test(bg)) return true;
+      // Invisible layers: fully opaque geometry but no visible paint.
+      var opacity = cs.opacity;
+      if (opacity != null && parseFloat(opacity) === 0) return true;
+      var filter = cs.filter || cs.webkitFilter || "";
+      if (/opacity\(\s*0\s*(%)?\s*\)/.test(filter)) return true;
+      return false;
     }
 
-    // 1. transparent empty full-screen-ish layer pinned above everything
+    function passesClicksThrough(cs) {
+      var pe = cs && cs.pointerEvents;
+      return pe != null && pe !== "auto" && /none/.test(pe);
+    }
+
+    function hasVisibleContent(el) {
+      var txt = (el.textContent || "").replace(/\s+/g, " ").trim();
+      return txt.length > 0;
+    }
+
+    // 1. transparent / invisible empty full-screen-ish layer pinned above everything
     function isClickTrap(el) {
       var tag = el.tagName;
       if (tag !== "DIV" && tag !== "INS" && tag !== "IFRAME" && tag !== "SECTION" && tag !== "A") return false;
@@ -35,26 +61,29 @@
       if (cs.position !== "absolute" && cs.position !== "fixed") return false;
       var z = parseInt(cs.zIndex, 10);
       if (!(z >= HIGH_Z)) return false;
-      if (!transparent(cs)) return false;
-      if (el.childElementCount > 0 || (el.textContent || "").trim()) return false;
+      if (!isTransparent(cs)) return false;
+      if (passesClicksThrough(cs)) return false;
+      if (el.childElementCount > 0) return false;
+      if (hasVisibleContent(el)) return false;
       var r = el.getBoundingClientRect();
       return r.width >= 40 && r.height >= 40;
     }
 
-    // 2. hidden anchor parked off-screen (classic popunder)
+    // 2. hidden or far off-screen anchor (classic popunder / click hijack)
     function isPopunder(el) {
       if (el.tagName !== "A") return false;
       var cs = window.getComputedStyle(el);
-      if (!cs || (cs.display !== "none" && cs.visibility !== "hidden")) return false;
+      if (!cs || passesClicksThrough(cs)) return false;
       var href = el.getAttribute("href") || "";
-      if (href && AD_HREF.test(href)) return true;
-      if (href && href !== "#") return false;
-      if (el.childElementCount > 0 || (el.textContent || "").trim()) return false;
+      if (el.childElementCount > 0 || hasVisibleContent(el)) return false;
       var r = el.getBoundingClientRect();
-      return r.left <= -200 || r.top <= -200 || r.right <= -200 || r.bottom <= -200;
+      var offScreen = r.left <= -200 || r.top <= -200 || r.right <= -200 || r.bottom <= -200;
+      if (cs.display === "none" || cs.visibility === "hidden") return offScreen || href === "";
+      if (offScreen && (href === "" || href === "#" || AD_HREF.test(href))) return true;
+      return false;
     }
 
-    // 3. max-z-index ad box (usually autoplaying video) inside a shadow root
+    // 3. high-z-index ad box inside a shadow root — remove the host instead.
     function findShadowAdBox(root) {
       var els = root.querySelectorAll("*");
       for (var i = 0; i < els.length; i++) {
@@ -63,9 +92,11 @@
         if (!cs || (cs.position !== "fixed" && cs.position !== "absolute")) continue;
         var z = parseInt(cs.zIndex, 10);
         if (!(z >= HIGH_Z)) continue;
+        if (passesClicksThrough(cs)) continue;
         var txt = (el.textContent || "").replace(/\s+/g, " ").trim();
         if (AD_TEXT.test(txt)) return el;
         if (el.querySelector && el.querySelector("video, iframe")) return el;
+        if (isClickTrap(el)) return el;
       }
       return null;
     }
