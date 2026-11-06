@@ -54,10 +54,28 @@ class WebEngineCallback(
         url: String,
         load: NewTabLoad,
     ): WebEngine? {
-        val index =
-            NewTabPositionPolicy.insertIndexAfter(tabsModel.tabsStates.indexOf(tabsModel.currentTab.value), tabsModel.tabsStates.size)
+        val index = insertIndexAfterCurrentTab()
         return host.openInNewTabAt(url, index, load)
     }
+
+    override fun onOpenPopupRequested(url: String): WebEngine? {
+        // The engine loads the popup url into the new tab itself (Deferred); the host only
+        // decides whether to switch to it. Background popups keep the current page focused.
+        val focus = !settingsModel.openPopupsInBackground
+        return host.openInNewTabAt(
+            url = url,
+            index = insertIndexAfterCurrentTab(),
+            load = NewTabLoad.Deferred,
+            focus = focus,
+            popupOpenerUrl = tab.url,
+        )
+    }
+
+    private fun insertIndexAfterCurrentTab(): Int =
+        NewTabPositionPolicy.insertIndexAfter(
+            tabsModel.tabsStates.indexOf(tabsModel.currentTab.value),
+            tabsModel.tabsStates.size,
+        )
 
     override fun onDownloadRequested(url: String) {
         Log.i(TAG, "onDownloadRequested url: $url")
@@ -142,6 +160,7 @@ class WebEngineCallback(
         url: String,
         isAutomaticRedirect: Boolean,
     ): Boolean {
+        if (shouldBlockPopupNavigation(url)) return true
         tabsModel.onNavigationRequested(tab, url)
 
         val uri =
@@ -193,6 +212,27 @@ class WebEngineCallback(
             Log.e(TAG, "shouldOverrideUrlLoading: ", e)
             true
         }
+    }
+
+    /**
+     * A popup tab remembers the page that opened it until its first network navigation. If that
+     * first target is cross-site and the user enabled the protection, the popup is closed before it
+     * can replace the page the user was watching.
+     */
+    private fun shouldBlockPopupNavigation(url: String): Boolean {
+        val openerUrl = tab.popupOpenerUrl ?: return false
+        // An empty/about:blank popup is a common two-step setup; keep watching until a real
+        // navigation arrives.
+        if (!url.startsWith("http://") && !url.startsWith("https://")) return false
+        tab.popupOpenerUrl = null
+        if (!PopupPolicy.shouldBlockCrossSitePopup(openerUrl, url, settingsModel.blockCrossSitePopups)) {
+            return false
+        }
+        Log.i(TAG, "blocked cross-site popup: $openerUrl -> $url")
+        tabsModel.onDialogBlocked(tab)
+        host.showBlockedDialogNotification(newTab = true)
+        host.closeTab(tab)
+        return true
     }
 
     private fun shouldBlockAutomaticRedirect(url: String): Boolean {
@@ -269,6 +309,20 @@ class WebEngineCallback(
         )
     }
 
+    override fun shouldBlockPopupRequest(
+        url: String,
+        dialog: Boolean,
+        userGesture: Boolean,
+    ): Boolean =
+        shouldBlockNewWindow(dialog, userGesture) ||
+            PopupPolicy.shouldBlockCrossSitePopup(
+                openerUrl = tab.url,
+                popupUrl = url,
+                enabled = settingsModel.blockCrossSitePopups,
+            )
+
+    override fun shouldOpenPopupsInBackground(): Boolean = settingsModel.openPopupsInBackground
+
     override fun onBlockedAd(uri: String) {
         Log.i(TAG, "onBlockedAd: $uri")
         if (!adblockModel.adBlockEnabled) return
@@ -289,12 +343,17 @@ class WebEngineCallback(
             return null
         }
         val tab = WebTabState(incognito = settingsModel.incognitoMode)
+        tab.popupOpenerUrl = this.tab.url
         val webView = host.createWebView(tab) ?: return null
-        val currentTab = tabsModel.currentTab.value ?: return null
-        val index =
-            NewTabPositionPolicy.insertIndexAfter(tabsModel.tabsStates.indexOf(currentTab), tabsModel.tabsStates.size)
+        val index = insertIndexAfterCurrentTab()
         tabsModel.onOpenTab(tab, index)
-        host.changeTab(tab)
+        if (settingsModel.openPopupsInBackground) {
+            // The transport loads the popup into this view without it being attached, so give the
+            // engine its per-tab adapter now and leave the current tab in the window.
+            tab.webEngine.bindCallback(WebEngineCallback(host, tab, tabsModel, adblockModel, settingsModel, viewModel))
+        } else {
+            host.changeTab(tab)
+        }
         return webView
     }
 

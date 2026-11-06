@@ -75,6 +75,24 @@ class AdsSettingsView(
             add(
                 SettingsItem.Toggle(
                     iconRes = R.drawable.ic_settings_block_24dp,
+                    titleRes = R.string.settings_block_cross_site_popups,
+                    summaryRes = R.string.settings_block_cross_site_popups_summary,
+                    isChecked = { deps.settings.blockCrossSitePopups },
+                    onCheckedChange = { deps.settings.blockCrossSitePopups = it },
+                ),
+            )
+            add(
+                SettingsItem.Toggle(
+                    iconRes = R.drawable.ic_settings_link_24dp,
+                    titleRes = R.string.settings_open_popups_in_background,
+                    summaryRes = R.string.settings_open_popups_in_background_summary,
+                    isChecked = { deps.settings.openPopupsInBackground },
+                    onCheckedChange = { deps.settings.openPopupsInBackground = it },
+                ),
+            )
+            add(
+                SettingsItem.Toggle(
+                    iconRes = R.drawable.ic_settings_block_24dp,
                     titleRes = R.string.settings_accept_third_party_cookies,
                     summaryRes = R.string.settings_accept_third_party_cookies_summary,
                     isChecked = { deps.settings.acceptThirdPartyCookies },

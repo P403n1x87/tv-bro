@@ -77,6 +77,26 @@ interface WebEngineWindowProviderCallback {
         userGesture: Boolean,
     ): Boolean
 
+    /**
+     * Like [shouldBlockNewWindow], but with the popup's target url so policies that need to compare
+     * sites (cross-site popup blocking) can take part. Engines that do not know the url yet keep the
+     * legacy decision.
+     */
+    fun shouldBlockPopupRequest(
+        url: String,
+        dialog: Boolean,
+        userGesture: Boolean,
+    ): Boolean = shouldBlockNewWindow(dialog, userGesture)
+
+    /** Whether an allowed popup should be created without switching to it. */
+    fun shouldOpenPopupsInBackground(): Boolean = false
+
+    /**
+     * Opens [url] as a popup tab. The default keeps the plain new-tab path; the app callback adds
+     * the popup opener and the background-focus setting.
+     */
+    fun onOpenPopupRequested(url: String): WebEngine? = onOpenInNewTabRequested(url, NewTabLoad.Deferred)
+
     fun onBlockedAd(uri: String)
 
     fun onBlockedDialog(newTab: Boolean)

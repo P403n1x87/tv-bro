@@ -611,7 +611,7 @@ class MyPromptDelegate(
         prompt: GeckoSession.PromptDelegate.PopupPrompt,
     ): GeckoResult<GeckoSession.PromptDelegate.PromptResponse>? {
         if (webEngine.callback?.shouldBlockNewWindow(dialog = false, userGesture = false) == true) {
-            webEngine.callback?.onBlockedDialog(newTab = true)
+            webEngine.callback?.onBlockedDialog(newTab = false)
             return GeckoResult.fromValue(prompt.dismiss())
         }
         return GeckoResult.fromValue(prompt.confirm(AllowOrDeny.ALLOW))

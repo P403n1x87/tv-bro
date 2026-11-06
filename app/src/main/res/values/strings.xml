@@ -261,6 +261,10 @@
     <string name="settings_update_ad_block_list">Update ad-blocker list</string>
     <string name="settings_block_redirects">Block automatic redirects</string>
     <string name="settings_block_redirects_summary">Stop pages from redirecting you to another site</string>
+    <string name="settings_block_cross_site_popups">Block cross-site popups</string>
+    <string name="settings_block_cross_site_popups_summary">Stop links from opening a new tab on another site</string>
+    <string name="settings_open_popups_in_background">Open popups in the background</string>
+    <string name="settings_open_popups_in_background_summary">Keep the current page focused when a site opens a new tab</string>
     <string name="settings_block_ads">Block ads</string>
     <string name="settings_block_ads_summary">Use the ad-blocker list below</string>
 
