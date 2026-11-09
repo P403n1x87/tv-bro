@@ -63,6 +63,11 @@ data class WebTabState(
     @Ignore
     var lastLoadingUrl: String? = null
 
+    // Set on a popup tab until its first network navigation: the cross-site popup guard compares
+    // that target with the page that opened the popup, then clears it.
+    @Ignore
+    var popupOpenerUrl: String? = null
+
     // this is last url appeared in WebViewClient.shouldOverrideUrlLoading callback
     @Ignore
     var blockedAds = 0

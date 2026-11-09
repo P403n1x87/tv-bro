@@ -184,6 +184,10 @@ class GeckoWebEngine(
     private var webView: GeckoViewWithVirtualCursor? = null
     var session: GeckoSession
     var callback: WebEngineWindowProviderCallback? = null
+
+    /** Last popup target's user-gesture flag, captured from [MyNavigationDelegate.onLoadRequest] for `TARGET_WINDOW_NEW`. */
+    var lastPopupUserGesture: Boolean = false
+        internal set
     val navigationDelegate = MyNavigationDelegate(this)
     val progressDelegate = MyProgressDelegate(this)
     val promptDelegate = MyPromptDelegate(this)

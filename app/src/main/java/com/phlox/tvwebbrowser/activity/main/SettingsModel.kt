@@ -127,6 +127,20 @@ class SettingsModel(
             config.playbackConfig.acceptThirdPartyCookies = value
         }
 
+    /** Blocks popups whose target leaves the opener's registrable domain. */
+    var blockCrossSitePopups: Boolean
+        get() = config.blockCrossSitePopups
+        set(value) {
+            config.blockCrossSitePopups = value
+        }
+
+    /** Keeps the current page focused when a site opens a popup tab. */
+    var openPopupsInBackground: Boolean
+        get() = config.openPopupsInBackground
+        set(value) {
+            config.openPopupsInBackground = value
+        }
+
     // Controls
     var disableMotionAxesDpadNavigation: Boolean
         get() = config.cursorConfig.disableMotionAxesDpadNavigation

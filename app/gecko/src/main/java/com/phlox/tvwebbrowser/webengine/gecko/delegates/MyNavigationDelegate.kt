@@ -1,7 +1,6 @@
 package com.phlox.tvwebbrowser.webengine.gecko.delegates
 
 import android.util.Log
-import com.phlox.tvwebbrowser.webengine.NewTabLoad
 import com.phlox.tvwebbrowser.webengine.gecko.GeckoWebEngine
 import kotlinx.coroutines.runBlocking
 import org.mozilla.geckoview.AllowOrDeny
@@ -71,6 +70,11 @@ class MyNavigationDelegate(
         val isAutomaticRedirect =
             request.target == GeckoSession.NavigationDelegate.TARGET_WINDOW_CURRENT &&
                 (!request.hasUserGesture || request.isRedirect)
+        if (request.target == GeckoSession.NavigationDelegate.TARGET_WINDOW_NEW) {
+            // Remember the gesture so onNewSession can honour popup levels 1–3 instead of
+            // treating every window.open as blocked.
+            webEngine.lastPopupUserGesture = request.hasUserGesture
+        }
         if (callback.shouldOverrideUrlLoading(request.uri, isAutomaticRedirect)) {
             return GeckoResult.deny()
         }
@@ -103,11 +107,13 @@ class MyNavigationDelegate(
     ): GeckoResult<GeckoSession>? {
         Log.d(TAG, "onNewSession: $uri")
         val callback = webEngine.callback ?: return null
-        if (webEngine.callback?.shouldBlockNewWindow(dialog = false, userGesture = false) == true) {
-            callback.onBlockedDialog(newTab = true)
+        val userGesture = webEngine.lastPopupUserGesture
+        webEngine.lastPopupUserGesture = false
+        if (callback.shouldBlockPopupRequest(uri, dialog = false, userGesture = userGesture) == true) {
+            callback.onBlockedDialog(newTab = false)
             return null
         }
-        val engine = webEngine.callback?.onOpenInNewTabRequested(uri, NewTabLoad.Deferred)
+        val engine = webEngine.callback?.onOpenPopupRequested(uri)
         return if (engine == null) {
             null
         } else {

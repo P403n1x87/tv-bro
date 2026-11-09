@@ -88,6 +88,7 @@ open class WebViewEx(
         const val INTERNAL_SCHEME_WARNING_DOMAIN = "warning"
         const val INTERNAL_SCHEME_WARNING_DOMAIN_TYPE_CERT = "certificate"
         const val OVERLAY_ZAPPER_ASSET = "overlay_zapper.js"
+        const val POPUP_GUARD_ASSET = "popup_guard.js"
         const val MAX_DETECTED_MEDIA = 30
 
         // coming back from an external player sooner than this means it likely failed
@@ -107,6 +108,9 @@ open class WebViewEx(
     private var overlayZapperHandler: ScriptHandler? = null
     private var overlayZapperScript: String? = null
     private var overlayZapperFallback = false
+    private var popupGuardHandler: ScriptHandler? = null
+    private var popupGuardScript: String? = null
+    private var popupGuardFallback = false
     private var internalWebChromeClient: WebChromeClient
     private var fullscreenViewCallback: WebChromeClient.CustomViewCallback? = null
     private var pickFileCallback: ValueCallback<Array<Uri>>? = null
@@ -947,6 +951,7 @@ open class WebViewEx(
             settings.safeBrowsingEnabled = adblockEnabled
         }
         updateOverlayZapper(adblockEnabled)
+        updatePopupGuard(adblockEnabled)
     }
 
     /**
@@ -986,6 +991,40 @@ open class WebViewEx(
         } catch (e: Exception) {
             Log.w(TAG, "failed to register overlay zapper", e)
             overlayZapperFallback = true
+        }
+    }
+
+    /**
+     * Registers (or removes) the popup guard as a document-start script running in every frame.
+     * It short-circuits gestureless or trap-driven window.open before any page script can act,
+     * complementing the engine-level popup policy. A no-op if the WebView provider is too old.
+     */
+    private fun updatePopupGuard(enabled: Boolean) {
+        if (!enabled) {
+            popupGuardHandler?.remove()
+            popupGuardHandler = null
+            popupGuardFallback = false
+            return
+        }
+        if (popupGuardHandler != null || popupGuardFallback) return
+        val script =
+            popupGuardScript ?: try {
+                context.assets
+                    .open(POPUP_GUARD_ASSET)
+                    .bufferedReader()
+                    .use { it.readText() }
+            } catch (e: Exception) {
+                Log.w(TAG, "popup guard asset not available", e)
+                return
+            }.also { popupGuardScript = it }
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            Log.d(TAG, "popup guard: no document-start API, skipping")
+            return
+        }
+        try {
+            popupGuardHandler = WebViewCompat.addDocumentStartJavaScript(this, script, setOf("*"))
+        } catch (e: Exception) {
+            Log.w(TAG, "failed to register popup guard", e)
         }
     }
 

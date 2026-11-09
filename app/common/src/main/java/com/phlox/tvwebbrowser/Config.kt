@@ -48,6 +48,8 @@ class Config(
         const val HOME_PAGE_MODE = "home_page_mode"
         const val WEB_ENGINE = "web_engine"
         const val BLOCK_AUTOMATIC_REDIRECTS_KEY = "block_automatic_redirects"
+        const val BLOCK_CROSS_SITE_POPUPS_KEY = "block_cross_site_popups"
+        const val OPEN_POPUPS_IN_BACKGROUND_KEY = "open_popups_in_background"
         const val HIDE_TOOLBAR_WHEN_BROWSING_KEY = "hide_toolbar_when_browsing"
 
         @Deprecated("Use HIDE_TOOLBAR_WHEN_BROWSING_KEY")
@@ -188,6 +190,20 @@ class Config(
         get() = prefs.getBoolean(BLOCK_AUTOMATIC_REDIRECTS_KEY, true)
         set(value) {
             prefs.edit().putBoolean(BLOCK_AUTOMATIC_REDIRECTS_KEY, value).apply()
+        }
+
+    /** Blocks popups that leave the opener's registrable domain, even after a user gesture. */
+    var blockCrossSitePopups: Boolean
+        get() = prefs.getBoolean(BLOCK_CROSS_SITE_POPUPS_KEY, false)
+        set(value) {
+            prefs.edit().putBoolean(BLOCK_CROSS_SITE_POPUPS_KEY, value).apply()
+        }
+
+    /** Creates popup tabs without switching to them, so the current page keeps focus. */
+    var openPopupsInBackground: Boolean
+        get() = prefs.getBoolean(OPEN_POPUPS_IN_BACKGROUND_KEY, false)
+        set(value) {
+            prefs.edit().putBoolean(OPEN_POPUPS_IN_BACKGROUND_KEY, value).apply()
         }
 
     var hideToolbarWhenBrowsing: Boolean

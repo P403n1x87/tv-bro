@@ -28,6 +28,8 @@ interface WebEngineCallbackHost {
         url: String,
         index: Int,
         load: NewTabLoad,
+        focus: Boolean = true,
+        popupOpenerUrl: String? = null,
     ): WebEngine?
 
     // -- page lifecycle repainting -----------------------------------------------------------

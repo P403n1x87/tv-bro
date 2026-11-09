@@ -80,4 +80,54 @@ class PopupPolicyTest {
         }
         assertEquals(HostConfig.POPUP_BLOCK_NEW_AUTO_OPENED_TABS, level)
     }
+
+    // --- cross-site popup guard -----------------------------------------------------------
+
+    @Test
+    fun crossSiteGuardDisabledNeverBlocks() {
+        // Same site and cross-site alike: when the setting is off nothing is blocked.
+        assertFalse(
+            PopupPolicy.shouldBlockCrossSitePopup("https://example.com/page", "https://ads.network/x", enabled = false),
+        )
+        assertFalse(
+            PopupPolicy.shouldBlockCrossSitePopup("https://example.com/page", "https://example.com/other", enabled = false),
+        )
+    }
+
+    @Test
+    fun crossSiteGuardBlocksCrossSitePopup() {
+        assertTrue(
+            PopupPolicy.shouldBlockCrossSitePopup("https://example.com/page", "https://ads.network/x", enabled = true),
+        )
+        assertTrue(
+            PopupPolicy.shouldBlockCrossSitePopup("https://example.com/page", "http://other.org/y", enabled = true),
+        )
+        // Subdomains collapse to the same registrable domain -> not cross-site.
+        assertFalse(
+            PopupPolicy.shouldBlockCrossSitePopup("https://example.com/page", "https://www.example.com/other", enabled = true),
+        )
+    }
+
+    @Test
+    fun crossSiteGuardAllowsSameSite() {
+        assertFalse(
+            PopupPolicy.shouldBlockCrossSitePopup("https://example.com/page", "https://example.com/other", enabled = true),
+        )
+        assertFalse(
+            PopupPolicy.shouldBlockCrossSitePopup("https://shop.example.co.uk/x", "https://www.example.co.uk/y", enabled = true),
+        )
+    }
+
+    @Test
+    fun crossSiteGuardIgnoresUnknownHosts() {
+        // about:blank / data: / custom schemes have no registrable domain -> never cross-site.
+        assertFalse(
+            PopupPolicy.shouldBlockCrossSitePopup("about:blank", "https://ads.network/x", enabled = true),
+        )
+        assertFalse(
+            PopupPolicy.shouldBlockCrossSitePopup("https://example.com/page", "data:text/html,<b>x</b>", enabled = true),
+        )
+        assertFalse(PopupPolicy.shouldBlockCrossSitePopup(null, "https://ads.network/x", enabled = true))
+        assertFalse(PopupPolicy.shouldBlockCrossSitePopup("https://example.com/page", null, enabled = true))
+    }
 }
