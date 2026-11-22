@@ -122,16 +122,17 @@ class MainScreenSmokeTest {
         // HTML with magnet links as plain text (not wrapped in <a> tags), served via local asset server
         // First launch the app to start the local asset server, then load the test page
         launch()
-        // Wait for home page to load (starts local asset server)
-        awaitPageContent { /* home page already loading */ }
+        // Wait for home page to load (starts local asset server) - check URL box for home page
+        device.wait(Until.findObject(By.res(URL_BOX).textContains("127.0.0.1")), LOAD_TIMEOUT_MS)
+            ?: error("URL box never showed local asset server URL for home page")
 
         // Now load the test page with magnet links
         val url = "http://127.0.0.1:46321/appcontent/home/test_magnet.html"
         openUrl(url)
 
         // Wait for URL box to show the local URL (page load started)
-        device.wait(Until.findObject(By.res(URL_BOX).textContains("127.0.0.1")), LOAD_TIMEOUT_MS)
-            ?: error("URL box never showed local asset server URL")
+        device.wait(Until.findObject(By.res(URL_BOX).textContains("test_magnet")), LOAD_TIMEOUT_MS)
+            ?: error("URL box never showed test magnet page URL")
 
         // Wait for page content to render and JavaScript to process magnet links
         // The magnet links get converted to <a> elements; search for partial text
