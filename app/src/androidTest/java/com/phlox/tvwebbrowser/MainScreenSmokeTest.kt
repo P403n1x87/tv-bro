@@ -119,21 +119,14 @@ class MainScreenSmokeTest {
 
     @Test
     fun magnetLinksInPlainTextBecomeClickable() {
-        // HTML with magnet links as plain text (not wrapped in <a> tags)
-        val html =
-            """
-            <html><body>
-                <p>Here is a magnet link: magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12</p>
-                <p>Another one: magnet:?xt=urn:btih:ABCDEF1234567890ABCDEF1234567890ABCDEF12&dn=test</p>
-            </body></html>
-            """.trimIndent()
-        val url = "data:text/html," + Uri.encode(html)
+        // HTML with magnet links as plain text (not wrapped in <a> tags), served via local asset server
+        val url = "http://127.0.0.1:46321/appcontent/home/test_magnet.html"
 
         openUrl(url)
 
-        // Wait for URL box to show the data: URL (page load started)
-        device.wait(Until.findObject(By.res(URL_BOX).textContains("data:")), LOAD_TIMEOUT_MS)
-            ?: error("URL box never showed data: URL")
+        // Wait for URL box to show the local URL (page load started)
+        device.wait(Until.findObject(By.res(URL_BOX).textContains("127.0.0.1")), LOAD_TIMEOUT_MS)
+            ?: error("URL box never showed local asset server URL")
 
         // Wait for page content to render and JavaScript to process magnet links
         // The magnet links get converted to <a> elements; search for partial text
