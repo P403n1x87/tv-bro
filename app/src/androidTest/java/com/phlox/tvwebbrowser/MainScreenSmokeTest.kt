@@ -120,8 +120,13 @@ class MainScreenSmokeTest {
     @Test
     fun magnetLinksInPlainTextBecomeClickable() {
         // HTML with magnet links as plain text (not wrapped in <a> tags), served via local asset server
-        val url = "http://127.0.0.1:46321/appcontent/home/test_magnet.html"
+        // First launch the app to start the local asset server, then load the test page
+        launch()
+        // Wait for home page to load (starts local asset server)
+        awaitPageContent { /* home page already loading */ }
 
+        // Now load the test page with magnet links
+        val url = "http://127.0.0.1:46321/appcontent/home/test_magnet.html"
         openUrl(url)
 
         // Wait for URL box to show the local URL (page load started)
