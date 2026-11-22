@@ -149,6 +149,14 @@ android {
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
+            // Retry flaky tests once (e.g. network issues fetching Maven artifacts during test init)
+            all {
+                testLogging.exceptionFormat = org.gradle.api.tasks.testing.TestExceptionFormat.FULL
+            }
+            retry {
+                maxRetries = 1
+                maxFailures = 5
+            }
         }
     }
 }
