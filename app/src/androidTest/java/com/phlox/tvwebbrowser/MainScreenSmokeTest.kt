@@ -117,6 +117,32 @@ class MainScreenSmokeTest {
         check(device.wait(Until.gone(By.res(BOOKMARKS_PANEL)), 15_000)) { "bookmarks panel did not close on back" }
     }
 
+    @Test
+    fun magnetLinksInPlainTextBecomeClickable() {
+        // HTML with magnet links as plain text (not wrapped in <a> tags)
+        val html = """
+            <html><body>
+                <p>Here is a magnet link: magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12</p>
+                <p>Another one: magnet:?xt=urn:btih:ABCDEF1234567890ABCDEF1234567890ABCDEF12&dn=test</p>
+            </body></html>
+        """.trimIndent()
+        val url = "data:text/html," + Uri.encode(html)
+        
+        openUrl(url)
+        
+        // Wait for page to load and JavaScript to process magnet links
+        Thread.sleep(2000)
+        
+        // Verify magnet links are now clickable (they should appear in accessibility tree as links)
+        val magnetLink1 = device.wait(Until.hasObject(By.textContains("magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12")), 10_000)
+        val magnetLink2 = device.wait(Until.hasObject(By.textContains("magnet:?xt=urn:btih:ABCDEF1234567890ABCDEF1234567890ABCDEF12")), 10_000)
+        
+        if (!magnetLink1 || !magnetLink2) {
+            logHierarchy("magnet links not found in accessibility tree")
+            error("magnet links in plain text were not converted to clickable links")
+        }
+    }
+
     private fun awaitUrl(
         text: String,
         message: String,
