@@ -120,12 +120,13 @@ class MainScreenSmokeTest {
     @Test
     fun magnetLinksInPlainTextBecomeClickable() {
         // HTML with magnet links as plain text (not wrapped in <a> tags)
-        val html = """
+        val html =
+            """
             <html><body>
                 <p>Here is a magnet link: magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12</p>
                 <p>Another one: magnet:?xt=urn:btih:ABCDEF1234567890ABCDEF1234567890ABCDEF12&dn=test</p>
             </body></html>
-        """.trimIndent()
+            """.trimIndent()
         val url = "data:text/html," + Uri.encode(html)
 
         openUrl(url)
@@ -136,8 +137,16 @@ class MainScreenSmokeTest {
 
         // Wait for page content to render and JavaScript to process magnet links
         // The magnet links get converted to <a> elements; search for partial text
-        val magnetLink1 = device.wait(Until.hasObject(By.textContains("magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12")), 20_000)
-        val magnetLink2 = device.wait(Until.hasObject(By.textContains("magnet:?xt=urn:btih:ABCDEF1234567890ABCDEF1234567890ABCDEF12")), 20_000)
+        val magnetLink1 =
+            device.wait(
+                Until.hasObject(By.textContains("magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12")),
+                20_000,
+            )
+        val magnetLink2 =
+            device.wait(
+                Until.hasObject(By.textContains("magnet:?xt=urn:btih:ABCDEF1234567890ABCDEF1234567890ABCDEF12")),
+                20_000,
+            )
 
         if (!magnetLink1 || !magnetLink2) {
             logHierarchy("magnet links not found in accessibility tree")
